@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply antialiased;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* === Animated Background Gradients (Spec 2.5) === */
+
+.bg-animated-light {
+  background: linear-gradient(
+    135deg,
+    #FFF8F0 0%,
+    #FFF0E6 25%,
+    #FFF8F0 50%,
+    #F0F0FF 75%,
+    #FFF8F0 100%
+  );
+  background-size: 400% 400%;
+  animation: gradient-shift-light 45s ease infinite;
+}
+
+.bg-animated-dark {
+  background: linear-gradient(
+    135deg,
+    #0F0E17 0%,
+    #1A1028 25%,
+    #0F0E17 50%,
+    #0D1B2A 75%,
+    #0F0E17 100%
+  );
+  background-size: 400% 400%;
+  animation: gradient-shift-dark 45s ease infinite;
+}
+
+@keyframes gradient-shift-light {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 100% 50%; }
+  50% { background-position: 100% 0%; }
+  75% { background-position: 0% 100%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes gradient-shift-dark {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 50% 100%; }
+  50% { background-position: 100% 50%; }
+  75% { background-position: 50% 0%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* === Organic Blob Shapes === */
+
+.blob-shape {
+  border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+}
+
+.blob-shape-alt {
+  border-radius: 40% 60% 70% 30% / 30% 70% 40% 60%;
+}
+
+/* === Membrane breathing animation === */
+
+@keyframes membrane-breathe {
+  0%, 100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+  33% {
+    border-radius: 40% 60% 70% 30% / 40% 60% 30% 70%;
+  }
+  66% {
+    border-radius: 50% 50% 40% 60% / 55% 45% 55% 45%;
+  }
+}
+
+.membrane-breathe {
+  animation: membrane-breathe 8s ease-in-out infinite;
+}
+
+/* === Pulse glow for active bubbles === */
+
+@keyframes pulse-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px currentColor); }
+  50% { filter: drop-shadow(0 0 12px currentColor); }
+}
+
+.pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* === Scrollbar styling === */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
