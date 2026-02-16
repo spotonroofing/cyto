@@ -59,7 +59,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
           delay: idle.phase,
         },
       }}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: 'pointer', pointerEvents: 'auto' }}
       onClick={() => onTap(milestoneId)}
       role="button"
       tabIndex={0}

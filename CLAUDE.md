@@ -154,14 +154,13 @@ npm run typecheck  # TypeScript checking
 
 ## Visual Implementation Notes
 
-- **Milestones use radial gradients** — solid color at center, transparent at edges. This creates the organic "membrane" look. No SVG goo filter is used (it was removed because it doesn't work with multi-colored elements).
-- **Progress is shown by core circle size** — the inner solid blob scales from 0.5× to 0.85× of the milestone radius based on completion percentage. No circular ring indicator.
-- **Connections use gradient SVG paths** — thick bezier curves with `linearGradient` strokes that transition between source and target milestone colors. Three layers: outer glow (widest, most transparent), main path, inner bright core.
-- **Energy pulses** animate along active connection paths.
-- **Labels are rendered in a separate overlay group** so they stay sharp and aren't affected by any visual effects on the connection/milestone layer.
-- **Mobile panning uses native event listeners** with `{ passive: false }` — React synthetic events don't support this, which is required for `preventDefault()` to work on mobile touch.
-- **Buttons don't bob/float** — they're static positioned with tap animations only.
-- **Background particles** are small canvas-rendered ellipses (radius 1.5-5.5px, opacity 0.03-0.07, count 40 mobile / 70 desktop).
+- **Panning uses plain `<g transform>`, NOT Framer Motion `motion.g`.** Framer Motion's animate/transition system fights with manual transform updates and breaks pan/drag. The transform string is set directly from React state on every mouse/touch move.
+- **Mouse and touch handlers use native `addEventListener`** with `{ passive: false }`. React synthetic events don't support passive:false (needed for preventDefault on mobile). Mouse listeners for move/up are on `window` so dragging works when cursor leaves the container.
+- **The SVG element has `pointerEvents: 'none'`** so mouse events pass through to the container div. Interactive elements inside (Bubble click targets) have `pointerEvents: 'auto'`.
+- **Milestone connections use the Hiroyuki Sato metaball algorithm** (from Paper.js / varun.ca/metaballs). This generates filled SVG path geometry that forms organic membrane shapes between circles — real goo, not filter hacks or stroked lines. The path is filled with a linearGradient that transitions between source and target milestone colors.
+- **Milestone circles have an `feTurbulence` + `feDisplacementMap` filter** that makes their edges wobble organically like cell membranes. The turbulence seed is animated via SMIL to slowly shift the pattern.
+- **Labels render in a separate unfiltered group** above the wobbled milestone circles so text stays sharp.
+- **Do NOT use Framer Motion for the pan/zoom transform group.** This has caused panning bugs across multiple iterations.
 
 ## After Every Change
 Always run: npm run typecheck && npm run build

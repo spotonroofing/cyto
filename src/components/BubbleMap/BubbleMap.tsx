@@ -1,5 +1,4 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { useBubbleLayout } from './useBubbleLayout'
 import { Bubble } from './Bubble'
 import { ConnectionLines } from './ConnectionLines'
@@ -26,13 +25,10 @@ export function BubbleMap() {
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
   const hasPannedRef = useRef(false)
 
-  // Active pan tracking (disables spring animation during drag)
-  const [isUserPanning, setIsUserPanning] = useState(false)
-
   // Auto-zoom tracking
   const hasAutoZoomedRef = useRef(false)
 
-  // Refs for native touch event handlers (can't read React state in closure)
+  // Refs for native event handlers (can't read React state in closure)
   const transformRef = useRef(transform)
   const bubblesRef = useRef<ReturnType<typeof useBubbleLayout>['bubbles']>([])
 
@@ -78,35 +74,49 @@ export function BubbleMap() {
     })
   }, [settled, bubbles, dimensions, getCurrentMilestone])
 
-  // Pan handlers (mouse)
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return
-    isPanningRef.current = true
-    setIsUserPanning(true)
-    lastPanRef.current = { x: e.clientX, y: e.clientY }
-  }, [])
+  // Native mouse handlers (bypass SVG pointer-events issues)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isPanningRef.current) return
-    const dx = e.clientX - lastPanRef.current.x
-    const dy = e.clientY - lastPanRef.current.y
-    lastPanRef.current = { x: e.clientX, y: e.clientY }
-    setTransform((t) => ({ ...t, x: t.x + dx, y: t.y + dy }))
-  }, [])
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return
+      isPanningRef.current = true
+      lastPanRef.current = { x: e.clientX, y: e.clientY }
+    }
 
-  const handleMouseUp = useCallback(() => {
-    isPanningRef.current = false
-    setIsUserPanning(false)
-  }, [])
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isPanningRef.current) return
+      const dx = e.clientX - lastPanRef.current.x
+      const dy = e.clientY - lastPanRef.current.y
+      lastPanRef.current = { x: e.clientX, y: e.clientY }
+      setTransform((t) => ({ ...t, x: t.x + dx, y: t.y + dy }))
+    }
 
-  // Zoom handler (wheel)
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    const delta = e.deltaY > 0 ? 0.95 : 1.05
-    setTransform((t) => ({
-      ...t,
-      scale: Math.max(0.3, Math.min(3, t.scale * delta)),
-    }))
+    const onMouseUp = () => {
+      isPanningRef.current = false
+    }
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const delta = e.deltaY > 0 ? 0.95 : 1.05
+      setTransform((t) => ({
+        ...t,
+        scale: Math.max(0.3, Math.min(3, t.scale * delta)),
+      }))
+    }
+
+    el.addEventListener('mousedown', onMouseDown)
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    el.addEventListener('wheel', onWheel, { passive: false })
+
+    return () => {
+      el.removeEventListener('mousedown', onMouseDown)
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      el.removeEventListener('wheel', onWheel)
+    }
   }, [])
 
   // Native touch handlers (passive: false required for preventDefault on mobile)
@@ -118,7 +128,6 @@ export function BubbleMap() {
       if (e.touches.length === 1) {
         const touch = e.touches[0]!
         isPanningRef.current = true
-        setIsUserPanning(true)
         hasPannedRef.current = false
         lastPanRef.current = { x: touch.clientX, y: touch.clientY }
         touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() }
@@ -170,7 +179,6 @@ export function BubbleMap() {
 
     const onTouchEnd = (e: TouchEvent) => {
       isPanningRef.current = false
-      setIsUserPanning(false)
       lastPinchDistRef.current = 0
 
       if (touchStartRef.current && !hasPannedRef.current) {
@@ -244,11 +252,6 @@ export function BubbleMap() {
       ref={containerRef}
       className="w-full h-screen overflow-hidden relative"
       style={{ touchAction: 'none' }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onWheel={handleWheel}
     >
       {/* Microscope background particles */}
       <BackgroundParticles />
@@ -257,17 +260,33 @@ export function BubbleMap() {
         width={dimensions.width}
         height={dimensions.height}
         className="absolute inset-0"
-        style={{ zIndex: 1 }}
+        style={{ zIndex: 1, pointerEvents: 'none' }}
       >
         <defs>
-          {/* Radial gradients for each milestone — solid center fading to transparent edge */}
-          {bubbles.map((bubble) => (
-            <radialGradient key={`mg-${bubble.milestoneId}`} id={`milestone-grad-${bubble.milestoneId}`}>
-              <stop offset="0%" stopColor={getPhaseColor(bubble.phaseIndex, isDark)} stopOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.4 : 0.75} />
-              <stop offset="55%" stopColor={getPhaseColor(bubble.phaseIndex, isDark)} stopOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.25 : 0.5} />
-              <stop offset="100%" stopColor={getPhaseColor(bubble.phaseIndex, isDark)} stopOpacity={0.0} />
-            </radialGradient>
-          ))}
+          {/* Organic wobble filter — makes circles look like cell membranes */}
+          <filter id="organic-wobble" x="-10%" y="-10%" width="120%" height="120%">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.04"
+              numOctaves={3}
+              seed="2"
+              result="turbulence"
+            >
+              <animate
+                attributeName="seed"
+                values="1;5;3;8;2;7;4;1"
+                dur="12s"
+                repeatCount="indefinite"
+              />
+            </feTurbulence>
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="turbulence"
+              scale="6"
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
 
           {/* Glow filters for overdue milestones */}
           <filter id="glow-orange" x="-50%" y="-50%" width="200%" height="200%">
@@ -290,44 +309,25 @@ export function BubbleMap() {
           </filter>
         </defs>
 
-        <motion.g
-          animate={{
-            x: transform.x,
-            y: transform.y,
-            scale: transform.scale,
-          }}
-          transition={isUserPanning
-            ? { duration: 0 }
-            : { type: 'spring', stiffness: 300, damping: 30 }
-          }
-        >
-          {/* Connection paths (behind milestones) */}
+        <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
+          {/* Connection membranes (behind milestones) */}
           <ConnectionLines links={links} />
 
-          {/* Milestone membrane circles — radial gradient gives soft organic edge */}
-          {bubbles.map((bubble) => (
-            <circle
-              key={`membrane-${bubble.milestoneId}`}
-              cx={bubble.x}
-              cy={bubble.y}
-              r={bubble.radius * 1.3}
-              fill={`url(#milestone-grad-${bubble.milestoneId})`}
-            />
-          ))}
+          {/* Milestone circles — solid fill with organic wobble filter */}
+          <g filter="url(#organic-wobble)">
+            {bubbles.map((bubble) => (
+              <circle
+                key={`cell-${bubble.milestoneId}`}
+                cx={bubble.x}
+                cy={bubble.y}
+                r={bubble.radius}
+                fill={getPhaseColor(bubble.phaseIndex, isDark)}
+                fillOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.25 : 0.6}
+              />
+            ))}
+          </g>
 
-          {/* Milestone core circles — solid inner blob */}
-          {bubbles.map((bubble) => (
-            <circle
-              key={`core-${bubble.milestoneId}`}
-              cx={bubble.x}
-              cy={bubble.y}
-              r={bubble.radius * (0.5 + (bubble.progress / 100) * 0.35)}
-              fill={getPhaseColor(bubble.phaseIndex, isDark)}
-              fillOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.3 : 0.7}
-            />
-          ))}
-
-          {/* Overlay layer — labels, click targets */}
+          {/* Overlay layer — labels and click targets (NOT filtered) */}
           {bubbles.map((bubble) => (
             <Bubble
               key={bubble.milestoneId}
@@ -339,7 +339,7 @@ export function BubbleMap() {
               onTap={handleBubbleTap}
             />
           ))}
-        </motion.g>
+        </g>
       </svg>
 
     </div>

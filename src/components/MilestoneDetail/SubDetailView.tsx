@@ -14,23 +14,11 @@ export function SubDetailView({ title, color, onClose, children }: SubDetailView
 
   return (
     <motion.div
-      initial={{
-        opacity: 0,
-        borderRadius: '50%',
-      }}
-      animate={{
-        opacity: 1,
-        borderRadius: '24px',
-      }}
-      exit={{
-        opacity: 0,
-        borderRadius: '50%',
-      }}
-      transition={{
-        type: 'spring',
-        stiffness: 120,
-        damping: 18,
-      }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      transition={{ duration: 0.2, ease: 'easeInOut' }}
+      style={{ borderRadius: 24 }}
       className={`fixed inset-x-4 top-24 bottom-24 z-50
         md:inset-auto md:top-[15%] md:left-[15%] md:right-[15%] md:bottom-[15%]
         overflow-y-auto overscroll-contain shadow-2xl
