@@ -11,8 +11,39 @@ import { getPhaseColor } from '@/styles/theme'
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
 
+// Animated nucleus component — organic morphing ellipses
+function MorphingNucleus({ bubble, isDark, time }: {
+  bubble: { x: number; y: number; radius: number; phaseIndex: number; milestoneId: string }
+  isDark: boolean
+  time: number
+}) {
+  const color = getPhaseColor(bubble.phaseIndex, isDark)
+  const baseR = bubble.radius * 0.72
+
+  // Organic deformation
+  const breathe = Math.sin(time * 0.5 + bubble.phaseIndex * 0.9) * 2
+  const wobbleX = Math.sin(time * 0.35 + bubble.phaseIndex * 1.2) * 1.5
+  const wobbleY = Math.cos(time * 0.28 + bubble.phaseIndex * 0.7) * 1.5
+  const rx = baseR + breathe + Math.sin(time * 0.4 + bubble.phaseIndex) * 2
+  const ry = baseR - breathe + Math.cos(time * 0.3 + bubble.phaseIndex * 1.5) * 2
+  const rotation = Math.sin(time * 0.15 + bubble.phaseIndex * 0.6) * 8 // degrees
+
+  return (
+    <ellipse
+      cx={bubble.x + wobbleX}
+      cy={bubble.y + wobbleY}
+      rx={Math.max(rx, baseR * 0.8)}
+      ry={Math.max(ry, baseR * 0.8)}
+      fill={color}
+      fillOpacity={0.5}
+      transform={`rotate(${rotation}, ${bubble.x + wobbleX}, ${bubble.y + wobbleY})`}
+    />
+  )
+}
+
 export function BubbleMap() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const blurRef = useRef<SVGFEGaussianBlurElement>(null)
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
 
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 })
@@ -26,6 +57,10 @@ export function BubbleMap() {
 
   const transformRef = useRef(transform)
   const bubblesRef = useRef<ReturnType<typeof useBubbleLayout>['bubbles']>([])
+
+  // Nucleus animation time
+  const [nucleusTime, setNucleusTime] = useState(0)
+  const nucleusAnimRef = useRef<number>(0)
 
   const selectMilestone = useUIStore((s) => s.selectMilestone)
   const getCurrentMilestone = useRoadmapStore((s) => s.getCurrentMilestone)
@@ -48,6 +83,27 @@ export function BubbleMap() {
 
   useEffect(() => { transformRef.current = transform }, [transform])
   useEffect(() => { bubblesRef.current = bubbles }, [bubbles])
+
+  // Update goo filter stdDeviation when zoom changes
+  useEffect(() => {
+    if (blurRef.current) {
+      // Scale blur with zoom so goo merging stays consistent
+      const scaledStd = Math.max(6, 12 * Math.sqrt(transform.scale))
+      blurRef.current.setAttribute('stdDeviation', String(scaledStd))
+    }
+  }, [transform.scale])
+
+  // Nucleus morphing animation loop (lower frequency updates for SVG)
+  useEffect(() => {
+    let time = 0
+    const tick = () => {
+      time += 0.016
+      setNucleusTime(time)
+      nucleusAnimRef.current = requestAnimationFrame(tick)
+    }
+    nucleusAnimRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(nucleusAnimRef.current)
+  }, [])
 
   // Auto-zoom to current milestone
   useEffect(() => {
@@ -217,24 +273,29 @@ export function BubbleMap() {
     >
       <BackgroundParticles />
 
-      {/* Petri dish vignette */}
+      {/* Petri dish vignette — slightly more visible */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           zIndex: 0,
-          background: 'radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.03) 100%)',
+          background: 'radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(0,0,0,0.07) 100%)',
         }}
       />
 
-      {/* Hidden SVG for goo filter definition */}
+      {/* Hidden SVG for goo filter definition — stdDeviation is dynamic */}
       <svg width="0" height="0" style={{ position: 'absolute' }}>
         <defs>
           <filter id="goo-filter" colorInterpolationFilters="sRGB">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
+            <feGaussianBlur
+              ref={blurRef}
+              in="SourceGraphic"
+              stdDeviation="12"
+              result="blur"
+            />
             <feColorMatrix
               in="blur"
               type="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8"
               result="goo"
             />
             <feBlend in="SourceGraphic" in2="goo" />
@@ -242,7 +303,7 @@ export function BubbleMap() {
         </defs>
       </svg>
 
-      {/* Goo canvas — milestone blobs + animated bridge circles with blur+contrast filter */}
+      {/* Goo canvas — milestone blobs + animated tapered connections with goo filter */}
       <GooCanvas
         width={dimensions.width}
         height={dimensions.height}
@@ -251,7 +312,7 @@ export function BubbleMap() {
         transform={transform}
       />
 
-      {/* SVG overlay — labels and click targets ONLY (no filter) */}
+      {/* SVG overlay — morphing nucleus, labels and click targets (no filter) */}
       <svg
         width={dimensions.width}
         height={dimensions.height}
@@ -259,36 +320,15 @@ export function BubbleMap() {
         style={{ zIndex: 2, pointerEvents: 'none' }}
       >
         <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
-          {/* Nucleus circles — denser inner core */}
+          {/* Morphing nucleus circles — organic ellipses that breathe and wobble */}
           {bubbles.map((bubble) => (
-            <circle
+            <MorphingNucleus
               key={`nucleus-${bubble.milestoneId}`}
-              cx={bubble.x}
-              cy={bubble.y}
-              r={bubble.radius * 0.72}
-              fill={getPhaseColor(bubble.phaseIndex, isDark)}
-              fillOpacity={0.5}
+              bubble={bubble}
+              isDark={isDark}
+              time={nucleusTime}
             />
           ))}
-
-          {/* Locked phase indicators — dashed rings */}
-          {bubbles.map((bubble) => {
-            const isLocked = bubble.status === 'blocked' || bubble.status === 'not_started'
-            if (!isLocked) return null
-            return (
-              <circle
-                key={`locked-${bubble.milestoneId}`}
-                cx={bubble.x}
-                cy={bubble.y}
-                r={bubble.radius + 4}
-                fill="none"
-                stroke={getPhaseColor(bubble.phaseIndex, isDark)}
-                strokeWidth={1}
-                strokeOpacity={0.3}
-                strokeDasharray="6 4"
-              />
-            )
-          })}
 
           {/* Labels and click targets */}
           {bubbles.map((bubble) => (
