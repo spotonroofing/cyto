@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useBubbleLayout } from './useBubbleLayout'
 import { Bubble } from './Bubble'
-import { ConnectionLines } from './ConnectionLines'
+import { GooCanvas } from './GooCanvas'
 import { BackgroundParticles } from './BackgroundParticles'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -217,7 +217,7 @@ export function BubbleMap() {
     >
       <BackgroundParticles />
 
-      {/* Petri dish vignette — subtle circular darkening at viewport edges */}
+      {/* Petri dish vignette */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -226,41 +226,55 @@ export function BubbleMap() {
         }}
       />
 
+      {/* Hidden SVG for goo filter definition */}
+      <svg width="0" height="0" style={{ position: 'absolute' }}>
+        <defs>
+          <filter id="goo-filter" colorInterpolationFilters="sRGB">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
+            <feColorMatrix
+              in="blur"
+              type="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"
+              result="goo"
+            />
+            <feBlend in="SourceGraphic" in2="goo" />
+          </filter>
+        </defs>
+      </svg>
+
+      {/* Goo canvas — milestone blobs + animated bridge circles with blur+contrast filter */}
+      <GooCanvas
+        width={dimensions.width}
+        height={dimensions.height}
+        bubbles={bubbles}
+        links={links}
+        transform={transform}
+      />
+
+      {/* SVG overlay — labels and click targets ONLY (no filter) */}
       <svg
         width={dimensions.width}
         height={dimensions.height}
         className="absolute inset-0"
-        style={{ zIndex: 1, pointerEvents: 'none' }}
+        style={{ zIndex: 2, pointerEvents: 'none' }}
       >
-        {/* NO SVG FILTERS — they kill mobile performance */}
-
         <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
-          {/* Metaball connections — renders outer membrane + connector goo */}
-          <ConnectionLines links={links} bubbles={bubbles} />
-
-          {/* Inner core circles — solid, more saturated, breathing */}
+          {/* Locked phase indicators — dashed rings */}
           {bubbles.map((bubble) => {
-            const coreR = bubble.radius * 0.78
-            const breatheMin = coreR - 1.5
-            const breatheMax = coreR + 1.5
-            // Each milestone gets a slightly different duration so they don't sync
-            const dur = 4 + (bubble.phaseIndex * 0.7)
+            const isLocked = bubble.status === 'blocked' || bubble.status === 'not_started'
+            if (!isLocked) return null
             return (
               <circle
-                key={`core-${bubble.milestoneId}`}
+                key={`locked-${bubble.milestoneId}`}
                 cx={bubble.x}
                 cy={bubble.y}
-                r={coreR}
-                fill={getPhaseColor(bubble.phaseIndex, isDark)}
-                fillOpacity={0.55}
-              >
-                <animate
-                  attributeName="r"
-                  values={`${coreR};${breatheMax};${coreR};${breatheMin};${coreR}`}
-                  dur={`${dur}s`}
-                  repeatCount="indefinite"
-                />
-              </circle>
+                r={bubble.radius + 4}
+                fill="none"
+                stroke={getPhaseColor(bubble.phaseIndex, isDark)}
+                strokeWidth={1}
+                strokeOpacity={0.3}
+                strokeDasharray="6 4"
+              />
             )
           })}
 

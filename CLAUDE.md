@@ -152,21 +152,49 @@ npm run typecheck  # TypeScript checking
 
 \- Do not refactor code unless explicitly asked.
 
-## Visual Implementation Notes
+## Visual Architecture
 
-- **ZERO SVG filters.** No feTurbulence, no feDisplacementMap. These kill iPhone GPU.
-- **SMIL `<animate>` on circle `r` attribute only.** This is the one animation on the map. It interpolates a single number per element per frame — negligible cost. Each milestone breathes at a slightly different rate (4-9s) so they don't sync.
+### Goo Rendering (Canvas + SVG Filter)
+The gooey organic effect uses the **blur + alpha contrast** technique:
+1. **GooCanvas** (`<canvas>`) draws milestone circles + animated bridge circles
+2. CSS `filter: url(#goo-filter)` applies the SVG goo filter to the canvas
+3. Filter chain: `feGaussianBlur(stdDeviation=8)` → `feColorMatrix(alpha×20-9)` → `feBlend(SourceGraphic)`
+4. Where circles overlap, their blurred alpha halos merge past the threshold → organic gooey merging
+5. Bridge circles oscillate perpendicular to connection paths → flowing liquid movement
+
+### SVG Overlay (Labels Only)
+A separate SVG sits on top of the canvas (z-index 2). It contains:
+- Click targets (transparent circles)
+- Phase name + number labels
+- Dashed rings for locked phases
+- **NO visual circles** — all visual rendering is on the canvas
+
+### Why Canvas, Not SVG
+SVG filter on a `<g>` group re-rasterizes every frame when child elements animate. Canvas composites all circles into a single raster, then the filter runs once on that raster. ONE filter pass per frame vs N.
+
+### Performance
+- Canvas draws ~60-80 circles per frame (trivial)
+- Bridge count reduced on mobile (6 vs 10 per connection)
+- devicePixelRatio capped at 2
+- feGaussianBlur stdDeviation=8 is moderate (GPU-accelerated separable blur)
+- No feTurbulence, no animated seed, no SMIL on filter params
+
+### Tuning the Goo
+- **Softer goo**: Lower the `20` in feColorMatrix alpha row (e.g., 15) or increase stdDeviation
+- **Sharper goo**: Raise the `20` (e.g., 25) or decrease stdDeviation
+- **Thicker connections**: Increase bridge circle `baseR` or `midR`
+- **More flow**: Increase `amplitude` in bridge circle oscillation
+- **Less flow**: Decrease `amplitude` or `speed`
+
+### Other Notes
 - **Panning uses plain `<g transform>`.** No Framer Motion on the map.
 - **Mouse/touch handlers use native addEventListener** with { passive: false }.
 - **Zoom is cursor/pinch-anchored.**
-- **Milestones have TWO layers:**
-  1. OUTER MEMBRANE: Full-radius circle, low opacity (0.22), gentle r-breathing — rendered by ConnectionLines ON TOP of goo paths
-  2. INNER CORE: 0.78× radius circle, higher opacity (0.55), r-breathing — rendered by BubbleMap
-- **Locked phases** get a dashed stroke ring just outside the membrane (not dimmed).
-- **Goo connectors:** Hiroyuki Sato metaball with v=0.8, handleSize=5.0, d2 clamped minimum 0.5. Draw order: goo paths FIRST, membrane circles ON TOP (covers junction seams at fork points).
-- **Buttons** use radial gradient for cell look (opaque center, soft edge) + membrane-breathe CSS.
+- **Locked phases** get a dashed stroke ring on the SVG overlay (not dimmed).
+- **Buttons** use radial gradient for cell look + membrane-breathe CSS.
 - **Background:** #FFF8F7 base, radial vignette overlay, muted pink-mauve particles.
 - **Color:** cream = #FFF8F7 throughout. No warm peach/orange tones.
+- **ConnectionLines.tsx was deleted** — GooCanvas replaces it entirely.
 
 ## After Every Change
 Always run: npm run typecheck && npm run build
