@@ -15,17 +15,14 @@ export function SubDetailView({ title, color, onClose, children }: SubDetailView
   return (
     <motion.div
       initial={{
-        scale: 0.3,
         opacity: 0,
         borderRadius: '50%',
       }}
       animate={{
-        scale: 1,
         opacity: 1,
         borderRadius: '24px',
       }}
       exit={{
-        scale: 0.3,
         opacity: 0,
         borderRadius: '50%',
       }}

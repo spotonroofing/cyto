@@ -14,15 +14,12 @@ interface SettingsPanelProps {
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const theme = useSettingsStore((s) => s.theme)
   const toggleTheme = useSettingsStore((s) => s.toggleTheme)
-  const anthropicApiKey = useSettingsStore((s) => s.anthropicApiKey)
-  const setAnthropicApiKey = useSettingsStore((s) => s.setAnthropicApiKey)
   const protocolStartDate = useSettingsStore((s) => s.protocolStartDate)
   const setProtocolStartDate = useSettingsStore((s) => s.setProtocolStartDate)
   const healthContext = useSettingsStore((s) => s.healthContext)
   const setHealthContext = useSettingsStore((s) => s.setHealthContext)
   const isDark = theme === 'dark'
 
-  const [showApiKey, setShowApiKey] = useState(false)
   const [editingContext, setEditingContext] = useState(false)
   const [contextDraft, setContextDraft] = useState(healthContext ?? defaultHealthContext)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
@@ -170,32 +167,6 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   : 'bg-black/[0.03] focus:ring-gold/30 text-charcoal'
               }`}
             />
-          </div>
-
-          {/* API Key */}
-          <div className="mb-6">
-            <label className="text-sm font-medium block mb-2">Anthropic API Key</label>
-            <div className="flex gap-2">
-              <input
-                type={showApiKey ? 'text' : 'password'}
-                value={anthropicApiKey}
-                onChange={(e) => setAnthropicApiKey(e.target.value)}
-                placeholder="sk-ant-..."
-                className={`flex-1 px-3 py-2 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 ${
-                  isDark
-                    ? 'bg-white/5 focus:ring-copper/30 placeholder:text-white/20'
-                    : 'bg-black/[0.03] focus:ring-gold/30 placeholder:text-black/20'
-                }`}
-              />
-              <button
-                onClick={() => setShowApiKey(!showApiKey)}
-                className={`px-3 py-2 rounded-xl text-xs ${
-                  isDark ? 'bg-white/5' : 'bg-black/[0.03]'
-                }`}
-              >
-                {showApiKey ? 'Hide' : 'Show'}
-              </button>
-            </div>
           </div>
 
           {/* Health context editor */}

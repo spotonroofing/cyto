@@ -152,3 +152,17 @@ npm run typecheck  # TypeScript checking
 
 \- Do not refactor code unless explicitly asked.
 
+## Visual Implementation Notes
+
+- The goo SVG filter creates organic merging between milestone circles and bridge circles. It works by boosting alpha channel contrast. Elements in the goo group MUST have fillOpacity > 0.39 to survive the filter math (alpha * 18 - 7).
+- Bridge circles connect milestones along bezier curves. Spacing must be ≤ 14px with radius ≥ 8px for visible merging.
+- Labels are rendered OUTSIDE the goo-filtered group so they stay sharp.
+- Milestone labels use "Phase X" + short name format, not full titles.
+- The idle floating animation on Bubble.tsx overlay is cosmetic (±2px drift). The goo group circles are static — this mismatch is acceptable.
+- Mobile panning uses touch-action: none with custom JS handlers. During active pan, transform transitions are instant (duration: 0). Spring animation only applies during auto-zoom.
+- Buttons stack vertically in bottom-right: location, +log, chat. Analytics stays bottom-left. Settings stays top-right.
+- Background particles are canvas-rendered ellipses with membrane outlines to look like microscope cells.
+
+## After Every Change
+Always run: npm run typecheck && npm run build
+Always push: git add -A && git commit -m "description" && git push origin main

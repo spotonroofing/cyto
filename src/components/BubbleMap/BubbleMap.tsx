@@ -3,9 +3,14 @@ import { motion } from 'framer-motion'
 import { useBubbleLayout } from './useBubbleLayout'
 import { Bubble } from './Bubble'
 import { ConnectionLines } from './ConnectionLines'
-import { RecenterButton } from './RecenterButton'
+import { BackgroundParticles } from './BackgroundParticles'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { getPhaseColor } from '@/styles/theme'
+
+const TAP_DISTANCE_THRESHOLD = 10
+const TAP_TIME_THRESHOLD = 300
 
 export function BubbleMap() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -17,8 +22,20 @@ export function BubbleMap() {
   const lastPanRef = useRef({ x: 0, y: 0 })
   const lastPinchDistRef = useRef(0)
 
+  // Touch tap detection
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
+  const hasPannedRef = useRef(false)
+
+  // Active pan tracking (disables spring animation during drag)
+  const [isUserPanning, setIsUserPanning] = useState(false)
+
+  // Auto-zoom tracking
+  const hasAutoZoomedRef = useRef(false)
+
   const selectMilestone = useUIStore((s) => s.selectMilestone)
   const getCurrentMilestone = useRoadmapStore((s) => s.getCurrentMilestone)
+  const theme = useSettingsStore((s) => s.theme)
+  const isDark = theme === 'dark'
 
   // Measure container
   useEffect(() => {
@@ -33,12 +50,31 @@ export function BubbleMap() {
     return () => window.removeEventListener('resize', measure)
   }, [])
 
-  const { bubbles, links } = useBubbleLayout(dimensions.width, dimensions.height)
+  const { bubbles, links, settled } = useBubbleLayout(dimensions.width, dimensions.height)
+
+  // Auto-zoom to current milestone when simulation first settles
+  useEffect(() => {
+    if (!settled || hasAutoZoomedRef.current || bubbles.length === 0) return
+    hasAutoZoomedRef.current = true
+
+    const current = getCurrentMilestone()
+    if (!current) return
+    const bubble = bubbles.find((b) => b.milestoneId === current.id)
+    if (!bubble) return
+
+    const scale = 1.2
+    setTransform({
+      x: dimensions.width / 2 - bubble.x * scale,
+      y: dimensions.height / 2 - bubble.y * scale,
+      scale,
+    })
+  }, [settled, bubbles, dimensions, getCurrentMilestone])
 
   // Pan handlers (mouse)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return
     isPanningRef.current = true
+    setIsUserPanning(true)
     lastPanRef.current = { x: e.clientX, y: e.clientY }
   }, [])
 
@@ -52,6 +88,7 @@ export function BubbleMap() {
 
   const handleMouseUp = useCallback(() => {
     isPanningRef.current = false
+    setIsUserPanning(false)
   }, [])
 
   // Zoom handler (wheel)
@@ -64,12 +101,19 @@ export function BubbleMap() {
     }))
   }, [])
 
-  // Touch handlers (pan + pinch)
+  // Touch handlers — fixed tap vs pan detection
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 1) {
+      const touch = e.touches[0]!
       isPanningRef.current = true
-      lastPanRef.current = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY }
+      setIsUserPanning(true)
+      hasPannedRef.current = false
+      lastPanRef.current = { x: touch.clientX, y: touch.clientY }
+      touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() }
     } else if (e.touches.length === 2) {
+      // Pinch start — cancel any pending tap
+      isPanningRef.current = false
+      touchStartRef.current = null
       const dx = e.touches[0]!.clientX - e.touches[1]!.clientX
       const dy = e.touches[0]!.clientY - e.touches[1]!.clientY
       lastPinchDistRef.current = Math.sqrt(dx * dx + dy * dy)
@@ -78,11 +122,29 @@ export function BubbleMap() {
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 1 && isPanningRef.current) {
-      const dx = e.touches[0]!.clientX - lastPanRef.current.x
-      const dy = e.touches[0]!.clientY - lastPanRef.current.y
-      lastPanRef.current = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY }
+      const touch = e.touches[0]!
+      const dx = touch.clientX - lastPanRef.current.x
+      const dy = touch.clientY - lastPanRef.current.y
+      lastPanRef.current = { x: touch.clientX, y: touch.clientY }
+
+      // Check if we've moved enough to consider it a pan
+      if (touchStartRef.current) {
+        const totalDx = touch.clientX - touchStartRef.current.x
+        const totalDy = touch.clientY - touchStartRef.current.y
+        const totalDist = Math.sqrt(totalDx * totalDx + totalDy * totalDy)
+        if (totalDist > TAP_DISTANCE_THRESHOLD) {
+          hasPannedRef.current = true
+        }
+      }
+
+      // Only prevent default once we're actually panning
+      if (hasPannedRef.current) {
+        e.preventDefault()
+      }
+
       setTransform((t) => ({ ...t, x: t.x + dx, y: t.y + dy }))
     } else if (e.touches.length === 2) {
+      e.preventDefault()
       const dx = e.touches[0]!.clientX - e.touches[1]!.clientX
       const dy = e.touches[0]!.clientY - e.touches[1]!.clientY
       const dist = Math.sqrt(dx * dx + dy * dy)
@@ -97,10 +159,43 @@ export function BubbleMap() {
     }
   }, [])
 
-  const handleTouchEnd = useCallback(() => {
-    isPanningRef.current = false
-    lastPinchDistRef.current = 0
-  }, [])
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      isPanningRef.current = false
+      setIsUserPanning(false)
+      lastPinchDistRef.current = 0
+
+      // Check if this was a tap (short, minimal movement)
+      if (touchStartRef.current && !hasPannedRef.current) {
+        const elapsed = Date.now() - touchStartRef.current.time
+        if (elapsed < TAP_TIME_THRESHOLD) {
+          // Find if a bubble was tapped
+          const touch = touchStartRef.current
+          // Account for container offset before converting to SVG coordinates
+          const rect = containerRef.current?.getBoundingClientRect()
+          const offsetX = rect?.left ?? 0
+          const offsetY = rect?.top ?? 0
+          const svgX = (touch.x - offsetX - transform.x) / transform.scale
+          const svgY = (touch.y - offsetY - transform.y) / transform.scale
+
+          for (const bubble of bubbles) {
+            const dx = svgX - bubble.x
+            const dy = svgY - bubble.y
+            const dist = Math.sqrt(dx * dx + dy * dy)
+            if (dist <= bubble.radius) {
+              e.preventDefault()
+              selectMilestone(bubble.milestoneId)
+              break
+            }
+          }
+        }
+      }
+
+      touchStartRef.current = null
+      hasPannedRef.current = false
+    },
+    [bubbles, transform, selectMilestone],
+  )
 
   // Recenter on current milestone
   const handleRecenter = useCallback(() => {
@@ -108,12 +203,20 @@ export function BubbleMap() {
     if (!current) return
     const bubble = bubbles.find((b) => b.milestoneId === current.id)
     if (!bubble) return
+    const scale = 1.2
     setTransform({
-      x: dimensions.width / 2 - bubble.x,
-      y: dimensions.height / 2 - bubble.y,
-      scale: 1,
+      x: dimensions.width / 2 - bubble.x * scale,
+      y: dimensions.height / 2 - bubble.y * scale,
+      scale,
     })
   }, [bubbles, dimensions, getCurrentMilestone])
+
+  // Listen for recenter events from App-level button
+  useEffect(() => {
+    const handler = () => handleRecenter()
+    window.addEventListener('cyto-recenter', handler)
+    return () => window.removeEventListener('cyto-recenter', handler)
+  }, [handleRecenter])
 
   const handleBubbleTap = useCallback(
     (milestoneId: string) => {
@@ -125,7 +228,8 @@ export function BubbleMap() {
   return (
     <div
       ref={containerRef}
-      className="w-full h-screen overflow-hidden relative touch-none"
+      className="w-full h-screen overflow-hidden relative"
+      style={{ touchAction: 'none' }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -135,13 +239,23 @@ export function BubbleMap() {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
+      {/* Microscope background particles */}
+      <BackgroundParticles />
+
       <svg
         width={dimensions.width}
         height={dimensions.height}
         className="absolute inset-0"
+        style={{ zIndex: 1 }}
       >
-        {/* SVG filters for glow effects */}
+        {/* SVG filters */}
         <defs>
+          {/* Goo filter — merges nearby circles into organic blobs */}
+          <filter id="goo">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="12" colorInterpolationFilters="sRGB" result="blur" />
+            <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
+            <feBlend in="SourceGraphic" in2="goo" />
+          </filter>
           <filter id="glow-orange" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="6" result="blur" />
             <feFlood floodColor="#FF8C00" floodOpacity="0.6" />
@@ -168,12 +282,27 @@ export function BubbleMap() {
             y: transform.y,
             scale: transform.scale,
           }}
-          transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+          transition={isUserPanning
+            ? { duration: 0 }
+            : { type: 'spring', stiffness: 300, damping: 30 }
+          }
         >
-          {/* Connection lines (behind bubbles) */}
-          <ConnectionLines links={links} />
+          {/* Goo layer — milestone circles + bridge connections merge organically */}
+          <g filter="url(#goo)">
+            <ConnectionLines links={links} />
+            {bubbles.map((bubble) => (
+              <circle
+                key={bubble.milestoneId}
+                cx={bubble.x}
+                cy={bubble.y}
+                r={bubble.radius}
+                fill={getPhaseColor(bubble.phaseIndex, isDark)}
+                fillOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.55 : 0.85}
+              />
+            ))}
+          </g>
 
-          {/* Bubbles */}
+          {/* Overlay layer — labels, progress rings, click targets (NOT goo filtered) */}
           {bubbles.map((bubble) => (
             <Bubble
               key={bubble.milestoneId}
@@ -188,8 +317,6 @@ export function BubbleMap() {
         </motion.g>
       </svg>
 
-      {/* Recenter button */}
-      <RecenterButton onRecenter={handleRecenter} />
     </div>
   )
 }

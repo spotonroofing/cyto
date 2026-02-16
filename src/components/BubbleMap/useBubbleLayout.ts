@@ -1,23 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
-import * as d3 from 'd3'
+import { useEffect, useRef, useState } from 'react'
 import { milestones, phases } from '@/stores/roadmapStore'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { milestoneDependencies } from '@/data/dependencies'
-import type { BubblePosition } from '@/types'
-
-interface BubbleNode extends d3.SimulationNodeDatum {
-  id: string
-  milestoneId: string
-  phaseId: string
-  phaseIndex: number
-  radius: number
-  progress: number
-}
-
-interface BubbleLink extends d3.SimulationLinkDatum<BubbleNode> {
-  sourceId: string
-  targetId: string
-}
+import type { MilestoneStatus } from '@/types'
 
 export interface LayoutBubble {
   milestoneId: string
@@ -27,125 +12,128 @@ export interface LayoutBubble {
   y: number
   radius: number
   progress: number
+  status: MilestoneStatus
 }
+
+export interface LayoutLink {
+  source: { x: number; y: number; radius: number; milestoneId: string }
+  target: { x: number; y: number; radius: number; milestoneId: string }
+  sourceStatus: MilestoneStatus
+  targetStatus: MilestoneStatus
+  sourcePhaseIndex: number
+}
+
+// Deterministic layout: each milestone has a fixed horizontal order and branch assignment.
+// order: 0 (far left) to 6 (far right)
+// branch: 'main' = center path, 'upper'/'lower' = fork offset
+const milestoneLayout: Record<string, { order: number; branch: 'main' | 'upper' | 'lower' }> = {
+  'ms-diagnostic-baseline': { order: 0, branch: 'main' },
+  'ms-interpret-results': { order: 1, branch: 'main' },
+  'ms-antibiotic-protocol': { order: 2, branch: 'main' },
+  'ms-rebuild-gut': { order: 3, branch: 'upper' },
+  'ms-confirm-progress': { order: 3.5, branch: 'lower' },
+  'ms-diet-expansion': { order: 4, branch: 'upper' },
+  'ms-expand-strengthen': { order: 5, branch: 'main' },
+  'ms-sustained-recovery': { order: 6, branch: 'main' },
+}
+
+const SPACING = 280
 
 export function useBubbleLayout(width: number, height: number) {
   const [bubbles, setBubbles] = useState<LayoutBubble[]>([])
-  const [links, setLinks] = useState<{ source: BubblePosition; target: BubblePosition }[]>([])
-  const simulationRef = useRef<d3.Simulation<BubbleNode, BubbleLink> | null>(null)
+  const [links, setLinks] = useState<LayoutLink[]>([])
+  const [settled, setSettled] = useState(false)
+  const initialSettleRef = useRef(false)
 
   const getMilestoneProgress = useRoadmapStore((s) => s.getMilestoneProgress)
+  const getMilestoneStatus = useRoadmapStore((s) => s.getMilestoneStatus)
 
-  const buildLayout = useCallback(() => {
+  useEffect(() => {
     if (width === 0 || height === 0) return
 
-    // Build nodes
-    const nodes: BubbleNode[] = milestones.map((ms) => {
+    const paddingX = SPACING * 0.5
+    const centerY = height / 2
+    const waveAmplitude = Math.min(height * 0.08, 60)
+    const branchOffset = Math.min(height * 0.12, 90)
+
+    // Build bubbles with deterministic positions
+    const positionMap = new Map<string, { x: number; y: number; radius: number; phaseIndex: number }>()
+
+    const computedBubbles: LayoutBubble[] = milestones.map((ms) => {
       const phase = phases.find((p) => p.id === ms.phaseId)
       const phaseIndex = phases.indexOf(phase!)
       const progress = getMilestoneProgress(ms.id)
-      // Radius based on number of action items (min 35, max 70)
       const itemCount = ms.actionItemIds.length
       const radius = Math.max(35, Math.min(70, 25 + itemCount * 3))
 
+      const layout = milestoneLayout[ms.id]
+      if (!layout) {
+        positionMap.set(ms.id, { x: 0, y: centerY, radius, phaseIndex })
+        return { milestoneId: ms.id, phaseId: ms.phaseId, phaseIndex, x: 0, y: centerY, radius, progress: progress.percentage, status: getMilestoneStatus(ms.id) }
+      }
+
+      // X: deterministic horizontal position
+      const x = paddingX + layout.order * SPACING
+
+      // Y: sine wave for organic vertical offset + branch split
+      let y = centerY + Math.sin(layout.order * 0.8) * waveAmplitude
+      if (layout.branch === 'upper') y -= branchOffset
+      if (layout.branch === 'lower') y += branchOffset
+
+      positionMap.set(ms.id, { x, y, radius, phaseIndex })
+
       return {
-        id: ms.id,
         milestoneId: ms.id,
         phaseId: ms.phaseId,
         phaseIndex,
+        x,
+        y,
         radius,
         progress: progress.percentage,
-        // Start positions spread by phase
-        x: width / 2 + (phaseIndex - 3.5) * (width / 10),
-        y: height / 2 + (Math.random() - 0.5) * 100,
+        status: getMilestoneStatus(ms.id),
       }
     })
 
-    // Build links from dependencies
-    const linkData: BubbleLink[] = []
+    // Build links from dependency graph
+    const computedLinks: LayoutLink[] = []
     for (const [sourceId, targets] of Object.entries(milestoneDependencies)) {
       for (const targetId of targets) {
-        linkData.push({
-          sourceId,
-          targetId,
-          source: sourceId,
-          target: targetId,
+        const sourcePos = positionMap.get(sourceId)
+        const targetPos = positionMap.get(targetId)
+        if (!sourcePos || !targetPos) continue
+
+        computedLinks.push({
+          source: {
+            x: sourcePos.x,
+            y: sourcePos.y,
+            radius: sourcePos.radius,
+            milestoneId: sourceId,
+          },
+          target: {
+            x: targetPos.x,
+            y: targetPos.y,
+            radius: targetPos.radius,
+            milestoneId: targetId,
+          },
+          sourceStatus: getMilestoneStatus(sourceId),
+          targetStatus: getMilestoneStatus(targetId),
+          sourcePhaseIndex: sourcePos.phaseIndex,
         })
       }
     }
 
-    // Stop existing simulation
-    if (simulationRef.current) {
-      simulationRef.current.stop()
+    setBubbles(computedBubbles)
+    setLinks(computedLinks)
+
+    // Signal settled after entrance animations complete (first time only)
+    if (!initialSettleRef.current) {
+      const timer = window.setTimeout(() => {
+        setSettled(true)
+        initialSettleRef.current = true
+      }, 800)
+      return () => clearTimeout(timer)
     }
+  }, [width, height, getMilestoneProgress, getMilestoneStatus])
 
-    const simulation = d3
-      .forceSimulation<BubbleNode>(nodes)
-      .force(
-        'link',
-        d3
-          .forceLink<BubbleNode, BubbleLink>(linkData)
-          .id((d) => d.id)
-          .distance(150)
-          .strength(0.3),
-      )
-      .force('charge', d3.forceManyBody().strength(-300))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force(
-        'collision',
-        d3.forceCollide<BubbleNode>().radius((d) => d.radius + 15),
-      )
-      // Push nodes along x-axis by phase order (chronological flow)
-      .force(
-        'x',
-        d3
-          .forceX<BubbleNode>()
-          .x((d) => {
-            const xSpread = width * 0.75
-            const xStart = width * 0.125
-            return xStart + (d.phaseIndex / 7) * xSpread
-          })
-          .strength(0.15),
-      )
-      .force('y', d3.forceY(height / 2).strength(0.05))
-      .alphaDecay(0.02)
-
-    simulation.on('tick', () => {
-      const updatedBubbles: LayoutBubble[] = nodes.map((node) => ({
-        milestoneId: node.milestoneId,
-        phaseId: node.phaseId,
-        phaseIndex: node.phaseIndex,
-        x: node.x ?? 0,
-        y: node.y ?? 0,
-        radius: node.radius,
-        progress: node.progress,
-      }))
-
-      const updatedLinks = linkData.map((link) => {
-        const sourceNode = typeof link.source === 'object' ? link.source : nodes.find((n) => n.id === link.source)
-        const targetNode = typeof link.target === 'object' ? link.target : nodes.find((n) => n.id === link.target)
-        return {
-          source: { x: sourceNode?.x ?? 0, y: sourceNode?.y ?? 0, radius: sourceNode?.radius ?? 35 },
-          target: { x: targetNode?.x ?? 0, y: targetNode?.y ?? 0, radius: targetNode?.radius ?? 35 },
-        }
-      })
-
-      setBubbles(updatedBubbles)
-      setLinks(updatedLinks)
-    })
-
-    simulationRef.current = simulation
-
-    // Let simulation settle
-    simulation.alpha(1).restart()
-  }, [width, height, getMilestoneProgress])
-
-  useEffect(() => {
-    buildLayout()
-    return () => {
-      simulationRef.current?.stop()
-    }
-  }, [buildLayout])
-
-  return { bubbles, links }
+  return { bubbles, links, settled }
 }

@@ -37,19 +37,14 @@ export function Bubble({ milestoneId, x, y, radius, progress, onTap }: BubblePro
   })
 
   const idle = idleRef.current
-
-  // Bubble appearance based on status
-  const opacity = status === 'not_started' ? 0.6 : status === 'blocked' ? 0.4 : 1
-  const fillColor = status === 'completed' ? doneColor : color
   const scale = status === 'completed' ? 0.9 : 1
 
   // Progress ring
   const circumference = 2 * Math.PI * (radius + 4)
   const progressOffset = circumference - (progress / 100) * circumference
 
-  // Glow for overdue milestones (Phase 11: Timeline Intelligence)
+  // Glow for overdue milestones
   const glowState = getMilestoneGlowState(milestoneId)
-  const glowFilter = glowState === 'red' ? 'url(#glow-red)' : glowState === 'orange' ? 'url(#glow-orange)' : undefined
 
   return (
     <motion.g
@@ -80,22 +75,31 @@ export function Bubble({ milestoneId, x, y, radius, progress, onTap }: BubblePro
       role="button"
       tabIndex={0}
     >
-      {/* Main bubble */}
+      {/* Transparent click target (the filled circle is in the goo group) */}
       <circle
         cx={0}
         cy={0}
         r={radius}
-        fill={fillColor}
-        fillOpacity={opacity}
-        stroke={fillColor}
-        strokeWidth={2}
-        strokeOpacity={0.5}
-        filter={glowFilter}
+        fill="transparent"
       />
 
-      {/* Progress ring */}
-      {progress > 0 && progress < 100 && (
+      {/* Glow ring for overdue milestones */}
+      {glowState && (
         <circle
+          cx={0}
+          cy={0}
+          r={radius}
+          fill="none"
+          stroke={glowState === 'red' ? '#FF4444' : '#FF8C00'}
+          strokeWidth={4}
+          strokeOpacity={0.4}
+          filter={`url(#glow-${glowState})`}
+        />
+      )}
+
+      {/* Progress ring — animated */}
+      {progress > 0 && progress < 100 && (
+        <motion.circle
           cx={0}
           cy={0}
           r={radius + 4}
@@ -104,7 +108,9 @@ export function Bubble({ milestoneId, x, y, radius, progress, onTap }: BubblePro
           strokeWidth={3}
           strokeLinecap="round"
           strokeDasharray={circumference}
-          strokeDashoffset={progressOffset}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: progressOffset }}
+          transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1], delay: 0.5 }}
           transform="rotate(-90)"
           opacity={0.8}
         />
@@ -123,53 +129,49 @@ export function Bubble({ milestoneId, x, y, radius, progress, onTap }: BubblePro
         />
       )}
 
-      {/* Blocked overlay icon */}
-      {status === 'blocked' && (
-        <text
-          x={0}
-          y={-radius + 14}
-          textAnchor="middle"
-          fontSize={12}
-          fill={isDark ? '#FFFFFE' : '#2D2A32'}
-          opacity={0.5}
-        >
-          🔒
-        </text>
-      )}
-
       {/* Label */}
       <text
         x={0}
-        y={status === 'blocked' ? 4 : 0}
+        y={-6}
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={radius > 50 ? 11 : 10}
+        fontSize={12}
         fontFamily="'Space Grotesk', sans-serif"
-        fontWeight={500}
+        fontWeight={600}
         fill={isDark ? '#FFFFFE' : '#2D2A32'}
-        opacity={0.9}
+        opacity={status === 'blocked' ? 0.4 : 0.9}
       >
-        {truncateLabel(milestone?.title ?? '', radius)}
+        {`Phase ${phaseIndex}`}
       </text>
-
-      {/* Phase label (small) */}
       <text
         x={0}
-        y={14}
+        y={10}
         textAnchor="middle"
-        fontSize={8}
-        fontFamily="'Inter', sans-serif"
+        dominantBaseline="central"
+        fontSize={9}
+        fontFamily="'Space Grotesk', sans-serif"
+        fontWeight={400}
         fill={isDark ? '#FFFFFE' : '#2D2A32'}
-        opacity={0.5}
+        opacity={status === 'blocked' ? 0.3 : 0.6}
       >
-        Phase {phaseIndex}
+        {getShortPhaseName(phaseIndex)}
       </text>
+
     </motion.g>
   )
 }
 
-function truncateLabel(text: string, radius: number): string {
-  const maxChars = Math.floor(radius / 4.5)
-  if (text.length <= maxChars) return text
-  return text.slice(0, maxChars - 1) + '…'
+const shortPhaseNames: Record<number, string> = {
+  0: 'Baseline',
+  1: 'Interpret',
+  2: 'Treatment',
+  3: 'Rebuild',
+  4: 'Diet Trial',
+  5: 'Retest',
+  6: 'Optimize',
+  7: 'Maintain',
+}
+
+function getShortPhaseName(phaseIndex: number): string {
+  return shortPhaseNames[phaseIndex] ?? ''
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ThemeProvider } from '@/components/UI/ThemeProvider'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useRoadmapStore } from '@/stores/roadmapStore'
@@ -67,58 +67,88 @@ export function App() {
         {/* Milestone Detail View (overlay) */}
         <AnimatePresence>
           {selectedMilestoneId && (
-            <Suspense fallback={null}>
-              <MilestoneDetail milestoneId={selectedMilestoneId} />
-            </Suspense>
+            <motion.div
+              key="milestone-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Suspense fallback={null}>
+                <MilestoneDetail milestoneId={selectedMilestoneId} />
+              </Suspense>
+            </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Floating buttons on map view */}
-        {showFloatingButtons && (
-          <>
-            {/* Settings gear (Spec 9.1: top-right) */}
+        {/* Bottom-right button stack — always visible */}
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-center gap-3">
+          {/* Location/recenter button */}
+          {showFloatingButtons && (
             <FloatingButton
-              onClick={() => useUIStore.getState().toggleSettings()}
-              position="top-right"
-              className="bg-gold/15 dark:bg-copper/15 text-charcoal dark:text-softwhite hover:bg-gold/25 dark:hover:bg-copper/25 w-10 h-10 !px-0 flex items-center justify-center"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('cyto-recenter'))
+              }}
+              position="inline"
+              className="w-11 h-11 !px-0 flex items-center justify-center"
             >
-              <svg width={16} height={16} viewBox="0 0 16 16" fill="none">
-                <path d="M8 10C9.1 10 10 9.1 10 8C10 6.9 9.1 6 8 6C6.9 6 6 6.9 6 8C6 9.1 6.9 10 8 10Z" stroke="currentColor" strokeWidth={1.5} />
-                <path d="M13 8C13 7.64 12.97 7.29 12.92 6.95L14.5 5.82L13.5 4.09L11.67 4.72C11.16 4.28 10.57 3.94 9.92 3.72L9.5 1.82H7.5L7.08 3.72C6.43 3.94 5.84 4.28 5.33 4.72L3.5 4.09L2.5 5.82L4.08 6.95C4.03 7.29 4 7.64 4 8C4 8.36 4.03 8.71 4.08 9.05L2.5 10.18L3.5 11.91L5.33 11.28C5.84 11.72 6.43 12.06 7.08 12.28L7.5 14.18H9.5L9.92 12.28C10.57 12.06 11.16 11.72 11.67 11.28L13.5 11.91L14.5 10.18L12.92 9.05C12.97 8.71 13 8.36 13 8Z" stroke="currentColor" strokeWidth={1.5} />
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
               </svg>
             </FloatingButton>
+          )}
 
-            {/* Analytics chart button (Spec 7.1: bottom-left) */}
-            <FloatingButton
-              onClick={toggleAnalytics}
-              position="bottom-left"
-              className="bg-gold/25 dark:bg-copper/25 text-charcoal dark:text-softwhite hover:bg-gold/35 dark:hover:bg-copper/35 w-12 h-12 !px-0 flex items-center justify-center"
-            >
-              <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-                <path d="M2 14V8M6 14V4M10 14V10M14 14V6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-              </svg>
-            </FloatingButton>
-
-            {/* cyto Chat button */}
-            <FloatingButton
-              onClick={() => openChat()}
-              position="bottom-right"
-              className="bg-gold/25 dark:bg-copper/25 text-charcoal dark:text-softwhite hover:bg-gold/35 dark:hover:bg-copper/35 w-12 h-12 !px-0 flex items-center justify-center mb-16"
-            >
-              <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-                <path d="M3 9C3 5.686 5.686 3 9 3C12.314 3 15 5.686 15 9C15 12.314 12.314 15 9 15C7.92 15 6.903 14.73 6.003 14.253L3 15L3.747 11.997C3.27 11.097 3 10.08 3 9Z" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </FloatingButton>
-
-            {/* Daily Log "+" button (Spec 6.2: bottom-right) */}
+          {/* Daily log + button */}
+          {showFloatingButtons && (
             <FloatingButton
               onClick={toggleLog}
-              position="bottom-right"
-              className="bg-gold/25 dark:bg-copper/25 text-charcoal dark:text-softwhite hover:bg-gold/35 dark:hover:bg-copper/35 w-12 h-12 !px-0 flex items-center justify-center text-xl"
+              position="inline"
+              className="w-11 h-11 !px-0 flex items-center justify-center text-lg"
             >
               +
             </FloatingButton>
-          </>
+          )}
+
+          {/* Chat button — always visible unless chat open */}
+          {!isChatOpen && (
+            <FloatingButton
+              onClick={() => openChat()}
+              position="inline"
+              className="w-11 h-11 !px-0 flex items-center justify-center"
+            >
+              <svg width={16} height={16} viewBox="0 0 18 18" fill="none">
+                <path d="M3 9C3 5.686 5.686 3 9 3C12.314 3 15 5.686 15 9C15 12.314 12.314 15 9 15C7.92 15 6.903 14.73 6.003 14.253L3 15L3.747 11.997C3.27 11.097 3 10.08 3 9Z" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </FloatingButton>
+          )}
+        </div>
+
+        {/* Analytics button stays bottom-left */}
+        {showFloatingButtons && (
+          <FloatingButton
+            onClick={toggleAnalytics}
+            position="bottom-left"
+            className="w-11 h-11 !px-0 flex items-center justify-center"
+          >
+            <svg width={16} height={16} viewBox="0 0 18 18" fill="none">
+              <path d="M2 14V8M6 14V4M10 14V10M14 14V6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+            </svg>
+          </FloatingButton>
+        )}
+
+        {/* Settings stays top-right */}
+        {showFloatingButtons && (
+          <FloatingButton
+            onClick={() => useUIStore.getState().toggleSettings()}
+            position="top-right"
+            className="w-10 h-10 !px-0 flex items-center justify-center"
+          >
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </FloatingButton>
         )}
 
         {/* Daily Log Panel */}
