@@ -67,25 +67,26 @@ function sampleConnection(
   t: number, // 0..1 along path
   time: number,
 ): { x: number; y: number; width: number } {
-  // Base position along straight line with slight organic curve
-  const curveBow = Math.sin(t * Math.PI) * conn.dist * 0.04
-  const flowWave = Math.sin(time * conn.flowSpeed + t * 6 + conn.phaseOffset) * 10
-  const perpOffset = curveBow + flowWave * Math.sin(t * Math.PI) // damped at endpoints
+  // Very subtle organic curve — NOT a sag, just a gentle living wobble
+  const curveBow = Math.sin(t * Math.PI) * conn.dist * 0.008
+  // Gentle flow wave, damped hard at endpoints
+  const dampEnds = Math.sin(t * Math.PI)  // 0 at edges, 1 at center
+  const flowWave = Math.sin(time * conn.flowSpeed + t * 4 + conn.phaseOffset) * 4 * dampEnds
 
-  const x = conn.sx + conn.dx * t + conn.nx * perpOffset
-  const y = conn.sy + conn.dy * t + conn.ny * perpOffset
+  const x = conn.sx + conn.dx * t + conn.nx * (curveBow + flowWave)
+  const y = conn.sy + conn.dy * t + conn.ny * (curveBow + flowWave)
 
-  // Taper: wide at cells, narrow in middle
-  // Smooth cubic falloff from endpoints
-  const distFromEdge = Math.min(t, 1 - t) * 2 // 0 at edges, 1 at center
+  // Taper: thick at cells, still substantial in middle
+  const distFromEdge = Math.min(t, 1 - t) * 2  // 0 at edges, 1 at center
   const smallerR = Math.min(conn.sr, conn.tr)
-  const endWidth = smallerR * 0.38 // width near cells
-  const midWidth = Math.max(5, smallerR * 0.08) // thin in middle
-  const taper = midWidth + (endWidth - midWidth) * Math.pow(1 - distFromEdge, 1.8)
+  const endWidth = smallerR * 0.55   // thick near cells — overlaps blob for goo merge
+  const midWidth = smallerR * 0.18   // still visible in center (~9px for r=50)
+  // Smooth taper — stays thick longer, narrows gently
+  const taper = midWidth + (endWidth - midWidth) * Math.pow(1 - distFromEdge, 1.2)
 
   // Subtle width pulse
-  const widthPulse = Math.sin(time * 0.6 + t * 4 + conn.phaseOffset) * 2.5
-  const width = Math.max(3, taper + widthPulse * Math.sin(t * Math.PI))
+  const widthPulse = Math.sin(time * 0.5 + t * 3 + conn.phaseOffset) * 1.5 * dampEnds
+  const width = Math.max(midWidth * 0.8, taper + widthPulse)
 
   return { x, y, width }
 }
@@ -260,7 +261,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           if (t < 0.05 || t > 0.95) continue // skip near endpoints
 
           const sample = sampleConnection(conn, t, time)
-          const particleR = sample.width * 0.4 + Math.sin(time * 1.2 + p * 2) * 1.5
+          const particleR = sample.width * 0.25 + Math.sin(time * 1.2 + p * 2) * 1
           const color = lerpColor(conn.sourceColor, conn.targetColor, t)
 
           ctx.beginPath()

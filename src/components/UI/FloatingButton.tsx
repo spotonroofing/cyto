@@ -5,6 +5,7 @@ interface FloatingButtonProps {
   onClick: () => void
   children: React.ReactNode
   className?: string
+  style?: React.CSSProperties
   position?: 'bottom-center' | 'bottom-right' | 'bottom-left' | 'top-right' | 'inline'
   phaseColor?: string
 }
@@ -21,6 +22,7 @@ export function FloatingButton({
   onClick,
   children,
   className = '',
+  style,
   position = 'bottom-center',
   phaseColor,
 }: FloatingButtonProps) {
@@ -40,6 +42,7 @@ export function FloatingButton({
         opacity: { duration: 0.3 },
       }}
       onClick={onClick}
+      style={style}
       className={`${position === 'inline' ? '' : 'fixed'} ${positionClasses[position]} z-40
         rounded-full relative overflow-hidden
         text-charcoal/70 dark:text-softwhite/70 ${className}`}
