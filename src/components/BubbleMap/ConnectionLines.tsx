@@ -7,8 +7,6 @@ interface ConnectionLinesProps {
   bubbles: LayoutBubble[]
 }
 
-// --- Metaball math (Hiroyuki Sato / Paper.js) ---
-
 function vecDist(a: [number, number], b: [number, number]): number {
   return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 }
@@ -28,7 +26,7 @@ function metaballPath(
 ): string {
   const HALF_PI = Math.PI / 2
   const d = vecDist(c1, c2)
-  const maxDist = r1 + r2 + 400
+  const maxDist = r1 + r2 + 500
   let u1 = 0, u2 = 0
 
   if (r1 === 0 || r2 === 0 || d > maxDist || d <= Math.abs(r1 - r2)) return ''
@@ -39,7 +37,7 @@ function metaballPath(
   }
 
   const abc = vecAngle(c2, c1)
-  const maxSpread = Math.acos((r1 - r2) / d)
+  const maxSpread = Math.acos(Math.max(-1, Math.min(1, (r1 - r2) / d)))
 
   const a1 = abc + u1 + (maxSpread - u1) * v
   const a2 = abc - u1 - (maxSpread - u1) * v
@@ -51,7 +49,8 @@ function metaballPath(
 
   const tr = r1 + r2
   const d2b = Math.min(v * handleSize, vecDist(p1, p3) / tr)
-  const d2 = d2b * Math.min(1, (d * 2) / tr)
+  // CLAMP minimum handle factor to 0.5 — prevents thin spider-web connectors
+  const d2 = Math.max(d2b * Math.min(1, (d * 2) / tr), 0.5)
   const hr1 = r1 * d2, hr2 = r2 * d2
 
   const h1 = getVec(p1, a1 - HALF_PI, hr1)
@@ -74,13 +73,6 @@ export function ConnectionLines({ links, bubbles }: ConnectionLinesProps) {
   const theme = useSettingsStore((s) => s.theme)
   const isDark = theme === 'dark'
 
-  // Build a set of milestones that have connections (for outer membrane rendering)
-  const connectedMilestones = new Set<string>()
-  for (const link of links) {
-    connectedMilestones.add(link.source.milestoneId)
-    connectedMilestones.add(link.target.milestoneId)
-  }
-
   return (
     <>
       <defs>
@@ -102,31 +94,18 @@ export function ConnectionLines({ links, bubbles }: ConnectionLinesProps) {
         })}
       </defs>
 
-      {/* OUTER MEMBRANE: full circles for each milestone (lighter, larger) */}
-      {bubbles.filter(b => connectedMilestones.has(b.milestoneId)).map((bubble) => (
-        <circle
-          key={`membrane-${bubble.milestoneId}`}
-          cx={bubble.x}
-          cy={bubble.y}
-          r={bubble.radius}
-          fill={getPhaseColor(bubble.phaseIndex, isDark)}
-          fillOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.1 : 0.2}
-        />
-      ))}
+      {/* DRAW ORDER MATTERS: goo paths FIRST, then membrane circles ON TOP to cover junction seams */}
 
-      {/* GOO CONNECTORS: metaball membrane paths between milestones */}
+      {/* GOO CONNECTORS — thicker, higher opacity */}
       {links.map((link, i) => {
-        const isBlocked = link.targetStatus === 'blocked' || link.targetStatus === 'not_started'
-        const opacity = isBlocked ? 0.08 : 0.2
-
         const c1: [number, number] = [link.source.x, link.source.y]
         const c2: [number, number] = [link.target.x, link.target.y]
 
-        // Use larger radii for the metaball to create thicker goo
-        const gooR1 = link.source.radius * 1.0
-        const gooR2 = link.target.radius * 1.0
-
-        const pathD = metaballPath(gooR1, gooR2, c1, c2, 3.5, 0.65)
+        // Use v=0.8, handleSize=5.0 for thick organic goo
+        const pathD = metaballPath(
+          link.source.radius, link.target.radius,
+          c1, c2, 5.0, 0.8,
+        )
         if (!pathD) return null
 
         return (
@@ -134,9 +113,57 @@ export function ConnectionLines({ links, bubbles }: ConnectionLinesProps) {
             key={`goo-${i}`}
             d={pathD}
             fill={`url(#cg-${i})`}
-            fillOpacity={opacity}
+            fillOpacity={0.35}
             stroke="none"
           />
+        )
+      })}
+
+      {/* OUTER MEMBRANE CIRCLES — drawn ON TOP of goo to cover fork junction seams */}
+      {bubbles.map((bubble) => {
+        const memR = bubble.radius
+        const breatheMin = memR - 1
+        const breatheMax = memR + 1
+        const dur = 5 + (bubble.phaseIndex * 0.5)
+        const isLocked = bubble.status === 'blocked' || bubble.status === 'not_started'
+        return (
+          <g key={`membrane-group-${bubble.milestoneId}`}>
+            <circle
+              cx={bubble.x}
+              cy={bubble.y}
+              r={memR}
+              fill={getPhaseColor(bubble.phaseIndex, isDark)}
+              fillOpacity={0.22}
+            >
+              <animate
+                attributeName="r"
+                values={`${memR};${breatheMax};${memR};${breatheMin};${memR}`}
+                dur={`${dur}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+
+            {/* Dashed ring for locked phases — "membrane not fully formed" */}
+            {isLocked && (
+              <circle
+                cx={bubble.x}
+                cy={bubble.y}
+                r={memR + 2}
+                fill="none"
+                stroke={getPhaseColor(bubble.phaseIndex, isDark)}
+                strokeWidth={1}
+                strokeOpacity={0.3}
+                strokeDasharray="6 4"
+              >
+                <animate
+                  attributeName="r"
+                  values={`${memR + 2};${breatheMax + 2};${memR + 2};${breatheMin + 2};${memR + 2}`}
+                  dur={`${dur}s`}
+                  repeatCount="indefinite"
+                />
+              </circle>
+            )}
+          </g>
         )
       })}
     </>

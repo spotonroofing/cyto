@@ -25,7 +25,7 @@ export const phaseColors = {
 
 export const themeColors = {
   light: {
-    background: '#FFF5F2',
+    background: '#FFF8F7',
     text: '#2D2A32',
     accent: '#D4A574',
     done: '#B5C4B1',

@@ -83,6 +83,19 @@ export function App() {
 
         {/* Bottom-right: Daily log + Chat — always visible unless their own panel is open */}
         <div className="fixed bottom-6 right-6 z-40 flex flex-col items-center gap-3">
+          {/* Recenter button — map view only */}
+          {showMapOnlyButtons && (
+            <FloatingButton
+              onClick={() => window.dispatchEvent(new CustomEvent('cyto-recenter'))}
+              position="inline"
+              className="w-11 h-11 !px-0 flex items-center justify-center"
+            >
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+              </svg>
+            </FloatingButton>
+          )}
           {/* Daily log button */}
           {!isLogOpen && (
             <FloatingButton

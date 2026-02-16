@@ -88,8 +88,8 @@ export function BackgroundParticles() {
         ctx.beginPath()
         ctx.ellipse(p.x, p.y, rx, ry, p.wobblePhase * 0.5, 0, Math.PI * 2)
         ctx.fillStyle = isDark
-          ? `rgba(196, 154, 108, ${p.opacity})`
-          : `rgba(212, 165, 116, ${p.opacity})`
+          ? `rgba(180, 150, 170, ${p.opacity})`
+          : `rgba(220, 190, 200, ${p.opacity})`
         ctx.fill()
       }
 

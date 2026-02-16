@@ -154,18 +154,19 @@ npm run typecheck  # TypeScript checking
 
 ## Visual Implementation Notes
 
-- **ZERO SVG filters on the map.** No feTurbulence, no feDisplacementMap. These kill iPhone GPU performance when zoomed in.
-- **ZERO Framer Motion on the map.** No motion.g, no animate, no SMIL. All milestone elements are static SVG.
-- **Panning uses plain `<g transform>`.** Transform string set directly from React state.
+- **ZERO SVG filters.** No feTurbulence, no feDisplacementMap. These kill iPhone GPU.
+- **SMIL `<animate>` on circle `r` attribute only.** This is the one animation on the map. It interpolates a single number per element per frame — negligible cost. Each milestone breathes at a slightly different rate (4-9s) so they don't sync.
+- **Panning uses plain `<g transform>`.** No Framer Motion on the map.
 - **Mouse/touch handlers use native addEventListener** with { passive: false }.
-- **Zoom is cursor/pinch-anchored** — adjusts translation to keep point under cursor fixed.
+- **Zoom is cursor/pinch-anchored.**
 - **Milestones have TWO layers:**
-  1. OUTER MEMBRANE: Larger circle, low opacity (0.2) — rendered by ConnectionLines
-  2. INNER CORE: Smaller circle (0.8× radius), higher opacity (0.55) — rendered by BubbleMap
-- **Goo connectors use the Hiroyuki Sato metaball algorithm** with handleSize=3.5, v=0.65, maxDist=r1+r2+400. Filled with a linearGradient transitioning source→target color.
-- **Buttons use membrane-breathe CSS animation** for organic blob shape and have a subtle pink tint (#FFE8E4).
-- **Chat + Daily Log buttons are always visible.** Analytics bottom-left, Settings top-right (map view only).
-- **Color theme:** Light mode background is #FFF5F2 (slight pink, not cream/peach).
+  1. OUTER MEMBRANE: Full-radius circle, low opacity (0.22), gentle r-breathing — rendered by ConnectionLines ON TOP of goo paths
+  2. INNER CORE: 0.78× radius circle, higher opacity (0.55), r-breathing — rendered by BubbleMap
+- **Locked phases** get a dashed stroke ring just outside the membrane (not dimmed).
+- **Goo connectors:** Hiroyuki Sato metaball with v=0.8, handleSize=5.0, d2 clamped minimum 0.5. Draw order: goo paths FIRST, membrane circles ON TOP (covers junction seams at fork points).
+- **Buttons** use radial gradient for cell look (opaque center, soft edge) + membrane-breathe CSS.
+- **Background:** #FFF8F7 base, radial vignette overlay, muted pink-mauve particles.
+- **Color:** cream = #FFF8F7 throughout. No warm peach/orange tones.
 
 ## After Every Change
 Always run: npm run typecheck && npm run build

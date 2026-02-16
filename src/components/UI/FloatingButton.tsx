@@ -33,12 +33,13 @@ export function FloatingButton({
         opacity: { duration: 0.3 },
       }}
       onClick={onClick}
-      className={`${position === 'inline' ? '' : 'fixed'} ${positionClasses[position]} z-40 font-medium text-sm
+      className={`${position === 'inline' ? '' : 'fixed'} ${positionClasses[position]} z-40
         membrane-breathe
-        bg-[#FFE8E4]/60 dark:bg-white/10 backdrop-blur-md
-        border border-[#FFCFC8]/30 dark:border-white/10
-        shadow-sm hover:bg-[#FFE8E4]/80 dark:hover:bg-white/15
-        text-charcoal dark:text-softwhite ${className}`}
+        text-charcoal/70 dark:text-softwhite/70 ${className}`}
+      style={{
+        background: 'radial-gradient(circle at 50% 50%, rgba(255,245,243,0.85) 50%, rgba(255,228,224,0.35) 100%)',
+        boxShadow: '0 0 0 1.5px rgba(255,200,190,0.25), 0 2px 8px rgba(0,0,0,0.04)',
+      }}
     >
       {children}
     </motion.button>

@@ -217,6 +217,15 @@ export function BubbleMap() {
     >
       <BackgroundParticles />
 
+      {/* Petri dish vignette — subtle circular darkening at viewport edges */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          zIndex: 0,
+          background: 'radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.03) 100%)',
+        }}
+      />
+
       <svg
         width={dimensions.width}
         height={dimensions.height}
@@ -229,17 +238,31 @@ export function BubbleMap() {
           {/* Metaball connections — renders outer membrane + connector goo */}
           <ConnectionLines links={links} bubbles={bubbles} />
 
-          {/* Inner core circles — solid, more saturated */}
-          {bubbles.map((bubble) => (
-            <circle
-              key={`core-${bubble.milestoneId}`}
-              cx={bubble.x}
-              cy={bubble.y}
-              r={bubble.radius * 0.8}
-              fill={getPhaseColor(bubble.phaseIndex, isDark)}
-              fillOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.3 : 0.55}
-            />
-          ))}
+          {/* Inner core circles — solid, more saturated, breathing */}
+          {bubbles.map((bubble) => {
+            const coreR = bubble.radius * 0.78
+            const breatheMin = coreR - 1.5
+            const breatheMax = coreR + 1.5
+            // Each milestone gets a slightly different duration so they don't sync
+            const dur = 4 + (bubble.phaseIndex * 0.7)
+            return (
+              <circle
+                key={`core-${bubble.milestoneId}`}
+                cx={bubble.x}
+                cy={bubble.y}
+                r={coreR}
+                fill={getPhaseColor(bubble.phaseIndex, isDark)}
+                fillOpacity={0.55}
+              >
+                <animate
+                  attributeName="r"
+                  values={`${coreR};${breatheMax};${coreR};${breatheMin};${coreR}`}
+                  dur={`${dur}s`}
+                  repeatCount="indefinite"
+                />
+              </circle>
+            )
+          })}
 
           {/* Labels and click targets */}
           {bubbles.map((bubble) => (

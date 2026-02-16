@@ -24,11 +24,11 @@
 .bg-animated-light {
   background: linear-gradient(
     135deg,
-    #FFF5F2 0%,
-    #FFF0E6 25%,
-    #FFF5F2 50%,
-    #F0F0FF 75%,
-    #FFF5F2 100%
+    #FFF8F7 0%,
+    #FFF5F4 25%,
+    #FFF8F7 50%,
+    #F5F3FF 75%,
+    #FFF8F7 100%
   );
   background-size: 400% 400%;
   animation: gradient-shift-light 45s ease infinite;
