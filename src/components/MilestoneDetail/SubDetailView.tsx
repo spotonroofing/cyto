@@ -37,12 +37,10 @@ export function SubDetailView({ title, color, onClose, children }: SubDetailView
         ${isDark ? 'bg-navy/95' : 'bg-cream/95'} backdrop-blur-xl`}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Amoeba membrane effect - colored border */}
       <div
-        className="absolute inset-0 rounded-[24px] pointer-events-none membrane-breathe"
+        className="absolute inset-0 rounded-[24px] pointer-events-none"
         style={{
-          border: `2px solid ${color}40`,
-          boxShadow: `0 0 20px ${color}20, inset 0 0 20px ${color}10`,
+          border: `1px solid ${color}25`,
         }}
       />
 

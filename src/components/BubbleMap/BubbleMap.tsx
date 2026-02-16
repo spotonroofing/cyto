@@ -32,6 +32,10 @@ export function BubbleMap() {
   // Auto-zoom tracking
   const hasAutoZoomedRef = useRef(false)
 
+  // Refs for native touch event handlers (can't read React state in closure)
+  const transformRef = useRef(transform)
+  const bubblesRef = useRef<ReturnType<typeof useBubbleLayout>['bubbles']>([])
+
   const selectMilestone = useUIStore((s) => s.selectMilestone)
   const getCurrentMilestone = useRoadmapStore((s) => s.getCurrentMilestone)
   const theme = useSettingsStore((s) => s.theme)
@@ -51,6 +55,10 @@ export function BubbleMap() {
   }, [])
 
   const { bubbles, links, settled } = useBubbleLayout(dimensions.width, dimensions.height)
+
+  // Keep refs in sync
+  useEffect(() => { transformRef.current = transform }, [transform])
+  useEffect(() => { bubblesRef.current = bubbles }, [bubbles])
 
   // Auto-zoom to current milestone when simulation first settles
   useEffect(() => {
@@ -101,84 +109,81 @@ export function BubbleMap() {
     }))
   }, [])
 
-  // Touch handlers — fixed tap vs pan detection
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      const touch = e.touches[0]!
-      isPanningRef.current = true
-      setIsUserPanning(true)
-      hasPannedRef.current = false
-      lastPanRef.current = { x: touch.clientX, y: touch.clientY }
-      touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() }
-    } else if (e.touches.length === 2) {
-      // Pinch start — cancel any pending tap
-      isPanningRef.current = false
-      touchStartRef.current = null
-      const dx = e.touches[0]!.clientX - e.touches[1]!.clientX
-      const dy = e.touches[0]!.clientY - e.touches[1]!.clientY
-      lastPinchDistRef.current = Math.sqrt(dx * dx + dy * dy)
+  // Native touch handlers (passive: false required for preventDefault on mobile)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0]!
+        isPanningRef.current = true
+        setIsUserPanning(true)
+        hasPannedRef.current = false
+        lastPanRef.current = { x: touch.clientX, y: touch.clientY }
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() }
+      } else if (e.touches.length === 2) {
+        isPanningRef.current = false
+        touchStartRef.current = null
+        const dx = e.touches[0]!.clientX - e.touches[1]!.clientX
+        const dy = e.touches[0]!.clientY - e.touches[1]!.clientY
+        lastPinchDistRef.current = Math.sqrt(dx * dx + dy * dy)
+      }
     }
-  }, [])
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1 && isPanningRef.current) {
-      const touch = e.touches[0]!
-      const dx = touch.clientX - lastPanRef.current.x
-      const dy = touch.clientY - lastPanRef.current.y
-      lastPanRef.current = { x: touch.clientX, y: touch.clientY }
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1 && isPanningRef.current) {
+        const touch = e.touches[0]!
+        const dx = touch.clientX - lastPanRef.current.x
+        const dy = touch.clientY - lastPanRef.current.y
+        lastPanRef.current = { x: touch.clientX, y: touch.clientY }
 
-      // Check if we've moved enough to consider it a pan
-      if (touchStartRef.current) {
-        const totalDx = touch.clientX - touchStartRef.current.x
-        const totalDy = touch.clientY - touchStartRef.current.y
-        const totalDist = Math.sqrt(totalDx * totalDx + totalDy * totalDy)
-        if (totalDist > TAP_DISTANCE_THRESHOLD) {
-          hasPannedRef.current = true
+        if (touchStartRef.current) {
+          const totalDx = touch.clientX - touchStartRef.current.x
+          const totalDy = touch.clientY - touchStartRef.current.y
+          const totalDist = Math.sqrt(totalDx * totalDx + totalDy * totalDy)
+          if (totalDist > TAP_DISTANCE_THRESHOLD) {
+            hasPannedRef.current = true
+          }
         }
-      }
 
-      // Only prevent default once we're actually panning
-      if (hasPannedRef.current) {
+        if (hasPannedRef.current) {
+          e.preventDefault()
+        }
+
+        setTransform((t) => ({ ...t, x: t.x + dx, y: t.y + dy }))
+      } else if (e.touches.length === 2) {
         e.preventDefault()
+        const dx = e.touches[0]!.clientX - e.touches[1]!.clientX
+        const dy = e.touches[0]!.clientY - e.touches[1]!.clientY
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (lastPinchDistRef.current > 0) {
+          const delta = dist / lastPinchDistRef.current
+          setTransform((t) => ({
+            ...t,
+            scale: Math.max(0.3, Math.min(3, t.scale * delta)),
+          }))
+        }
+        lastPinchDistRef.current = dist
       }
-
-      setTransform((t) => ({ ...t, x: t.x + dx, y: t.y + dy }))
-    } else if (e.touches.length === 2) {
-      e.preventDefault()
-      const dx = e.touches[0]!.clientX - e.touches[1]!.clientX
-      const dy = e.touches[0]!.clientY - e.touches[1]!.clientY
-      const dist = Math.sqrt(dx * dx + dy * dy)
-      if (lastPinchDistRef.current > 0) {
-        const delta = dist / lastPinchDistRef.current
-        setTransform((t) => ({
-          ...t,
-          scale: Math.max(0.3, Math.min(3, t.scale * delta)),
-        }))
-      }
-      lastPinchDistRef.current = dist
     }
-  }, [])
 
-  const handleTouchEnd = useCallback(
-    (e: React.TouchEvent) => {
+    const onTouchEnd = (e: TouchEvent) => {
       isPanningRef.current = false
       setIsUserPanning(false)
       lastPinchDistRef.current = 0
 
-      // Check if this was a tap (short, minimal movement)
       if (touchStartRef.current && !hasPannedRef.current) {
         const elapsed = Date.now() - touchStartRef.current.time
         if (elapsed < TAP_TIME_THRESHOLD) {
-          // Find if a bubble was tapped
           const touch = touchStartRef.current
-          // Account for container offset before converting to SVG coordinates
           const rect = containerRef.current?.getBoundingClientRect()
           const offsetX = rect?.left ?? 0
           const offsetY = rect?.top ?? 0
-          const svgX = (touch.x - offsetX - transform.x) / transform.scale
-          const svgY = (touch.y - offsetY - transform.y) / transform.scale
+          const svgX = (touch.x - offsetX - transformRef.current.x) / transformRef.current.scale
+          const svgY = (touch.y - offsetY - transformRef.current.y) / transformRef.current.scale
 
-          for (const bubble of bubbles) {
+          for (const bubble of bubblesRef.current) {
             const dx = svgX - bubble.x
             const dy = svgY - bubble.y
             const dist = Math.sqrt(dx * dx + dy * dy)
@@ -193,9 +198,18 @@ export function BubbleMap() {
 
       touchStartRef.current = null
       hasPannedRef.current = false
-    },
-    [bubbles, transform, selectMilestone],
-  )
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: false })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd, { passive: false })
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [selectMilestone])
 
   // Recenter on current milestone
   const handleRecenter = useCallback(() => {
@@ -235,9 +249,6 @@ export function BubbleMap() {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
     >
       {/* Microscope background particles */}
       <BackgroundParticles />
@@ -248,14 +259,17 @@ export function BubbleMap() {
         className="absolute inset-0"
         style={{ zIndex: 1 }}
       >
-        {/* SVG filters */}
         <defs>
-          {/* Goo filter — merges nearby circles into organic blobs */}
-          <filter id="goo">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="12" colorInterpolationFilters="sRGB" result="blur" />
-            <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
-            <feBlend in="SourceGraphic" in2="goo" />
-          </filter>
+          {/* Radial gradients for each milestone — solid center fading to transparent edge */}
+          {bubbles.map((bubble) => (
+            <radialGradient key={`mg-${bubble.milestoneId}`} id={`milestone-grad-${bubble.milestoneId}`}>
+              <stop offset="0%" stopColor={getPhaseColor(bubble.phaseIndex, isDark)} stopOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.4 : 0.75} />
+              <stop offset="55%" stopColor={getPhaseColor(bubble.phaseIndex, isDark)} stopOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.25 : 0.5} />
+              <stop offset="100%" stopColor={getPhaseColor(bubble.phaseIndex, isDark)} stopOpacity={0.0} />
+            </radialGradient>
+          ))}
+
+          {/* Glow filters for overdue milestones */}
           <filter id="glow-orange" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="6" result="blur" />
             <feFlood floodColor="#FF8C00" floodOpacity="0.6" />
@@ -287,22 +301,33 @@ export function BubbleMap() {
             : { type: 'spring', stiffness: 300, damping: 30 }
           }
         >
-          {/* Goo layer — milestone circles + bridge connections merge organically */}
-          <g filter="url(#goo)">
-            <ConnectionLines links={links} />
-            {bubbles.map((bubble) => (
-              <circle
-                key={bubble.milestoneId}
-                cx={bubble.x}
-                cy={bubble.y}
-                r={bubble.radius}
-                fill={getPhaseColor(bubble.phaseIndex, isDark)}
-                fillOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.55 : 0.85}
-              />
-            ))}
-          </g>
+          {/* Connection paths (behind milestones) */}
+          <ConnectionLines links={links} />
 
-          {/* Overlay layer — labels, progress rings, click targets (NOT goo filtered) */}
+          {/* Milestone membrane circles — radial gradient gives soft organic edge */}
+          {bubbles.map((bubble) => (
+            <circle
+              key={`membrane-${bubble.milestoneId}`}
+              cx={bubble.x}
+              cy={bubble.y}
+              r={bubble.radius * 1.3}
+              fill={`url(#milestone-grad-${bubble.milestoneId})`}
+            />
+          ))}
+
+          {/* Milestone core circles — solid inner blob */}
+          {bubbles.map((bubble) => (
+            <circle
+              key={`core-${bubble.milestoneId}`}
+              cx={bubble.x}
+              cy={bubble.y}
+              r={bubble.radius * (0.5 + (bubble.progress / 100) * 0.35)}
+              fill={getPhaseColor(bubble.phaseIndex, isDark)}
+              fillOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.3 : 0.7}
+            />
+          ))}
+
+          {/* Overlay layer — labels, click targets */}
           {bubbles.map((bubble) => (
             <Bubble
               key={bubble.milestoneId}

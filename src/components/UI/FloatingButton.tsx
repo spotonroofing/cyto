@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion'
-import { useRef } from 'react'
 
 interface FloatingButtonProps {
   onClick: () => void
@@ -22,21 +21,17 @@ export function FloatingButton({
   className = '',
   position = 'bottom-center',
 }: FloatingButtonProps) {
-  const bobRef = useRef({ delay: Math.random() * 2 })
-
   return (
     <motion.button
       initial={{ scale: 0, opacity: 0 }}
       animate={{
         scale: 1,
         opacity: 1,
-        y: [0, -2, 0],
       }}
       exit={{ scale: 0, opacity: 0 }}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
       transition={{
-        y: { duration: 4, repeat: Infinity, ease: 'easeInOut', delay: bobRef.current.delay },
         scale: { type: 'spring', stiffness: 200, damping: 20 },
         opacity: { duration: 0.3 },
       }}

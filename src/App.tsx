@@ -104,7 +104,7 @@ export function App() {
             <FloatingButton
               onClick={toggleLog}
               position="inline"
-              className="w-11 h-11 !px-0 flex items-center justify-center text-lg"
+              className="w-11 h-11 !px-0 flex items-center justify-center text-xl"
             >
               +
             </FloatingButton>

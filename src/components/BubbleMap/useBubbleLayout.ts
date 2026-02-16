@@ -21,6 +21,7 @@ export interface LayoutLink {
   sourceStatus: MilestoneStatus
   targetStatus: MilestoneStatus
   sourcePhaseIndex: number
+  targetPhaseIndex: number
 }
 
 // Deterministic layout: each milestone has a fixed horizontal order and branch assignment.
@@ -118,6 +119,7 @@ export function useBubbleLayout(width: number, height: number) {
           sourceStatus: getMilestoneStatus(sourceId),
           targetStatus: getMilestoneStatus(targetId),
           sourcePhaseIndex: sourcePos.phaseIndex,
+          targetPhaseIndex: targetPos.phaseIndex,
         })
       }
     }

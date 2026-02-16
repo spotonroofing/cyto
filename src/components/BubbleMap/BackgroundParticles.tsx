@@ -35,16 +35,16 @@ export function BackgroundParticles() {
     window.addEventListener('resize', resize)
 
     // Particle count scaled by screen size
-    const count = window.innerWidth < 768 ? 20 : 30
+    const count = window.innerWidth < 768 ? 40 : 70
 
     // Initialize particles
     particlesRef.current = Array.from({ length: count }, () => ({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
-      radius: 4 + Math.random() * 12,
+      radius: 1.5 + Math.random() * 4,
       vx: (Math.random() - 0.5) * 0.3,
       vy: (Math.random() - 0.5) * 0.3,
-      opacity: 0.04 + Math.random() * 0.06,
+      opacity: 0.03 + Math.random() * 0.04,
       wobblePhase: Math.random() * Math.PI * 2,
       wobbleSpeed: 0.005 + Math.random() * 0.01,
       axisRatio: 0.7 + Math.random() * 0.3,
@@ -91,15 +91,6 @@ export function BackgroundParticles() {
           ? `rgba(196, 154, 108, ${p.opacity})`
           : `rgba(212, 165, 116, ${p.opacity})`
         ctx.fill()
-
-        // Membrane outline
-        ctx.beginPath()
-        ctx.ellipse(p.x, p.y, rx * 1.05, ry * 1.05, p.wobblePhase * 0.5, 0, Math.PI * 2)
-        ctx.strokeStyle = isDark
-          ? `rgba(196, 154, 108, ${p.opacity * 1.5})`
-          : `rgba(212, 165, 116, ${p.opacity * 1.5})`
-        ctx.lineWidth = 0.5
-        ctx.stroke()
       }
 
       animFrameRef.current = requestAnimationFrame(animate)
@@ -137,14 +128,5 @@ function drawParticles(
       ? `rgba(196, 154, 108, ${p.opacity})`
       : `rgba(212, 165, 116, ${p.opacity})`
     ctx.fill()
-
-    // Membrane outline
-    ctx.beginPath()
-    ctx.ellipse(p.x, p.y, p.radius * 1.05, p.radius * p.axisRatio * 1.05, 0, 0, Math.PI * 2)
-    ctx.strokeStyle = isDark
-      ? `rgba(196, 154, 108, ${p.opacity * 1.5})`
-      : `rgba(212, 165, 116, ${p.opacity * 1.5})`
-    ctx.lineWidth = 0.5
-    ctx.stroke()
   }
 }

@@ -154,14 +154,14 @@ npm run typecheck  # TypeScript checking
 
 ## Visual Implementation Notes
 
-- The goo SVG filter creates organic merging between milestone circles and bridge circles. It works by boosting alpha channel contrast. Elements in the goo group MUST have fillOpacity > 0.39 to survive the filter math (alpha * 18 - 7).
-- Bridge circles connect milestones along bezier curves. Spacing must be ≤ 14px with radius ≥ 8px for visible merging.
-- Labels are rendered OUTSIDE the goo-filtered group so they stay sharp.
-- Milestone labels use "Phase X" + short name format, not full titles.
-- The idle floating animation on Bubble.tsx overlay is cosmetic (±2px drift). The goo group circles are static — this mismatch is acceptable.
-- Mobile panning uses touch-action: none with custom JS handlers. During active pan, transform transitions are instant (duration: 0). Spring animation only applies during auto-zoom.
-- Buttons stack vertically in bottom-right: location, +log, chat. Analytics stays bottom-left. Settings stays top-right.
-- Background particles are canvas-rendered ellipses with membrane outlines to look like microscope cells.
+- **Milestones use radial gradients** — solid color at center, transparent at edges. This creates the organic "membrane" look. No SVG goo filter is used (it was removed because it doesn't work with multi-colored elements).
+- **Progress is shown by core circle size** — the inner solid blob scales from 0.5× to 0.85× of the milestone radius based on completion percentage. No circular ring indicator.
+- **Connections use gradient SVG paths** — thick bezier curves with `linearGradient` strokes that transition between source and target milestone colors. Three layers: outer glow (widest, most transparent), main path, inner bright core.
+- **Energy pulses** animate along active connection paths.
+- **Labels are rendered in a separate overlay group** so they stay sharp and aren't affected by any visual effects on the connection/milestone layer.
+- **Mobile panning uses native event listeners** with `{ passive: false }` — React synthetic events don't support this, which is required for `preventDefault()` to work on mobile touch.
+- **Buttons don't bob/float** — they're static positioned with tap animations only.
+- **Background particles** are small canvas-rendered ellipses (radius 1.5-5.5px, opacity 0.03-0.07, count 40 mobile / 70 desktop).
 
 ## After Every Change
 Always run: npm run typecheck && npm run build
