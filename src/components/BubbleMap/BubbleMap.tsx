@@ -11,6 +11,40 @@ import { getPhaseColor } from '@/styles/theme'
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
 
+// Generate a blobby SVG path from center, radius, and seed
+function blobPath(cx: number, cy: number, r: number, seed: number, variance: number = 0.15): string {
+  const points = 8
+  const angleStep = (Math.PI * 2) / points
+  const rand = (i: number) => {
+    const x = Math.sin(seed * 127.1 + i * 311.7) * 43758.5453
+    return x - Math.floor(x)
+  }
+  const pts: [number, number][] = []
+  for (let i = 0; i < points; i++) {
+    const a = angleStep * i
+    const rv = r * (1 + (rand(i) - 0.5) * variance * 2)
+    pts.push([cx + Math.cos(a) * rv, cy + Math.sin(a) * rv])
+  }
+  let d = `M ${pts[0]![0]},${pts[0]![1]}`
+  for (let i = 0; i < points; i++) {
+    const curr = pts[i]!
+    const next = pts[(i + 1) % points]!
+    const prev = pts[(i - 1 + points) % points]!
+    const nextNext = pts[(i + 2) % points]!
+    const cp1x = curr[0] + (next[0] - prev[0]) * 0.25
+    const cp1y = curr[1] + (next[1] - prev[1]) * 0.25
+    const cp2x = next[0] - (nextNext[0] - curr[0]) * 0.25
+    const cp2y = next[1] - (nextNext[1] - curr[1]) * 0.25
+    d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${next[0]},${next[1]}`
+  }
+  d += ' Z'
+  return d
+}
+
+function mileSeed(id: string): number {
+  return id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+}
+
 export function BubbleMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
@@ -99,11 +133,20 @@ export function BubbleMap() {
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      const delta = e.deltaY > 0 ? 0.95 : 1.05
-      setTransform((t) => ({
-        ...t,
-        scale: Math.max(0.3, Math.min(3, t.scale * delta)),
-      }))
+      const rect = el.getBoundingClientRect()
+      const cursorX = e.clientX - rect.left
+      const cursorY = e.clientY - rect.top
+
+      setTransform((t) => {
+        const factor = e.deltaY > 0 ? 0.95 : 1.05
+        const newScale = Math.max(0.3, Math.min(3, t.scale * factor))
+        const scaleChange = newScale / t.scale
+        return {
+          x: cursorX - (cursorX - t.x) * scaleChange,
+          y: cursorY - (cursorY - t.y) * scaleChange,
+          scale: newScale,
+        }
+      })
     }
 
     el.addEventListener('mousedown', onMouseDown)
@@ -163,17 +206,29 @@ export function BubbleMap() {
         setTransform((t) => ({ ...t, x: t.x + dx, y: t.y + dy }))
       } else if (e.touches.length === 2) {
         e.preventDefault()
-        const dx = e.touches[0]!.clientX - e.touches[1]!.clientX
-        const dy = e.touches[0]!.clientY - e.touches[1]!.clientY
-        const dist = Math.sqrt(dx * dx + dy * dy)
+        const t0 = e.touches[0]!
+        const t1 = e.touches[1]!
+        const dx = t0.clientX - t1.clientX
+        const dy = t0.clientY - t1.clientY
+        const newDist = Math.sqrt(dx * dx + dy * dy)
+
         if (lastPinchDistRef.current > 0) {
-          const delta = dist / lastPinchDistRef.current
-          setTransform((t) => ({
-            ...t,
-            scale: Math.max(0.3, Math.min(3, t.scale * delta)),
-          }))
+          const rect = containerRef.current?.getBoundingClientRect()
+          const midX = (t0.clientX + t1.clientX) / 2 - (rect?.left ?? 0)
+          const midY = (t0.clientY + t1.clientY) / 2 - (rect?.top ?? 0)
+          const factor = newDist / lastPinchDistRef.current
+
+          setTransform((t) => {
+            const newScale = Math.max(0.3, Math.min(3, t.scale * factor))
+            const scaleChange = newScale / t.scale
+            return {
+              x: midX - (midX - t.x) * scaleChange,
+              y: midY - (midY - t.y) * scaleChange,
+              scale: newScale,
+            }
+          })
         }
-        lastPinchDistRef.current = dist
+        lastPinchDistRef.current = newDist
       }
     }
 
@@ -263,26 +318,37 @@ export function BubbleMap() {
         style={{ zIndex: 1, pointerEvents: 'none' }}
       >
         <defs>
-          {/* Organic wobble filter — makes circles look like cell membranes */}
-          <filter id="organic-wobble" x="-10%" y="-10%" width="120%" height="120%">
+          {/* Organic wobble filter — static turbulence for cell membrane edges */}
+          <filter id="organic-wobble" x="-15%" y="-15%" width="130%" height="130%">
             <feTurbulence
               type="fractalNoise"
-              baseFrequency="0.04"
-              numOctaves={3}
-              seed="2"
+              baseFrequency="0.035"
+              numOctaves={2}
+              seed="3"
               result="turbulence"
-            >
-              <animate
-                attributeName="seed"
-                values="1;5;3;8;2;7;4;1"
-                dur="12s"
-                repeatCount="indefinite"
-              />
-            </feTurbulence>
+            />
             <feDisplacementMap
               in="SourceGraphic"
               in2="turbulence"
-              scale="6"
+              scale="10"
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
+
+          {/* Lighter wobble for connections */}
+          <filter id="organic-wobble-light" x="-10%" y="-10%" width="120%" height="120%">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.03"
+              numOctaves={1}
+              seed="7"
+              result="turbulence"
+            />
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="turbulence"
+              scale="5"
               xChannelSelector="R"
               yChannelSelector="G"
             />
@@ -310,21 +376,34 @@ export function BubbleMap() {
         </defs>
 
         <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
-          {/* Connection membranes (behind milestones) */}
-          <ConnectionLines links={links} />
+          {/* Connection membranes with light wobble */}
+          <g filter="url(#organic-wobble-light)">
+            <ConnectionLines links={links} />
+          </g>
 
-          {/* Milestone circles — solid fill with organic wobble filter */}
+          {/* Milestone blobs — animated blob paths with organic wobble filter */}
           <g filter="url(#organic-wobble)">
-            {bubbles.map((bubble) => (
-              <circle
-                key={`cell-${bubble.milestoneId}`}
-                cx={bubble.x}
-                cy={bubble.y}
-                r={bubble.radius}
-                fill={getPhaseColor(bubble.phaseIndex, isDark)}
-                fillOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.25 : 0.6}
-              />
-            ))}
+            {bubbles.map((bubble) => {
+              const seed = mileSeed(bubble.milestoneId)
+              const b1 = blobPath(bubble.x, bubble.y, bubble.radius, seed, 0.12)
+              const b2 = blobPath(bubble.x, bubble.y, bubble.radius, seed + 50, 0.16)
+              const b3 = blobPath(bubble.x, bubble.y, bubble.radius, seed + 100, 0.10)
+              return (
+                <path
+                  key={`cell-${bubble.milestoneId}`}
+                  d={b1}
+                  fill={getPhaseColor(bubble.phaseIndex, isDark)}
+                  fillOpacity={bubble.status === 'blocked' || bubble.status === 'not_started' ? 0.25 : 0.6}
+                >
+                  <animate
+                    attributeName="d"
+                    values={`${b1};${b2};${b3};${b1}`}
+                    dur="10s"
+                    repeatCount="indefinite"
+                  />
+                </path>
+              )
+            })}
           </g>
 
           {/* Overlay layer — labels and click targets (NOT filtered) */}

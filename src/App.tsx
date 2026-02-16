@@ -52,7 +52,7 @@ export function App() {
     )
   }
 
-  const showFloatingButtons = !selectedMilestoneId && !isLogOpen && !isAnalyticsOpen && !isChatOpen
+  const showMapOnlyButtons = !selectedMilestoneId && !isLogOpen && !isAnalyticsOpen && !isChatOpen
 
   return (
     <ThemeProvider>
@@ -81,10 +81,10 @@ export function App() {
           )}
         </AnimatePresence>
 
-        {/* Bottom-right button stack — always visible */}
+        {/* Bottom-right button stack */}
         <div className="fixed bottom-6 right-6 z-40 flex flex-col items-center gap-3">
-          {/* Location/recenter button */}
-          {showFloatingButtons && (
+          {/* Location/recenter button — map only */}
+          {showMapOnlyButtons && (
             <FloatingButton
               onClick={() => {
                 window.dispatchEvent(new CustomEvent('cyto-recenter'))
@@ -99,8 +99,8 @@ export function App() {
             </FloatingButton>
           )}
 
-          {/* Daily log + button */}
-          {showFloatingButtons && (
+          {/* Daily log + button — persistent */}
+          {!isLogOpen && (
             <FloatingButton
               onClick={toggleLog}
               position="inline"
@@ -110,7 +110,7 @@ export function App() {
             </FloatingButton>
           )}
 
-          {/* Chat button — always visible unless chat open */}
+          {/* Chat button — persistent */}
           {!isChatOpen && (
             <FloatingButton
               onClick={() => openChat()}
@@ -124,8 +124,8 @@ export function App() {
           )}
         </div>
 
-        {/* Analytics button stays bottom-left */}
-        {showFloatingButtons && (
+        {/* Analytics button — bottom-left, map only */}
+        {showMapOnlyButtons && (
           <FloatingButton
             onClick={toggleAnalytics}
             position="bottom-left"
@@ -137,16 +137,16 @@ export function App() {
           </FloatingButton>
         )}
 
-        {/* Settings stays top-right */}
-        {showFloatingButtons && (
+        {/* Logo / settings — top-right, map only */}
+        {showMapOnlyButtons && (
           <FloatingButton
             onClick={() => useUIStore.getState().toggleSettings()}
             position="top-right"
             className="w-10 h-10 !px-0 flex items-center justify-center"
           >
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-              <circle cx="12" cy="12" r="3" />
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.5} />
+              <text x="12" y="12" textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="700" fill="currentColor">C</text>
             </svg>
           </FloatingButton>
         )}

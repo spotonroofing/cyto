@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import { useRef } from 'react'
 import { useRoadmapStore, milestones, phases } from '@/stores/roadmapStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -13,6 +12,39 @@ interface BubbleProps {
   onTap: (milestoneId: string) => void
 }
 
+function blobPath(cx: number, cy: number, r: number, seed: number, variance: number = 0.15): string {
+  const points = 8
+  const angleStep = (Math.PI * 2) / points
+  const rand = (i: number) => {
+    const x = Math.sin(seed * 127.1 + i * 311.7) * 43758.5453
+    return x - Math.floor(x)
+  }
+  const pts: [number, number][] = []
+  for (let i = 0; i < points; i++) {
+    const a = angleStep * i
+    const rv = r * (1 + (rand(i) - 0.5) * variance * 2)
+    pts.push([cx + Math.cos(a) * rv, cy + Math.sin(a) * rv])
+  }
+  let d = `M ${pts[0]![0]},${pts[0]![1]}`
+  for (let i = 0; i < points; i++) {
+    const curr = pts[i]!
+    const next = pts[(i + 1) % points]!
+    const prev = pts[(i - 1 + points) % points]!
+    const nextNext = pts[(i + 2) % points]!
+    const cp1x = curr[0] + (next[0] - prev[0]) * 0.25
+    const cp1y = curr[1] + (next[1] - prev[1]) * 0.25
+    const cp2x = next[0] - (nextNext[0] - curr[0]) * 0.25
+    const cp2y = next[1] - (nextNext[1] - curr[1]) * 0.25
+    d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${next[0]},${next[1]}`
+  }
+  d += ' Z'
+  return d
+}
+
+function mileSeed(id: string): number {
+  return id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+}
+
 export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
   const theme = useSettingsStore((s) => s.theme)
   const getMilestoneStatus = useRoadmapStore((s) => s.getMilestoneStatus)
@@ -23,54 +55,32 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
   const phase = phases.find((p) => p.id === milestone?.phaseId)
   const phaseIndex = phase ? phases.indexOf(phase) : 0
 
-  const scale = status === 'completed' ? 0.9 : 1
+  const seedRef = useRef(mileSeed(milestoneId))
 
-  // Randomized idle animation offsets
-  const idleRef = useRef({
-    xAmplitude: 0.3 + Math.random() * 0.7,
-    yAmplitude: 0.3 + Math.random() * 0.7,
-    period: 5 + Math.random() * 5,
-    phase: Math.random() * Math.PI * 2,
-  })
-
-  const idle = idleRef.current
+  const blob1 = blobPath(0, 0, radius, seedRef.current, 0.12)
+  const blob2 = blobPath(0, 0, radius, seedRef.current + 100, 0.14)
+  const blob3 = blobPath(0, 0, radius, seedRef.current + 200, 0.10)
 
   return (
-    <motion.g
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{
-        scale,
-        opacity: 1,
-        x: [x - idle.xAmplitude, x + idle.xAmplitude, x - idle.xAmplitude],
-        y: [y - idle.yAmplitude, y + idle.yAmplitude, y - idle.yAmplitude],
-      }}
-      transition={{
-        scale: { type: 'spring', stiffness: 150, damping: 20 },
-        opacity: { duration: 0.4 },
-        x: {
-          duration: idle.period,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        },
-        y: {
-          duration: idle.period * 1.1,
-          repeat: Infinity,
-          ease: 'easeInOut',
-          delay: idle.phase,
-        },
-      }}
+    <g
+      transform={`translate(${x}, ${y})`}
       style={{ cursor: 'pointer', pointerEvents: 'auto' }}
       onClick={() => onTap(milestoneId)}
       role="button"
       tabIndex={0}
     >
-      {/* Transparent click target (the filled circle is in the main group) */}
-      <circle
-        cx={0}
-        cy={0}
-        r={radius}
+      {/* Blob click target with morphing animation */}
+      <path
+        d={blob1}
         fill="transparent"
-      />
+      >
+        <animate
+          attributeName="d"
+          values={`${blob1};${blob2};${blob3};${blob1}`}
+          dur="12s"
+          repeatCount="indefinite"
+        />
+      </path>
 
       {/* Label */}
       <text
@@ -99,8 +109,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       >
         {getShortPhaseName(phaseIndex)}
       </text>
-
-    </motion.g>
+    </g>
   )
 }
 

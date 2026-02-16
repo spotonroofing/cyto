@@ -157,10 +157,15 @@ npm run typecheck  # TypeScript checking
 - **Panning uses plain `<g transform>`, NOT Framer Motion `motion.g`.** Framer Motion's animate/transition system fights with manual transform updates and breaks pan/drag. The transform string is set directly from React state on every mouse/touch move.
 - **Mouse and touch handlers use native `addEventListener`** with `{ passive: false }`. React synthetic events don't support passive:false (needed for preventDefault on mobile). Mouse listeners for move/up are on `window` so dragging works when cursor leaves the container.
 - **The SVG element has `pointerEvents: 'none'`** so mouse events pass through to the container div. Interactive elements inside (Bubble click targets) have `pointerEvents: 'auto'`.
-- **Milestone connections use the Hiroyuki Sato metaball algorithm** (from Paper.js / varun.ca/metaballs). This generates filled SVG path geometry that forms organic membrane shapes between circles — real goo, not filter hacks or stroked lines. The path is filled with a linearGradient that transitions between source and target milestone colors.
-- **Milestone circles have an `feTurbulence` + `feDisplacementMap` filter** that makes their edges wobble organically like cell membranes. The turbulence seed is animated via SMIL to slowly shift the pattern.
+- **Milestone connections use the Hiroyuki Sato metaball algorithm** (from Paper.js / varun.ca/metaballs). This generates filled SVG path geometry that forms organic membrane shapes between circles — real goo, not filter hacks or stroked lines. The maxDist threshold is `radius1 + radius2 + 350` to ensure connections appear at the deterministic SPACING of 280px. The path is filled with a linearGradient that transitions between source and target milestone colors.
+- **Milestone circles have an `feTurbulence` + `feDisplacementMap` filter** that makes their edges wobble organically like cell membranes. The turbulence seed is STATIC (not animated) — animated seeds regenerate Perlin noise every frame and kill mobile GPU performance.
+- **Milestone shapes use `blobPath()` with SMIL `<animate>` on the `d` attribute** for organic blob morphing. Three blob variants are generated per milestone with different seeds/variance and interpolated in a 10s loop. The same blobPath function is used in both BubbleMap.tsx (filled shapes) and Bubble.tsx (transparent click targets).
+- **Zoom is cursor-anchored** (desktop) and **pinch-anchored** (mobile). The math adjusts translation so the point under the cursor/fingers stays fixed during scale changes.
 - **Labels render in a separate unfiltered group** above the wobbled milestone circles so text stays sharp.
+- **Bubble.tsx uses plain `<g transform>` with no Framer Motion.** Click targets are blob paths with SMIL morphing animation, not circles.
+- **Buttons use `membrane-breathe` CSS animation** for organic border-radius morphing. Chat and log buttons are persistent (always visible unless their panel is open). Other buttons only show on the map view.
 - **Do NOT use Framer Motion for the pan/zoom transform group.** This has caused panning bugs across multiple iterations.
+- **Do NOT animate the feTurbulence seed.** This has caused mobile performance issues across multiple iterations.
 
 ## After Every Change
 Always run: npm run typecheck && npm run build

@@ -36,7 +36,7 @@ export function FloatingButton({
         opacity: { duration: 0.3 },
       }}
       onClick={onClick}
-      className={`${position === 'inline' ? '' : 'fixed'} ${positionClasses[position]} z-40 rounded-full px-5 py-2.5 font-medium text-sm
+      className={`${position === 'inline' ? '' : 'fixed'} ${positionClasses[position]} z-40 membrane-breathe font-medium text-sm
         bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/30 dark:border-white/10
         shadow-sm hover:bg-white/80 dark:hover:bg-white/15
         text-charcoal dark:text-softwhite ${className}`}

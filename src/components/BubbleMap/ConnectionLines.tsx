@@ -30,7 +30,7 @@ function metaball(
 ): string {
   const HALF_PI = Math.PI / 2
   const d = dist(center1, center2)
-  const maxDist = radius1 + radius2 * 2.5
+  const maxDist = radius1 + radius2 + 350
   let u1: number, u2: number
 
   if (
@@ -128,8 +128,8 @@ export function ConnectionLines({ links }: ConnectionLinesProps) {
           link.target.radius,
           center1,
           center2,
-          2.4,
-          0.5,
+          3.0,
+          0.6,
         )
 
         if (!pathD) return null
