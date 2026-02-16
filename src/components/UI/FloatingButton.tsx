@@ -1,10 +1,12 @@
 import { motion } from 'framer-motion'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 interface FloatingButtonProps {
   onClick: () => void
   children: React.ReactNode
   className?: string
   position?: 'bottom-center' | 'bottom-right' | 'bottom-left' | 'top-right' | 'inline'
+  phaseColor?: string
 }
 
 const positionClasses: Record<string, string> = {
@@ -20,7 +22,12 @@ export function FloatingButton({
   children,
   className = '',
   position = 'bottom-center',
+  phaseColor,
 }: FloatingButtonProps) {
+  const theme = useSettingsStore((s) => s.theme)
+  const isDark = theme === 'dark'
+  const color = phaseColor ?? (isDark ? '#D4967E' : '#FCD5CE')
+
   return (
     <motion.button
       initial={{ scale: 0, opacity: 0 }}
@@ -34,14 +41,23 @@ export function FloatingButton({
       }}
       onClick={onClick}
       className={`${position === 'inline' ? '' : 'fixed'} ${positionClasses[position]} z-40
-        membrane-breathe
+        rounded-full relative overflow-hidden
         text-charcoal/70 dark:text-softwhite/70 ${className}`}
-      style={{
-        background: 'radial-gradient(circle at 50% 50%, rgba(255,245,243,0.85) 50%, rgba(255,228,224,0.35) 100%)',
-        boxShadow: '0 0 0 1.5px rgba(255,200,190,0.25), 0 2px 8px rgba(0,0,0,0.04)',
-      }}
     >
-      {children}
+      {/* Membrane layer */}
+      <span
+        className="absolute inset-0 rounded-full membrane-breathe"
+        style={{ backgroundColor: color, opacity: 0.2 }}
+      />
+      {/* Nucleus layer */}
+      <span
+        className="absolute rounded-full"
+        style={{ backgroundColor: color, opacity: 0.45, inset: '15%' }}
+      />
+      {/* Content */}
+      <span className="relative z-10 flex items-center justify-center w-full h-full">
+        {children}
+      </span>
     </motion.button>
   )
 }

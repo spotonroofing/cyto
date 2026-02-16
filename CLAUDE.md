@@ -154,44 +154,59 @@ npm run typecheck  # TypeScript checking
 
 ## Visual Architecture
 
+### Two-Layer Cell Rendering
+Each milestone is rendered with two visual layers to create an organic cell look:
+1. **Membrane layer** — GooCanvas (`<canvas>`) at CSS `opacity: 0.28`. Draws full-size milestone circles + animated bridge circles through the SVG goo filter. This creates a translucent, blobby outer membrane.
+2. **Nucleus layer** — SVG overlay circles at `r = radius * 0.72` and `fillOpacity: 0.5`. These sit inside the membrane, giving each cell a denser inner core.
+
 ### Goo Rendering (Canvas + SVG Filter)
 The gooey organic effect uses the **blur + alpha contrast** technique:
 1. **GooCanvas** (`<canvas>`) draws milestone circles + animated bridge circles
-2. CSS `filter: url(#goo-filter)` applies the SVG goo filter to the canvas
-3. Filter chain: `feGaussianBlur(stdDeviation=8)` → `feColorMatrix(alpha×20-9)` → `feBlend(SourceGraphic)`
+2. CSS `filter: url(#goo-filter)` + `opacity: 0.28` applied to the canvas
+3. Filter chain: `feGaussianBlur(stdDeviation=12)` → `feColorMatrix(alpha×22-9)` → `feBlend(SourceGraphic)`
 4. Where circles overlap, their blurred alpha halos merge past the threshold → organic gooey merging
-5. Bridge circles oscillate perpendicular to connection paths → flowing liquid movement
+5. Bridge circles spaced every 18px, oscillating perpendicular to connection paths → flowing liquid movement
 
-### SVG Overlay (Labels Only)
+### SVG Overlay (Nucleus + Labels)
 A separate SVG sits on top of the canvas (z-index 2). It contains:
+- Nucleus circles (72% radius, fillOpacity 0.5)
+- Dashed rings for locked phases
 - Click targets (transparent circles)
 - Phase name + number labels
-- Dashed rings for locked phases
-- **NO visual circles** — all visual rendering is on the canvas
+- The nucleus circles provide the denser inner core of each cell
 
 ### Why Canvas, Not SVG
 SVG filter on a `<g>` group re-rasterizes every frame when child elements animate. Canvas composites all circles into a single raster, then the filter runs once on that raster. ONE filter pass per frame vs N.
 
 ### Performance
-- Canvas draws ~60-80 circles per frame (trivial)
-- Bridge count reduced on mobile (6 vs 10 per connection)
+- Canvas draws circles at fixed 18px spacing per connection
 - devicePixelRatio capped at 2
-- feGaussianBlur stdDeviation=8 is moderate (GPU-accelerated separable blur)
+- feGaussianBlur stdDeviation=12 is moderate (GPU-accelerated separable blur)
+- Canvas at opacity 0.28 means membrane is subtle, nucleus carries the visual weight
 - No feTurbulence, no animated seed, no SMIL on filter params
 
 ### Tuning the Goo
-- **Softer goo**: Lower the `20` in feColorMatrix alpha row (e.g., 15) or increase stdDeviation
-- **Sharper goo**: Raise the `20` (e.g., 25) or decrease stdDeviation
-- **Thicker connections**: Increase bridge circle `baseR` or `midR`
+- **Softer goo**: Lower the `22` in feColorMatrix alpha row (e.g., 15) or increase stdDeviation
+- **Sharper goo**: Raise the `22` (e.g., 25) or decrease stdDeviation
+- **Thicker connections**: Increase bridge circle `baseR` or `midR` (currently smallerR * 0.28)
 - **More flow**: Increase `amplitude` in bridge circle oscillation
 - **Less flow**: Decrease `amplitude` or `speed`
+
+### Cell-Styled Buttons
+Each FloatingButton has two `<span>` layers mimicking the cell look:
+- Outer membrane span: full inset, phase color at opacity 0.2, membrane-breathe animation
+- Inner nucleus span: inset 15%, phase color at opacity 0.45
+- Each button receives a unique `phaseColor` prop from the phase palette
+
+### TypewriterTerminal
+Top-left overlay that types messages character-by-character with variable speed.
+JetBrains Mono font, 0.55 opacity, muted purple prompt character, blinking cursor.
 
 ### Other Notes
 - **Panning uses plain `<g transform>`.** No Framer Motion on the map.
 - **Mouse/touch handlers use native addEventListener** with { passive: false }.
 - **Zoom is cursor/pinch-anchored.**
 - **Locked phases** get a dashed stroke ring on the SVG overlay (not dimmed).
-- **Buttons** use radial gradient for cell look + membrane-breathe CSS.
 - **Background:** #FFF8F7 base, radial vignette overlay, muted pink-mauve particles.
 - **Color:** cream = #FFF8F7 throughout. No warm peach/orange tones.
 - **ConnectionLines.tsx was deleted** — GooCanvas replaces it entirely.

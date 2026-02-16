@@ -8,6 +8,8 @@ import { useChatStore } from '@/stores/chatStore'
 import { useUIStore } from '@/stores/uiStore'
 import { BubbleMap } from '@/components/BubbleMap/BubbleMap'
 import { FloatingButton } from '@/components/UI/FloatingButton'
+import { TypewriterTerminal } from '@/components/UI/TypewriterTerminal'
+import { phaseColors } from '@/styles/theme'
 
 // Lazy-loaded overlays (not needed on initial render)
 const MilestoneDetail = lazy(() => import('@/components/MilestoneDetail/MilestoneDetail').then((m) => ({ default: m.MilestoneDetail })))
@@ -18,6 +20,8 @@ const SettingsPanel = lazy(() => import('@/components/Settings/SettingsPanel').t
 
 export function App() {
   const theme = useSettingsStore((s) => s.theme)
+  const isDark = theme === 'dark'
+  const colors = isDark ? phaseColors.dark : phaseColors.light
   const selectedMilestoneId = useUIStore((s) => s.selectedMilestoneId)
   const isLogOpen = useUIStore((s) => s.isLogOpen)
   const isAnalyticsOpen = useUIStore((s) => s.isAnalyticsOpen)
@@ -64,6 +68,9 @@ export function App() {
         {/* Bubble Map (always rendered) */}
         <BubbleMap />
 
+        {/* Typewriter terminal — map view only */}
+        {showMapOnlyButtons && <TypewriterTerminal />}
+
         {/* Milestone Detail View (overlay) */}
         <AnimatePresence>
           {selectedMilestoneId && (
@@ -88,6 +95,7 @@ export function App() {
             <FloatingButton
               onClick={() => window.dispatchEvent(new CustomEvent('cyto-recenter'))}
               position="inline"
+              phaseColor={colors[0]}
               className="w-11 h-11 !px-0 flex items-center justify-center"
             >
               <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -101,6 +109,7 @@ export function App() {
             <FloatingButton
               onClick={toggleLog}
               position="inline"
+              phaseColor={colors[3]}
               className="w-12 h-12 !px-0 flex items-center justify-center"
             >
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -114,6 +123,7 @@ export function App() {
             <FloatingButton
               onClick={() => openChat()}
               position="inline"
+              phaseColor={colors[2]}
               className="w-12 h-12 !px-0 flex items-center justify-center"
             >
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -128,6 +138,7 @@ export function App() {
           <FloatingButton
             onClick={toggleAnalytics}
             position="bottom-left"
+            phaseColor={colors[5]}
             className="w-12 h-12 !px-0 flex items-center justify-center"
           >
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -141,6 +152,7 @@ export function App() {
           <FloatingButton
             onClick={() => useUIStore.getState().toggleSettings()}
             position="top-right"
+            phaseColor={colors[1]}
             className="w-10 h-10 !px-0 !p-0 flex items-center justify-center overflow-hidden"
           >
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">

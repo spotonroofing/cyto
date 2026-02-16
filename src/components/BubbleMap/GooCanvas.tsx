@@ -44,7 +44,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   // Recompute bridge circles when layout changes
   useEffect(() => {
     const bridges: BridgeCircle[] = []
-    const isMobile = width < 768
 
     for (const link of links) {
       const sx = link.source.x, sy = link.source.y
@@ -60,8 +59,9 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       const sourceColor = getPhaseColor(link.sourcePhaseIndex, isDark)
       const targetColor = getPhaseColor(link.targetPhaseIndex, isDark)
 
-      // Bridge circle count: more for longer distances, fewer on mobile
-      const count = isMobile ? 6 : 10
+      // Bridge circle spacing: fixed 18px between circles
+      const spacing = 18
+      const count = Math.max(2, Math.floor(dist / spacing))
 
       for (let i = 0; i <= count; i++) {
         const t = i / count
@@ -71,8 +71,9 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         // Radius: larger near milestones, thinner in middle (hourglass shape)
         // but with a minimum to prevent spider-thin connections
         const distFromCenter = Math.abs(t - 0.5) * 2 // 0 at center, 1 at ends
-        const endR = Math.min(link.source.radius, link.target.radius) * 0.5
-        const midR = endR * 0.45 // minimum thickness at center
+        const smallerR = Math.min(link.source.radius, link.target.radius)
+        const endR = smallerR * 0.5
+        const midR = smallerR * 0.28 // wider minimum thickness at center
         const r = midR + (endR - midR) * distFromCenter * distFromCenter
 
         bridges.push({
@@ -83,8 +84,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           perpX: px,
           perpY: py,
           phase: t * Math.PI * 2 + Math.random() * 0.5,
-          speed: 0.3 + Math.random() * 0.2,
-          amplitude: 2 + Math.random() * 3,
+          speed: 0.2 + Math.random() * 0.15,
+          amplitude: 2 + Math.random() * 2,
         })
       }
     }
@@ -163,6 +164,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         zIndex: 1,
         pointerEvents: 'none',
         filter: 'url(#goo-filter)',
+        opacity: 0.28,
       }}
     />
   )

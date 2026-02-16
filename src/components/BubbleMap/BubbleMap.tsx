@@ -230,11 +230,11 @@ export function BubbleMap() {
       <svg width="0" height="0" style={{ position: 'absolute' }}>
         <defs>
           <filter id="goo-filter" colorInterpolationFilters="sRGB">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
             <feColorMatrix
               in="blur"
               type="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9"
               result="goo"
             />
             <feBlend in="SourceGraphic" in2="goo" />
@@ -259,6 +259,18 @@ export function BubbleMap() {
         style={{ zIndex: 2, pointerEvents: 'none' }}
       >
         <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
+          {/* Nucleus circles — denser inner core */}
+          {bubbles.map((bubble) => (
+            <circle
+              key={`nucleus-${bubble.milestoneId}`}
+              cx={bubble.x}
+              cy={bubble.y}
+              r={bubble.radius * 0.72}
+              fill={getPhaseColor(bubble.phaseIndex, isDark)}
+              fillOpacity={0.5}
+            />
+          ))}
+
           {/* Locked phase indicators — dashed rings */}
           {bubbles.map((bubble) => {
             const isLocked = bubble.status === 'blocked' || bubble.status === 'not_started'
