@@ -34,7 +34,7 @@ const config: Config = {
           7: '#7BA87B', // Forest sage
         },
         // Theme colors
-        cream: '#FFF8F0',
+        cream: '#FFF5F2',
         navy: '#0F0E17',
         charcoal: '#2D2A32',
         softwhite: '#FFFFFE',

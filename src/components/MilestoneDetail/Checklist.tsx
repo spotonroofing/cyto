@@ -84,7 +84,7 @@ function ChecklistItem({ item, color, isDark, index, onToggle, onFoodTrialOutcom
           <svg width={10} height={10} viewBox="0 0 10 10" fill="none">
             <path
               d="M2 5L4.5 7.5L8 2.5"
-              stroke={isDark ? '#0F0E17' : '#FFF8F0'}
+              stroke={isDark ? '#0F0E17' : '#FFF5F2'}
               strokeWidth={1.5}
               strokeLinecap="round"
               strokeLinejoin="round"

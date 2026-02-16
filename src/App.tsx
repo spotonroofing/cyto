@@ -52,7 +52,7 @@ export function App() {
     )
   }
 
-  const showMapOnlyButtons = !selectedMilestoneId && !isLogOpen && !isAnalyticsOpen && !isChatOpen
+  const showMapOnlyButtons = !selectedMilestoneId && !isLogOpen && !isAnalyticsOpen && !isChatOpen && !isSettingsOpen
 
   return (
     <ThemeProvider>
@@ -81,72 +81,58 @@ export function App() {
           )}
         </AnimatePresence>
 
-        {/* Bottom-right button stack */}
+        {/* Bottom-right: Daily log + Chat — always visible unless their own panel is open */}
         <div className="fixed bottom-6 right-6 z-40 flex flex-col items-center gap-3">
-          {/* Location/recenter button — map only */}
-          {showMapOnlyButtons && (
-            <FloatingButton
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('cyto-recenter'))
-              }}
-              position="inline"
-              className="w-11 h-11 !px-0 flex items-center justify-center"
-            >
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
-              </svg>
-            </FloatingButton>
-          )}
-
-          {/* Daily log + button — persistent */}
+          {/* Daily log button */}
           {!isLogOpen && (
             <FloatingButton
               onClick={toggleLog}
               position="inline"
-              className="w-11 h-11 !px-0 flex items-center justify-center text-xl"
+              className="w-12 h-12 !px-0 flex items-center justify-center"
             >
-              +
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
             </FloatingButton>
           )}
 
-          {/* Chat button — persistent */}
+          {/* Chat button */}
           {!isChatOpen && (
             <FloatingButton
               onClick={() => openChat()}
               position="inline"
-              className="w-11 h-11 !px-0 flex items-center justify-center"
+              className="w-12 h-12 !px-0 flex items-center justify-center"
             >
-              <svg width={16} height={16} viewBox="0 0 18 18" fill="none">
-                <path d="M3 9C3 5.686 5.686 3 9 3C12.314 3 15 5.686 15 9C15 12.314 12.314 15 9 15C7.92 15 6.903 14.73 6.003 14.253L3 15L3.747 11.997C3.27 11.097 3 10.08 3 9Z" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
               </svg>
             </FloatingButton>
           )}
         </div>
 
-        {/* Analytics button — bottom-left, map only */}
+        {/* Analytics — bottom-left, map view only */}
         {showMapOnlyButtons && (
           <FloatingButton
             onClick={toggleAnalytics}
             position="bottom-left"
-            className="w-11 h-11 !px-0 flex items-center justify-center"
+            className="w-12 h-12 !px-0 flex items-center justify-center"
           >
-            <svg width={16} height={16} viewBox="0 0 18 18" fill="none">
-              <path d="M2 14V8M6 14V4M10 14V10M14 14V6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 20V10M12 20V4M6 20v-6" />
             </svg>
           </FloatingButton>
         )}
 
-        {/* Logo / settings — top-right, map only */}
+        {/* Settings — top-right, map view only */}
         {showMapOnlyButtons && (
           <FloatingButton
             onClick={() => useUIStore.getState().toggleSettings()}
             position="top-right"
-            className="w-10 h-10 !px-0 flex items-center justify-center"
+            className="w-10 h-10 !px-0 !p-0 flex items-center justify-center overflow-hidden"
           >
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.5} />
-              <text x="12" y="12" textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="700" fill="currentColor">C</text>
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
           </FloatingButton>
         )}
