@@ -1,216 +1,69 @@
-\# Cyto — Personal Health Recovery Tracker
-
-
-
-\## What This Is
-
-\*\*Cyto\*\* is a personal-use-only interactive health recovery web app for a single user (Willem). The name comes from "cytoplasm" — the living substance inside every cell — which captures what this app is: a living, breathing command center for health recovery. Cyto works as both the app brand ("Cyto — your living health dashboard") and the AI coach character ("Cyto noticed you skipped lunch"). It visualizes a multi-phase gut health recovery roadmap as an organic bubble/node map with smooth animations, AI-powered nudges via Anthropic API, daily logging, and analytics dashboards. It connects to an OpenClaw agent on Telegram for proactive notifications.
-
-
-
-\## Tech Stack
-
-\- React 18+ with TypeScript
-
-\- Vite for build tooling
-
-\- Tailwind CSS for utility styling + custom CSS for animations/gradients
-
-\- Framer Motion for all animations and transitions
-
-\- D3.js for the bubble map layout and force simulation
-
-\- Recharts for analytics charts
-
-\- Anthropic API (Claude Opus 4.6) for Cyto AI coach features
-
-\- LocalStorage + IndexedDB for persistent client-side data (no backend database)
-
-\- Railway for deployment
-
-
-
-\## Project Structure
-
-src/
-
-├── components/
-
-│   ├── BubbleMap/        # Main bubble visualization + force layout
-
-│   ├── MilestoneDetail/  # Expanded milestone view (checklist, notes, stats)
-
-│   ├── Analytics/        # Charts, trends, heat maps
-
-│   ├── Chat/             # Cyto in-app AI chat interface
-
-│   ├── Settings/         # Theme toggle, API key input, data export
-
-│   └── UI/               # Shared animated components (floating panels, transitions)
-
-├── data/
-
-│   ├── roadmap.ts        # All milestone/phase/action item data
-
-│   ├── dependencies.ts   # Which milestones block which downstream milestones
-
-│   └── healthContext.ts  # Willem's health context (editable by Cyto AI)
-
-├── hooks/                # Custom React hooks for animations, data, Cyto AI
-
-├── stores/               # State management (Zustand)
-
-├── styles/               # Global styles, theme definitions, animations
-
-├── utils/                # Date math, dependency graph logic, Cyto AI prompt builders
-
-└── types/                # TypeScript interfaces
-
-
-
-\## Code Style
-
-\- Functional components only, no class components
-
-\- Use Zustand for state management, not Redux or Context API
-
-\- All animations via Framer Motion — no CSS transition hacks
-
-\- Tailwind for layout/spacing, custom CSS only for complex gradients and organic shapes
-
-\- TypeScript strict mode, no `any` types
-
-\- ES modules (import/export), destructured imports
-
-\- All components must be responsive (mobile-first, works on phone and desktop)
-
-
-
-\## Design Principles
-
-\- Organic, amoeba-like visual language — no sharp rectangles or rigid grids
-
-\- The app IS Cyto — a living organism. The UI should feel like Cyto is alive, not a static dashboard
-
-\- Pastel rainbow palette across both light and dark themes
-
-\- Elements float and breathe — subtle idle animations on everything visible
-
-\- Transitions between views are smooth zooms/morphs, never hard cuts
-
-\- UI panels appear as floating organic shapes, not fixed modal boxes
-
-
-
-\## Key Behaviors
-
-\- Bubble map is the home view — centered on current/active milestone
-
-\- Tapping a bubble zooms into it smoothly, revealing details
-
-\- Sub-stats within a milestone can "break off" as smaller bubbles (amoeba split)
-
-\- Timeline adjusts dynamically based on completion — dependency-aware, not rigid
-
-\- AI chat is accessible from within the app — Cyto is the coach character, sharing context with the OpenClaw/Telegram agent
-
-\- Dark/light mode toggle with pastel color themes for both
-
-
-
-\## Commands
-
-```bash
-
-npm run dev        # Start dev server
-
-npm run build      # Production build
-
-npm run preview    # Preview production build
-
-npm run lint       # ESLint
-
-npm run typecheck  # TypeScript checking
-
-```
-
-
-
-\## Important Notes
-
-\- This is a SINGLE USER app. No auth, no multi-user, no login screens.
-
-\- All data persists client-side (IndexedDB + localStorage). No backend DB.
-
-\- The Anthropic API key is entered in settings and stored locally. Never hardcode it.
-
-\- When deploying to Railway, it's just a static site build (Vite output).
-
-\- Mobile responsiveness is critical — primary use is on phone.
-
-\- Never add features not in the spec. Ask before adding anything new.
-
-\- Do not refactor code unless explicitly asked.
-
-## Visual Architecture
-
-### Two-Layer Cell Rendering
-Each milestone is rendered with two visual layers to create an organic cell look:
-1. **Membrane layer** — GooCanvas (`<canvas>`) at CSS `opacity: 0.28`. Draws full-size milestone circles + animated bridge circles through the SVG goo filter. This creates a translucent, blobby outer membrane.
-2. **Nucleus layer** — SVG overlay circles at `r = radius * 0.72` and `fillOpacity: 0.5`. These sit inside the membrane, giving each cell a denser inner core.
-
-### Goo Rendering (Canvas + SVG Filter)
-The gooey organic effect uses the **blur + alpha contrast** technique:
-1. **GooCanvas** (`<canvas>`) draws milestone circles + animated bridge circles
-2. CSS `filter: url(#goo-filter)` + `opacity: 0.28` applied to the canvas
-3. Filter chain: `feGaussianBlur(stdDeviation=12)` → `feColorMatrix(alpha×22-9)` → `feBlend(SourceGraphic)`
-4. Where circles overlap, their blurred alpha halos merge past the threshold → organic gooey merging
-5. Bridge circles spaced every 18px, oscillating perpendicular to connection paths → flowing liquid movement
-
-### SVG Overlay (Nucleus + Labels)
-A separate SVG sits on top of the canvas (z-index 2). It contains:
-- Nucleus circles (72% radius, fillOpacity 0.5)
-- Dashed rings for locked phases
-- Click targets (transparent circles)
-- Phase name + number labels
-- The nucleus circles provide the denser inner core of each cell
-
-### Why Canvas, Not SVG
-SVG filter on a `<g>` group re-rasterizes every frame when child elements animate. Canvas composites all circles into a single raster, then the filter runs once on that raster. ONE filter pass per frame vs N.
-
-### Performance
-- Canvas draws circles at fixed 18px spacing per connection
-- devicePixelRatio capped at 2
-- feGaussianBlur stdDeviation=12 is moderate (GPU-accelerated separable blur)
-- Canvas at opacity 0.28 means membrane is subtle, nucleus carries the visual weight
-- No feTurbulence, no animated seed, no SMIL on filter params
-
-### Tuning the Goo
-- **Softer goo**: Lower the `22` in feColorMatrix alpha row (e.g., 15) or increase stdDeviation
-- **Sharper goo**: Raise the `22` (e.g., 25) or decrease stdDeviation
-- **Thicker connections**: Increase bridge circle `baseR` or `midR` (currently smallerR * 0.28)
-- **More flow**: Increase `amplitude` in bridge circle oscillation
-- **Less flow**: Decrease `amplitude` or `speed`
-
-### Cell-Styled Buttons
-Each FloatingButton has two `<span>` layers mimicking the cell look:
-- Outer membrane span: full inset, phase color at opacity 0.2, membrane-breathe animation
-- Inner nucleus span: inset 15%, phase color at opacity 0.45
-- Each button receives a unique `phaseColor` prop from the phase palette
-
-### TypewriterTerminal
-Top-left overlay that types messages character-by-character with variable speed.
-JetBrains Mono font, 0.55 opacity, muted purple prompt character, blinking cursor.
-
-### Other Notes
-- **Panning uses plain `<g transform>`.** No Framer Motion on the map.
-- **Mouse/touch handlers use native addEventListener** with { passive: false }.
-- **Zoom is cursor/pinch-anchored.**
-- **Locked phases** get a dashed stroke ring on the SVG overlay (not dimmed).
-- **Background:** #FFF8F7 base, radial vignette overlay, muted pink-mauve particles.
-- **Color:** cream = #FFF8F7 throughout. No warm peach/orange tones.
-- **ConnectionLines.tsx was deleted** — GooCanvas replaces it entirely.
-
-## After Every Change
-Always run: npm run typecheck && npm run build
-Always push: git add -A && git commit -m "description" && git push origin main
+# Cyto Web App — Project Context
+
+## What This Is
+Cyto is a personal health recovery tracker with an organic, cellular visual theme. It visualizes a 7-phase recovery roadmap as a "microscope view" — milestone nodes are living cells connected by gooey cytoplasm bridges. Think agar.io meets a biology textbook.
+
+## Tech Stack
+- **Framework:** React (Vite) + TypeScript
+- **Styling:** Tailwind CSS + globals.css (membrane-breathe keyframes)
+- **State:** Zustand (roadmapStore) + Dexie (IndexedDB persistence)
+- **Graphics:** Canvas (goo/connections) + SVG (nuclei, labels, buttons) — hybrid approach
+- **Animation:** Framer Motion (interactions) + CSS keyframes (ambient breathing)
+- **Server:** Hono on Railway (serves static build + /api/state endpoint)
+
+## Key Files
+- `src/components/BubbleMap/BubbleMap.tsx` — Main map container, zoom/pan state, SVG filter defs
+- `src/components/BubbleMap/GooCanvas.tsx` — Canvas layer for goo connections (tapered filled paths)
+- `src/components/BubbleMap/Bubble.tsx` — SVG layer for milestone nuclei + click handlers
+- `src/components/BubbleMap/useBubbleLayout.ts` — Deterministic layout positions
+- `src/components/BubbleMap/BackgroundParticles.tsx` — Canvas ambient particles
+- `src/components/MilestoneDetail/SubDetailView.tsx` — Milestone detail overlay
+- `src/components/MilestoneDetail/MilestoneDetail.tsx` — Detail panel
+- `src/components/UI/FloatingButton.tsx` — Floating action buttons
+- `src/components/Settings/SettingsPanel.tsx` — Settings panel
+- `src/styles/theme.ts` — Central color definitions
+- `src/styles/globals.css` — CSS keyframes (membrane-breathe)
+- `src/data/dependencies.ts` — Milestone dependency graph
+- `src/stores/roadmapStore.ts` — Zustand store (milestones, phases, user state)
+- `server/index.ts` — Hono server
+
+## Visual Design Rules
+- Background: Cream #FFF5F2
+- Cells have outer membrane (CSS border-radius morphing animation) and inner nucleus
+- Connections are thick organic "goo" — NOT thin lines, NOT dots, NOT arcs
+- Button tints: pastel variants of phase colors
+- Labels go OUTSIDE any SVG goo filter group (blur destroys text)
+- Mobile-first — everything must work on phone
+
+## Architecture Decisions
+- **Canvas for goo, SVG for UI:** Canvas handles high-particle-count goo rendering + blur filters efficiently. SVG keeps nuclei/text/buttons crisp.
+- **CSS keyframes for ambient animation:** Membrane breathing is pure CSS (GPU accelerated). No JS animation loops for constant effects.
+- **Deterministic layout:** Milestone positions are pre-calculated, not D3 force simulation. Same positions every load.
+- **No scale animations on overlays:** Scale transforms on SubDetailView/MilestoneDetail cause text jitter. Only border-radius and box-shadow animate.
+- **Native touch handlers:** Framer Motion drag conflicted with pan/zoom. Using native addEventListener with passive: false on a plain <g>, not motion.g.
+
+## Things NOT To Do
+- Do NOT use generateBlobPath / blobPath.ts — produces hexagonal shapes. Use plain circles.
+- Do NOT use metaballPath / metaball.ts — produces invisible connections.
+- Do NOT apply SVG goo filter to individual elements — must be on a <g> group.
+- Do NOT put text/labels inside the goo-filtered group — blur destroys them.
+- Do NOT use feTurbulence for cell shapes — kills mobile performance (15fps).
+- Do NOT add Framer Motion scale transforms to overlay containers.
+- Do NOT use D3 force simulation for layout — causes random positions on each load.
+- Do NOT over-engineer. Keep changes minimal and focused.
+
+## Current State
+- Phase 0 (Stabilize & Baseline) is active
+- Goo connections use Canvas with tapered filled paths (v8 approach)
+- Layout is deterministic left-to-right winding path with fork/merge
+- Mobile touch pan/zoom uses native handlers
+- Daily logging available but primarily done via Telegram agent
+
+## Reference Docs
+- `docs/WEB_APP_SCOPE.md` — Full feature inventory with status markers
+- `docs/WEB_APP_APPROACHES_TRIED.md` — CRITICAL: Every technique tried, what failed, and why
+- `docs/WEB_APP_ARCHITECTURE.md` — File structure, data flow, technical decisions
+- `docs/WEB_APP_KNOWN_BUGS.md` — Current bug list
+- `docs/WEB_APP_FUTURE_IDEAS.md` — Backlog of v2+ ideas
+- `docs/VISUAL_OVERHAUL_PROMPTS.md` — Pre-written prompt sequence for visual improvements (DO NOT run unless Willem says to)
+- `docs/WILLEM_CONTEXT.md` — Health context (for understanding what the milestones represent)
