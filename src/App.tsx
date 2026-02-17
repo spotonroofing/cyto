@@ -35,6 +35,7 @@ export function App() {
   const isSettingsOpen = useUIStore((s) => s.isSettingsOpen)
   const closeSettings = useUIStore((s) => s.closeSettings)
   const [ready, setReady] = useState(false)
+  const [recenterMode, setRecenterMode] = useState<'focus' | 'fit-all'>('focus')
 
   useEffect(() => {
     Promise.all([
@@ -42,6 +43,15 @@ export function App() {
       useDailyLogStore.getState().initialize(),
       useChatStore.getState().initialize(),
     ]).then(() => setReady(true))
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      setRecenterMode(detail)
+    }
+    window.addEventListener('cyto-recenter-mode', handler)
+    return () => window.removeEventListener('cyto-recenter-mode', handler)
   }, [])
 
   if (!ready) {
@@ -104,17 +114,23 @@ export function App() {
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.2 }}
             >
-              {/* Recenter button */}
+              {/* Recenter / Fit-all button */}
               <FloatingButton
                 onClick={() => window.dispatchEvent(new CustomEvent('cyto-recenter'))}
                 position="inline"
                 phaseColor={colors[0]}
                 className="w-11 h-11 !px-0 flex items-center justify-center"
               >
-                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
-                </svg>
+                {recenterMode === 'focus' ? (
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                  </svg>
+                ) : (
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                  </svg>
+                )}
               </FloatingButton>
 
               {/* Daily log button */}
@@ -144,36 +160,58 @@ export function App() {
           )}
         </AnimatePresence>
 
-        {/* Analytics — bottom-left, map view only, with safe padding */}
-        {showMapOnlyButtons && (
-          <FloatingButton
-            onClick={toggleAnalytics}
-            position="bottom-left"
-            phaseColor={colors[5]}
-            className="w-12 h-12 !px-0 flex items-center justify-center"
-            style={{ bottom: '2.5rem', left: '1.5rem' }}
-          >
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 20V10M12 20V4M6 20v-6" />
-            </svg>
-          </FloatingButton>
-        )}
+        {/* Analytics — bottom-left, mirrors bottom-right stack padding */}
+        <AnimatePresence>
+          {showMapOnlyButtons && (
+            <motion.div
+              key="bottom-left-buttons"
+              className="fixed z-40 flex flex-col items-center gap-3"
+              style={{ bottom: '1.5rem', left: '1.5rem' }}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <FloatingButton
+                onClick={toggleAnalytics}
+                position="inline"
+                phaseColor={colors[5]}
+                className="w-12 h-12 !px-0 flex items-center justify-center"
+              >
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 20V10M12 20V4M6 20v-6" />
+                </svg>
+              </FloatingButton>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Settings — top-right, map view only */}
-        {showMapOnlyButtons && (
-          <FloatingButton
-            onClick={() => useUIStore.getState().toggleSettings()}
-            position="top-right"
-            phaseColor={colors[1]}
-            className="w-11 h-11 !px-0 !p-0 flex items-center justify-center"
-            style={{ top: '1.5rem', right: '1.5rem' }}
-          >
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </FloatingButton>
-        )}
+        {/* Settings — top-right */}
+        <AnimatePresence>
+          {showMapOnlyButtons && (
+            <motion.div
+              key="top-right-buttons"
+              className="fixed z-40"
+              style={{ top: '1.5rem', right: '1.5rem' }}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <FloatingButton
+                onClick={() => useUIStore.getState().toggleSettings()}
+                position="inline"
+                phaseColor={colors[2]}
+                className="w-11 h-11 !px-0 !p-0 flex items-center justify-center"
+              >
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </FloatingButton>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Daily Log Panel */}
         <AnimatePresence>

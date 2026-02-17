@@ -5,41 +5,9 @@ import { GooCanvas } from './GooCanvas'
 import { BackgroundParticles } from './BackgroundParticles'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
-import { useSettingsStore } from '@/stores/settingsStore'
-import { getPhaseColor } from '@/styles/theme'
 
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
-
-// Animated nucleus component — organic morphing ellipses
-function MorphingNucleus({ bubble, isDark, time }: {
-  bubble: { x: number; y: number; radius: number; phaseIndex: number; milestoneId: string }
-  isDark: boolean
-  time: number
-}) {
-  const color = getPhaseColor(bubble.phaseIndex, isDark)
-  const baseR = bubble.radius * 0.72
-
-  // Organic deformation
-  const breathe = Math.sin(time * 0.5 + bubble.phaseIndex * 0.9) * 2
-  const wobbleX = Math.sin(time * 0.35 + bubble.phaseIndex * 1.2) * 1.5
-  const wobbleY = Math.cos(time * 0.28 + bubble.phaseIndex * 0.7) * 1.5
-  const rx = baseR + breathe + Math.sin(time * 0.4 + bubble.phaseIndex) * 2
-  const ry = baseR - breathe + Math.cos(time * 0.3 + bubble.phaseIndex * 1.5) * 2
-  const rotation = Math.sin(time * 0.15 + bubble.phaseIndex * 0.6) * 8 // degrees
-
-  return (
-    <ellipse
-      cx={bubble.x + wobbleX}
-      cy={bubble.y + wobbleY}
-      rx={Math.max(rx, baseR * 0.8)}
-      ry={Math.max(ry, baseR * 0.8)}
-      fill={color}
-      fillOpacity={0.5}
-      transform={`rotate(${rotation}, ${bubble.x + wobbleX}, ${bubble.y + wobbleY})`}
-    />
-  )
-}
 
 export function BubbleMap() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -58,14 +26,10 @@ export function BubbleMap() {
   const transformRef = useRef(transform)
   const bubblesRef = useRef<ReturnType<typeof useBubbleLayout>['bubbles']>([])
 
-  // Nucleus animation time
-  const [nucleusTime, setNucleusTime] = useState(0)
-  const nucleusAnimRef = useRef<number>(0)
+  const recenterModeRef = useRef<'focus' | 'fit-all'>('focus')
 
   const selectMilestone = useUIStore((s) => s.selectMilestone)
   const getCurrentMilestone = useRoadmapStore((s) => s.getCurrentMilestone)
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
 
   useEffect(() => {
     const measure = () => {
@@ -93,18 +57,6 @@ export function BubbleMap() {
     }
   }, [transform.scale])
 
-  // Nucleus morphing animation loop (lower frequency updates for SVG)
-  useEffect(() => {
-    let time = 0
-    const tick = () => {
-      time += 0.016
-      setNucleusTime(time)
-      nucleusAnimRef.current = requestAnimationFrame(tick)
-    }
-    nucleusAnimRef.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(nucleusAnimRef.current)
-  }, [])
-
   // Auto-zoom to current milestone
   useEffect(() => {
     if (!settled || hasAutoZoomedRef.current || bubbles.length === 0) return
@@ -129,6 +81,8 @@ export function BubbleMap() {
       if (e.button !== 0) return
       isPanningRef.current = true
       lastPanRef.current = { x: e.clientX, y: e.clientY }
+      recenterModeRef.current = 'focus'
+      window.dispatchEvent(new CustomEvent('cyto-recenter-mode', { detail: 'focus' }))
     }
     const onMouseMove = (e: MouseEvent) => {
       if (!isPanningRef.current) return
@@ -145,7 +99,7 @@ export function BubbleMap() {
       const cy = e.clientY - rect.top
       setTransform((t) => {
         const factor = e.deltaY > 0 ? 0.95 : 1.05
-        const ns = Math.max(0.3, Math.min(3, t.scale * factor))
+        const ns = Math.max(0.15, Math.min(3, t.scale * factor))
         const r = ns / t.scale
         return { x: cx - (cx - t.x) * r, y: cy - (cy - t.y) * r, scale: ns }
       })
@@ -173,6 +127,8 @@ export function BubbleMap() {
         hasPannedRef.current = false
         lastPanRef.current = { x: t.clientX, y: t.clientY }
         touchStartRef.current = { x: t.clientX, y: t.clientY, time: Date.now() }
+        recenterModeRef.current = 'focus'
+        window.dispatchEvent(new CustomEvent('cyto-recenter-mode', { detail: 'focus' }))
       } else if (e.touches.length === 2) {
         isPanningRef.current = false
         touchStartRef.current = null
@@ -205,7 +161,7 @@ export function BubbleMap() {
           const my = (t0.clientY + t1.clientY) / 2 - rect.top
           const f = nd / lastPinchDistRef.current
           setTransform((t) => {
-            const ns = Math.max(0.3, Math.min(3, t.scale * f))
+            const ns = Math.max(0.15, Math.min(3, t.scale * f))
             const r = ns / t.scale
             return { x: mx - (mx - t.x) * r, y: my - (my - t.y) * r, scale: ns }
           })
@@ -243,15 +199,39 @@ export function BubbleMap() {
   }, [selectMilestone])
 
   const handleRecenter = useCallback(() => {
-    const current = getCurrentMilestone()
-    if (!current) return
-    const bubble = bubbles.find((b) => b.milestoneId === current.id)
-    if (!bubble) return
-    setTransform({
-      x: dimensions.width / 2 - bubble.x * 1.2,
-      y: dimensions.height / 2 - bubble.y * 1.2,
-      scale: 1.2,
-    })
+    if (recenterModeRef.current === 'focus') {
+      // Focus on current milestone
+      const current = getCurrentMilestone()
+      if (!current) return
+      const bubble = bubbles.find((b) => b.milestoneId === current.id)
+      if (!bubble) return
+      setTransform({
+        x: dimensions.width / 2 - bubble.x * 1.2,
+        y: dimensions.height / 2 - bubble.y * 1.2,
+        scale: 1.2,
+      })
+      recenterModeRef.current = 'fit-all'
+      window.dispatchEvent(new CustomEvent('cyto-recenter-mode', { detail: 'fit-all' }))
+    } else {
+      // Fit entire map
+      if (bubbles.length === 0) return
+      const minX = Math.min(...bubbles.map(b => b.x - b.radius))
+      const maxX = Math.max(...bubbles.map(b => b.x + b.radius))
+      const minY = Math.min(...bubbles.map(b => b.y - b.radius))
+      const maxY = Math.max(...bubbles.map(b => b.y + b.radius))
+      const mapW = maxX - minX + 100  // padding
+      const mapH = maxY - minY + 100
+      const scale = Math.min(dimensions.width / mapW, dimensions.height / mapH, 1)
+      const cx = (minX + maxX) / 2
+      const cy = (minY + maxY) / 2
+      setTransform({
+        x: dimensions.width / 2 - cx * scale,
+        y: dimensions.height / 2 - cy * scale,
+        scale,
+      })
+      recenterModeRef.current = 'focus'
+      window.dispatchEvent(new CustomEvent('cyto-recenter-mode', { detail: 'focus' }))
+    }
   }, [bubbles, dimensions, getCurrentMilestone])
 
   useEffect(() => {
@@ -272,15 +252,6 @@ export function BubbleMap() {
       style={{ touchAction: 'none' }}
     >
       <BackgroundParticles />
-
-      {/* Petri dish vignette — slightly more visible */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          zIndex: 0,
-          background: 'radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(0,0,0,0.07) 100%)',
-        }}
-      />
 
       {/* Hidden SVG for goo filter definition — stdDeviation is dynamic */}
       <svg width="0" height="0" style={{ position: 'absolute' }}>
@@ -312,7 +283,7 @@ export function BubbleMap() {
         transform={transform}
       />
 
-      {/* SVG overlay — morphing nucleus, labels and click targets (no filter) */}
+      {/* SVG overlay — labels and click targets (no filter) */}
       <svg
         width={dimensions.width}
         height={dimensions.height}
@@ -320,16 +291,6 @@ export function BubbleMap() {
         style={{ zIndex: 2, pointerEvents: 'none' }}
       >
         <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
-          {/* Morphing nucleus circles — organic ellipses that breathe and wobble */}
-          {bubbles.map((bubble) => (
-            <MorphingNucleus
-              key={`nucleus-${bubble.milestoneId}`}
-              bubble={bubble}
-              isDark={isDark}
-              time={nucleusTime}
-            />
-          ))}
-
           {/* Labels and click targets */}
           {bubbles.map((bubble) => (
             <Bubble

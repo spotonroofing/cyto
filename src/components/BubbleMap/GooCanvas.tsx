@@ -11,24 +11,6 @@ interface GooCanvasProps {
   transform: { x: number; y: number; scale: number }
 }
 
-// ── Color helpers ──────────────────────────────────────────────
-
-function hexToRgb(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return [r, g, b]
-}
-
-function lerpColor(c1: string, c2: string, t: number): string {
-  const [r1, g1, b1] = hexToRgb(c1)
-  const [r2, g2, b2] = hexToRgb(c2)
-  const r = Math.round(r1 + (r2 - r1) * t)
-  const g = Math.round(g1 + (g2 - g1) * t)
-  const b = Math.round(b1 + (b2 - b1) * t)
-  return `rgb(${r}, ${g}, ${b})`
-}
-
 // ── Precomputed connection data (recomputed on layout change) ──
 
 interface ConnectionData {
@@ -48,6 +30,9 @@ interface ConnectionData {
   phaseOffset: number
   flowSpeed: number
   wobbleFreq: number
+  // Fan-out counts for branch goo cleanup
+  sourceFanOut: number
+  targetFanOut: number
 }
 
 interface BlobData {
@@ -58,6 +43,10 @@ interface BlobData {
   breathePhase: number
   wobblePhase: number
   deformFreq: number
+  // Nucleus-specific
+  nucleusHarmonics: number[]  // 4-6 random amplitudes for multi-harmonic shape
+  nucleusPhases: number[]     // matching phase offsets
+  nucleusRotSpeed: number     // rotation speed
 }
 
 // ── Sampling helpers ──────────────────────────────────────────
@@ -79,8 +68,16 @@ function sampleConnection(
   // Taper: thick at cells, still substantial in middle
   const distFromEdge = Math.min(t, 1 - t) * 2  // 0 at edges, 1 at center
   const smallerR = Math.min(conn.sr, conn.tr)
-  const endWidth = smallerR * 0.55   // thick near cells — overlaps blob for goo merge
-  const midWidth = smallerR * 0.18   // still visible in center (~9px for r=50)
+
+  // Reduce thickness at fan-out points (where branches split)
+  const sourceFan = conn.sourceFanOut || 1
+  const targetFan = conn.targetFanOut || 1
+  const fanReduction = t < 0.5
+    ? (sourceFan > 2 ? 0.6 : 1)
+    : (targetFan > 2 ? 0.6 : 1)
+
+  const endWidth = smallerR * 0.45 * fanReduction
+  const midWidth = smallerR * 0.14
   // Smooth taper — stays thick longer, narrows gently
   const taper = midWidth + (endWidth - midWidth) * Math.pow(1 - distFromEdge, 1.2)
 
@@ -122,8 +119,28 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         phaseOffset: Math.random() * Math.PI * 2,
         flowSpeed: 0.4 + Math.random() * 0.3,
         wobbleFreq: 3 + Math.random() * 2,
+        sourceFanOut: 1,
+        targetFanOut: 1,
       })
     }
+
+    // Count how many connections share each endpoint
+    const endpointCount = new Map<string, number>()
+    for (const conn of conns) {
+      const sKey = `${conn.sx},${conn.sy}`
+      const tKey = `${conn.tx},${conn.ty}`
+      endpointCount.set(sKey, (endpointCount.get(sKey) || 0) + 1)
+      endpointCount.set(tKey, (endpointCount.get(tKey) || 0) + 1)
+    }
+
+    // Store fan-out counts on each connection
+    for (const conn of conns) {
+      const sKey = `${conn.sx},${conn.sy}`
+      const tKey = `${conn.tx},${conn.ty}`
+      conn.sourceFanOut = endpointCount.get(sKey) || 1
+      conn.targetFanOut = endpointCount.get(tKey) || 1
+    }
+
     connectionsRef.current = conns
 
     const blobs: BlobData[] = bubbles.map((b) => ({
@@ -135,6 +152,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       breathePhase: b.phaseIndex * 0.9 + Math.random() * 0.5,
       wobblePhase: Math.random() * Math.PI * 2,
       deformFreq: 2 + Math.random(),
+      // Multi-harmonic nucleus shape — each blob gets unique deformation
+      nucleusHarmonics: Array.from({ length: 5 }, () => 1.5 + Math.random() * 4),
+      nucleusPhases: Array.from({ length: 5 }, () => Math.random() * Math.PI * 2),
+      nucleusRotSpeed: 0.08 + Math.random() * 0.12,
     }))
     blobsRef.current = blobs
   }, [links, bubbles, isDark])
@@ -154,12 +175,12 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     canvas.style.height = `${height}px`
 
     // Detect mobile for perf scaling
-    const isMobile = width < 768
-    const SAMPLES_PER_100PX = isMobile ? 6 : 10
+    const isMobile = width < 768 || 'ontouchstart' in window
+    const SAMPLES_PER_100PX = isMobile ? 4 : 8
 
     let time = 0
     let lastFrameTime = 0
-    const TARGET_DT = isMobile ? 1000 / 30 : 1000 / 60 // 30fps mobile, 60fps desktop
+    const TARGET_DT = isMobile ? 1000 / 24 : 1000 / 45 // 24fps mobile, 45fps desktop
 
     const draw = (timestamp: number) => {
       // Frame rate limiting for mobile
@@ -252,25 +273,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         ctx.fillStyle = grad
         ctx.fill()
 
-        // Add flowing "cytoplasm particles" along the path for extra life
-        const particleCount = isMobile ? 3 : 5
-        for (let p = 0; p < particleCount; p++) {
-          // Particle flows along the path over time
-          const baseT = ((time * 0.15 * conn.flowSpeed + p / particleCount + conn.phaseOffset) % 1)
-          const t = baseT
-          if (t < 0.05 || t > 0.95) continue // skip near endpoints
-
-          const sample = sampleConnection(conn, t, time)
-          const particleR = sample.width * 0.25 + Math.sin(time * 1.2 + p * 2) * 1
-          const color = lerpColor(conn.sourceColor, conn.targetColor, t)
-
-          ctx.beginPath()
-          ctx.arc(sample.x, sample.y, Math.max(2, particleR), 0, Math.PI * 2)
-          ctx.fillStyle = color
-          ctx.globalAlpha = 0.6
-          ctx.fill()
-          ctx.globalAlpha = 1
-        }
       }
 
       // ── Draw milestone blobs with organic deformation ──
@@ -300,6 +302,43 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         ctx.closePath()
         ctx.fillStyle = blob.color
         ctx.fill()
+      }
+
+      // ── Draw nucleus shapes (moved from SVG for performance) ──
+      for (const blob of blobs) {
+        const nucleusR = blob.radius * 0.68
+        const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 2.5
+
+        // Multi-harmonic organic shape — not just an oval
+        ctx.beginPath()
+        const steps = 64
+        for (let i = 0; i <= steps; i++) {
+          const angle = (i / steps) * Math.PI * 2
+          let r = nucleusR + breathe
+
+          // Sum multiple harmonics for complex organic shape
+          for (let h = 0; h < blob.nucleusHarmonics.length; h++) {
+            const freq = h + 2  // frequencies 2, 3, 4, 5, 6
+            const amp = blob.nucleusHarmonics[h]!
+            const phase = blob.nucleusPhases[h]! + time * blob.nucleusRotSpeed * (h % 2 === 0 ? 1 : -0.7)
+            r += amp * Math.sin(freq * angle + phase)
+          }
+
+          // Clamp so it doesn't exceed membrane
+          r = Math.max(nucleusR * 0.6, Math.min(nucleusR * 1.25, r))
+
+          const px = blob.x + Math.cos(angle) * r
+          const py = blob.y + Math.sin(angle) * r
+          if (i === 0) ctx.moveTo(px, py)
+          else ctx.lineTo(px, py)
+        }
+        ctx.closePath()
+
+        // Slightly brighter than the membrane blob
+        ctx.globalAlpha = 0.55
+        ctx.fillStyle = blob.color
+        ctx.fill()
+        ctx.globalAlpha = 1
       }
 
       ctx.restore()

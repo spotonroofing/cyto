@@ -22,28 +22,22 @@
 /* === Animated Background Gradients (Spec 2.5) === */
 
 .bg-animated-light {
-  background: linear-gradient(
-    135deg,
-    #FFF8F7 0%,
-    #FFF5F4 25%,
-    #FFF8F7 50%,
-    #F5F3FF 75%,
-    #FFF8F7 100%
-  );
-  background-size: 400% 400%;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(180, 140, 130, 0.04) 70%, rgba(160, 120, 110, 0.08) 100%),
+    radial-gradient(ellipse at 30% 30%, rgba(224, 152, 136, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 70%, rgba(184, 152, 184, 0.05) 0%, transparent 50%),
+    linear-gradient(135deg, #FFF8F6 0%, #FFF5F2 25%, #FFF7F5 50%, #F8F0EE 75%, #FFF8F6 100%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 400% 400%;
   animation: gradient-shift-light 45s ease infinite;
 }
 
 .bg-animated-dark {
-  background: linear-gradient(
-    135deg,
-    #0F0E17 0%,
-    #1A1028 25%,
-    #0F0E17 50%,
-    #0D1B2A 75%,
-    #0F0E17 100%
-  );
-  background-size: 400% 400%;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(40, 25, 30, 0.5) 70%, rgba(20, 12, 15, 0.8) 100%),
+    radial-gradient(ellipse at 30% 30%, rgba(80, 45, 35, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 70%, rgba(60, 40, 60, 0.12) 0%, transparent 50%),
+    linear-gradient(135deg, #100D12 0%, #18100E 25%, #120E10 50%, #0E0C10 75%, #100D12 100%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 400% 400%;
   animation: gradient-shift-dark 45s ease infinite;
 }
 
@@ -100,6 +94,17 @@
 
 .pulse-glow {
   animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* === Petri dish membrane rings === */
+@keyframes membrane-ring-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes membrane-ring-pulse {
+  0%, 100% { opacity: 0.03; transform: scale(1); }
+  50% { opacity: 0.06; transform: scale(1.02); }
 }
 
 /* === Scrollbar styling === */

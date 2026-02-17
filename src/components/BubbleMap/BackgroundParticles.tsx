@@ -61,10 +61,13 @@ export function BackgroundParticles() {
       }
     }
 
+    let time = 0
+
     const animate = () => {
       const w = canvas.width
       const h = canvas.height
       const particles = particlesRef.current
+      time += 16
 
       ctx.clearRect(0, 0, w, h)
 
@@ -88,9 +91,33 @@ export function BackgroundParticles() {
         ctx.beginPath()
         ctx.ellipse(p.x, p.y, rx, ry, p.wobblePhase * 0.5, 0, Math.PI * 2)
         ctx.fillStyle = isDark
-          ? `rgba(180, 150, 170, ${p.opacity})`
-          : `rgba(220, 190, 200, ${p.opacity})`
+          ? `rgba(160, 120, 100, ${p.opacity})`
+          : `rgba(200, 160, 140, ${p.opacity})`
         ctx.fill()
+      }
+
+      // Draw faint membrane rings (petri dish culture rings)
+      const ringCount = 4
+      const centerX = w / 2
+      const centerY = h / 2
+      for (let r = 0; r < ringCount; r++) {
+        const baseRadius = (Math.min(w, h) * 0.25) + r * (Math.min(w, h) * 0.15)
+        const wobble = Math.sin(time * 0.0003 + r * 1.5) * 8
+        const rx = baseRadius + wobble
+        const ry = baseRadius * (0.85 + Math.sin(time * 0.0002 + r) * 0.05) + wobble * 0.5
+        const rotation = time * 0.00005 * (r % 2 === 0 ? 1 : -1) + r * 0.3
+
+        ctx.save()
+        ctx.translate(centerX, centerY)
+        ctx.rotate(rotation)
+        ctx.beginPath()
+        ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2)
+        ctx.strokeStyle = isDark
+          ? `rgba(160, 120, 110, ${0.025 + Math.sin(time * 0.0004 + r) * 0.01})`
+          : `rgba(200, 160, 150, ${0.035 + Math.sin(time * 0.0004 + r) * 0.015})`
+        ctx.lineWidth = 1.5 + Math.sin(time * 0.0005 + r * 2) * 0.5
+        ctx.stroke()
+        ctx.restore()
       }
 
       animFrameRef.current = requestAnimationFrame(animate)
@@ -125,8 +152,8 @@ function drawParticles(
     ctx.beginPath()
     ctx.ellipse(p.x, p.y, p.radius, p.radius * p.axisRatio, 0, 0, Math.PI * 2)
     ctx.fillStyle = isDark
-      ? `rgba(196, 154, 108, ${p.opacity})`
-      : `rgba(212, 165, 116, ${p.opacity})`
+      ? `rgba(160, 120, 100, ${p.opacity})`
+      : `rgba(200, 160, 140, ${p.opacity})`
     ctx.fill()
   }
 }

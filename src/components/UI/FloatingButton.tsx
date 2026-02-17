@@ -50,12 +50,17 @@ export function FloatingButton({
       {/* Membrane layer */}
       <span
         className="absolute inset-0 rounded-full membrane-breathe"
-        style={{ backgroundColor: color, opacity: 0.2 }}
+        style={{ backgroundColor: color, opacity: 0.3 }}
       />
       {/* Nucleus layer */}
       <span
         className="absolute rounded-full"
-        style={{ backgroundColor: color, opacity: 0.45, inset: '15%' }}
+        style={{ backgroundColor: color, opacity: 0.55, inset: '15%' }}
+      />
+      {/* Border ring for visibility */}
+      <span
+        className="absolute inset-0 rounded-full"
+        style={{ border: `1.5px solid ${color}`, opacity: 0.25 }}
       />
       {/* Content */}
       <span className="relative z-10 flex items-center justify-center w-full h-full">

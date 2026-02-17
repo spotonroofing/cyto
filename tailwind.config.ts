@@ -13,33 +13,33 @@ const config: Config = {
       colors: {
         // Light mode phase colors
         phase: {
-          0: '#FFB5A7', // Soft coral — Immediate
-          1: '#FCD5CE', // Pastel peach — Assess
-          2: '#D8BBFF', // Lavender — Eradication
-          3: '#B8F3D4', // Soft mint — Restoration
-          4: '#FFF3B0', // Pastel yellow — Food Reintro
-          5: '#A2D2FF', // Pastel blue — Retest
-          6: '#FFAFCC', // Pastel pink — Optimization
-          7: '#C7DFC5', // Soft sage — Maintenance
+          0: '#E09888', // Warm Coral — Baseline/Immediate
+          1: '#D09BA8', // Dusty Rose — Assess
+          2: '#B898B8', // Soft Mauve — Eradication
+          3: '#CCB090', // Warm Clay — Restoration
+          4: '#C4A080', // Terracotta — Food Reintro
+          5: '#B0A0B0', // Dusty Taupe — Retest
+          6: '#D0A098', // Rose Clay — Optimization
+          7: '#A8A898', // Warm Stone — Maintenance
         },
         // Dark mode phase colors
         'phase-dark': {
-          0: '#E07A6B', // Deep coral
-          1: '#D4967E', // Burnt peach
-          2: '#9B72CF', // Deep lavender
-          3: '#5BBF8A', // Emerald
-          4: '#E0C44A', // Amber
-          5: '#5B8BC9', // Steel blue
-          6: '#D46A8C', // Rose
-          7: '#7BA87B', // Forest sage
+          0: '#B86850', // Deep Coral
+          1: '#986070', // Deep Rose
+          2: '#806080', // Deep Mauve
+          3: '#A08050', // Deep Clay
+          4: '#907048', // Deep Terracotta
+          5: '#706878', // Deep Taupe
+          6: '#A06858', // Deep Rose Clay
+          7: '#688060', // Deep Sage Stone
         },
         // Theme colors
         cream: '#FFF8F7',
         navy: '#0F0E17',
         charcoal: '#2D2A32',
         softwhite: '#FFFFFE',
-        gold: '#D4A574',
-        copper: '#C49A6C',
+        gold: '#C0907A',
+        copper: '#A07060',
         // Done colors
         'done-light': '#B5C4B1', // muted silver-green
         'done-dark': '#4A8B7F',  // muted teal
