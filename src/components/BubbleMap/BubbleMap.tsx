@@ -26,6 +26,30 @@ export function BubbleMap() {
   const transformRef = useRef(transform)
   const bubblesRef = useRef<ReturnType<typeof useBubbleLayout>['bubbles']>([])
 
+  // RAF batching: accumulate transform deltas, flush once per frame
+  const pendingTransformRef = useRef<((t: { x: number; y: number; scale: number }) => { x: number; y: number; scale: number }) | null>(null)
+  const rafPendingRef = useRef(0)
+  const flushTransform = useCallback(() => {
+    rafPendingRef.current = 0
+    const fn = pendingTransformRef.current
+    if (fn) {
+      pendingTransformRef.current = null
+      setTransform(fn)
+    }
+  }, [])
+  const batchTransform = useCallback((updater: (t: { x: number; y: number; scale: number }) => { x: number; y: number; scale: number }) => {
+    const prev = pendingTransformRef.current
+    if (prev) {
+      // Compose: apply previous updater first, then new one
+      pendingTransformRef.current = (t) => updater(prev(t))
+    } else {
+      pendingTransformRef.current = updater
+    }
+    if (!rafPendingRef.current) {
+      rafPendingRef.current = requestAnimationFrame(flushTransform)
+    }
+  }, [flushTransform])
+
   const recenterModeRef = useRef<'focus' | 'fit-all'>('focus')
 
   const selectMilestone = useUIStore((s) => s.selectMilestone)
@@ -89,7 +113,7 @@ export function BubbleMap() {
       const dx = e.clientX - lastPanRef.current.x
       const dy = e.clientY - lastPanRef.current.y
       lastPanRef.current = { x: e.clientX, y: e.clientY }
-      setTransform((t) => ({ ...t, x: t.x + dx, y: t.y + dy }))
+      batchTransform((t) => ({ ...t, x: t.x + dx, y: t.y + dy }))
     }
     const onMouseUp = () => { isPanningRef.current = false }
     const onWheel = (e: WheelEvent) => {
@@ -97,7 +121,7 @@ export function BubbleMap() {
       const rect = el.getBoundingClientRect()
       const cx = e.clientX - rect.left
       const cy = e.clientY - rect.top
-      setTransform((t) => {
+      batchTransform((t) => {
         const factor = e.deltaY > 0 ? 0.95 : 1.05
         const ns = Math.max(0.15, Math.min(3, t.scale * factor))
         const r = ns / t.scale
@@ -114,7 +138,7 @@ export function BubbleMap() {
       window.removeEventListener('mouseup', onMouseUp)
       el.removeEventListener('wheel', onWheel)
     }
-  }, [])
+  }, [batchTransform])
 
   // Native touch handlers
   useEffect(() => {
@@ -149,7 +173,7 @@ export function BubbleMap() {
           if (Math.sqrt(tdx * tdx + tdy * tdy) > TAP_DISTANCE_THRESHOLD) hasPannedRef.current = true
         }
         if (hasPannedRef.current) e.preventDefault()
-        setTransform((tr) => ({ ...tr, x: tr.x + dx, y: tr.y + dy }))
+        batchTransform((tr) => ({ ...tr, x: tr.x + dx, y: tr.y + dy }))
       } else if (e.touches.length === 2) {
         e.preventDefault()
         const t0 = e.touches[0]!, t1 = e.touches[1]!
@@ -160,7 +184,7 @@ export function BubbleMap() {
           const mx = (t0.clientX + t1.clientX) / 2 - rect.left
           const my = (t0.clientY + t1.clientY) / 2 - rect.top
           const f = nd / lastPinchDistRef.current
-          setTransform((t) => {
+          batchTransform((t) => {
             const ns = Math.max(0.15, Math.min(3, t.scale * f))
             const r = ns / t.scale
             return { x: mx - (mx - t.x) * r, y: my - (my - t.y) * r, scale: ns }
@@ -196,7 +220,7 @@ export function BubbleMap() {
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
     }
-  }, [selectMilestone])
+  }, [selectMilestone, batchTransform])
 
   const handleRecenter = useCallback(() => {
     if (recenterModeRef.current === 'focus') {

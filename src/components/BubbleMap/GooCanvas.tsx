@@ -32,6 +32,8 @@ interface ConnectionData {
   // Fan-out counts for branch goo cleanup
   sourceFanOut: number
   targetFanOut: number
+  // Bounding box for viewport culling (world coords, with padding)
+  minX: number; minY: number; maxX: number; maxY: number
 }
 
 interface BlobData {
@@ -47,6 +49,10 @@ interface BlobData {
   nucleusPhases: number[]     // matching phase offsets
   nucleusRotSpeed: number     // rotation speed
 }
+
+// ── Detect mobile once at module level ──
+const IS_MOBILE = typeof window !== 'undefined' &&
+  (window.innerWidth < 768 || 'ontouchstart' in window)
 
 // ── Sampling helpers ──────────────────────────────────────────
 
@@ -87,6 +93,24 @@ function sampleConnection(
   return { x, y, width }
 }
 
+// ── Viewport culling helper ──────────────────────────────────
+
+function isInViewport(
+  minX: number, minY: number, maxX: number, maxY: number,
+  tx: number, ty: number, scale: number,
+  viewW: number, viewH: number,
+): boolean {
+  // Convert world-space AABB to screen-space
+  const screenMinX = minX * scale + tx
+  const screenMinY = minY * scale + ty
+  const screenMaxX = maxX * scale + tx
+  const screenMaxY = maxY * scale + ty
+  // Check overlap with viewport (with generous padding for goo filter bleed)
+  const pad = 60
+  return screenMaxX >= -pad && screenMinX <= viewW + pad &&
+         screenMaxY >= -pad && screenMinY <= viewH + pad
+}
+
 // ── Main component ────────────────────────────────────────────
 
 export function GooCanvas({ width, height, bubbles, links, transform }: GooCanvasProps) {
@@ -94,7 +118,14 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   const connectionsRef = useRef<ConnectionData[]>([])
   const blobsRef = useRef<BlobData[]>([])
   const animFrameRef = useRef<number>(0)
+  // Store transform in a ref so animation loop reads it without restarting
+  const transformRef = useRef(transform)
   const { phaseColor, palette } = useTheme()
+  const paletteRef = useRef(palette)
+
+  // Keep refs in sync without restarting animation loop
+  useEffect(() => { transformRef.current = transform }, [transform])
+  useEffect(() => { paletteRef.current = palette }, [palette])
 
   // Precompute connection and blob data when layout changes
   useEffect(() => {
@@ -109,6 +140,13 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       const ux = dx / dist, uy = dy / dist
       const nx = -uy, ny = ux
 
+      // Compute bounding box with padding for wobble
+      const pad = Math.max(sr, tr) * 0.6
+      const minX = Math.min(sx, tx) - pad
+      const minY = Math.min(sy, ty) - pad
+      const maxX = Math.max(sx, tx) + pad
+      const maxY = Math.max(sy, ty) + pad
+
       conns.push({
         sx, sy, sr, tx, ty, tr,
         dx, dy, dist, ux, uy, nx, ny,
@@ -119,6 +157,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         wobbleFreq: 3 + Math.random() * 2,
         sourceFanOut: 1,
         targetFanOut: 1,
+        minX, minY, maxX, maxY,
       })
     }
 
@@ -158,7 +197,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     blobsRef.current = blobs
   }, [links, bubbles, palette])
 
-  // Animation loop
+  // Animation loop — does NOT depend on transform (reads from ref)
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || width === 0 || height === 0) return
@@ -166,22 +205,25 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const dpr = Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 2)
     canvas.width = width * dpr
     canvas.height = height * dpr
     canvas.style.width = `${width}px`
     canvas.style.height = `${height}px`
 
-    // Detect mobile for perf scaling
-    const isMobile = width < 768 || 'ontouchstart' in window
+    const isMobile = IS_MOBILE || width < 768
     const SAMPLES_PER_100PX = isMobile ? 4 : 8
+    // Mobile: fewer steps for blob/nucleus shapes
+    const BLOB_STEPS = isMobile ? 24 : 48
+    const NUCLEUS_STEPS = isMobile ? 24 : 64
+    const NUCLEUS_HARMONICS = isMobile ? 3 : 5
 
     let time = 0
     let lastFrameTime = 0
-    const TARGET_DT = isMobile ? 1000 / 24 : 1000 / 45 // 24fps mobile, 45fps desktop
+    const TARGET_DT = isMobile ? 1000 / 30 : 1000 / 45 // 30fps mobile, 45fps desktop
 
     const draw = (timestamp: number) => {
-      // Frame rate limiting for mobile
+      // Frame rate limiting
       if (timestamp - lastFrameTime < TARGET_DT * 0.8) {
         animFrameRef.current = requestAnimationFrame(draw)
         return
@@ -189,11 +231,14 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       lastFrameTime = timestamp
       time += 0.016
 
+      const tf = transformRef.current
+      const pal = paletteRef.current
+
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.save()
       ctx.scale(dpr, dpr)
-      ctx.translate(transform.x, transform.y)
-      ctx.scale(transform.scale, transform.scale)
+      ctx.translate(tf.x, tf.y)
+      ctx.scale(tf.scale, tf.scale)
 
       const connections = connectionsRef.current
       const blobs = blobsRef.current
@@ -201,7 +246,11 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       // ── Draw connections as thick tapered filled paths ──
 
       for (const conn of connections) {
-        const segments = Math.max(12, Math.floor(conn.dist / 100 * SAMPLES_PER_100PX))
+        // Viewport culling
+        if (!isInViewport(conn.minX, conn.minY, conn.maxX, conn.maxY,
+            tf.x, tf.y, tf.scale, width, height)) continue
+
+        const segments = Math.max(8, Math.floor(conn.dist / 100 * SAMPLES_PER_100PX))
 
         // Sample points along the connection
         const points: { x: number; y: number; width: number }[] = []
@@ -276,6 +325,12 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       // ── Draw milestone blobs with organic deformation ──
 
       for (const blob of blobs) {
+        // Viewport culling
+        const blobPad = blob.radius + 10
+        if (!isInViewport(blob.x - blobPad, blob.y - blobPad,
+            blob.x + blobPad, blob.y + blobPad,
+            tf.x, tf.y, tf.scale, width, height)) continue
+
         // Breathing radius
         const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 3
         const baseR = blob.radius + breathe
@@ -286,9 +341,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         const rotPhase = time * 0.15 + blob.phaseIndex * 0.5
 
         ctx.beginPath()
-        const steps = 48
-        for (let i = 0; i <= steps; i++) {
-          const angle = (i / steps) * Math.PI * 2
+        for (let i = 0; i <= BLOB_STEPS; i++) {
+          const angle = (i / BLOB_STEPS) * Math.PI * 2
           const r = baseR
             + deformA * Math.sin(blob.deformFreq * angle + rotPhase)
             + deformB * Math.cos((blob.deformFreq + 1) * angle - rotPhase * 0.7)
@@ -302,20 +356,26 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         ctx.fill()
       }
 
-      // ── Draw nucleus shapes (moved from SVG for performance) ──
+      // ── Draw nucleus shapes ──
       for (const blob of blobs) {
+        // Viewport culling (same bounds as blob)
+        const blobPad = blob.radius + 10
+        if (!isInViewport(blob.x - blobPad, blob.y - blobPad,
+            blob.x + blobPad, blob.y + blobPad,
+            tf.x, tf.y, tf.scale, width, height)) continue
+
         const nucleusR = blob.radius * 0.68
         const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 2.5
 
-        // Multi-harmonic organic shape — not just an oval
+        // Multi-harmonic organic shape
         ctx.beginPath()
-        const steps = 64
-        for (let i = 0; i <= steps; i++) {
-          const angle = (i / steps) * Math.PI * 2
+        for (let i = 0; i <= NUCLEUS_STEPS; i++) {
+          const angle = (i / NUCLEUS_STEPS) * Math.PI * 2
           let r = nucleusR + breathe
 
-          // Sum multiple harmonics for complex organic shape
-          for (let h = 0; h < blob.nucleusHarmonics.length; h++) {
+          // Sum harmonics (fewer on mobile)
+          const harmonicCount = Math.min(NUCLEUS_HARMONICS, blob.nucleusHarmonics.length)
+          for (let h = 0; h < harmonicCount; h++) {
             const freq = h + 2  // frequencies 2, 3, 4, 5, 6
             const amp = blob.nucleusHarmonics[h]!
             const phase = blob.nucleusPhases[h]! + time * blob.nucleusRotSpeed * (h % 2 === 0 ? 1 : -0.7)
@@ -333,7 +393,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         ctx.closePath()
 
         // Slightly brighter than the membrane blob
-        ctx.globalAlpha = palette.nucleus
+        ctx.globalAlpha = pal.nucleus
         ctx.fillStyle = blob.color
         ctx.fill()
         ctx.globalAlpha = 1
@@ -345,7 +405,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
 
     animFrameRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(animFrameRef.current)
-  }, [width, height, transform, bubbles, palette])
+  }, [width, height, bubbles, palette])
+  // NOTE: transform removed from deps — read from ref instead
 
   return (
     <canvas
@@ -354,7 +415,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       style={{
         zIndex: 1,
         pointerEvents: 'none',
-        filter: 'url(#goo-filter)',
+        // Skip expensive SVG goo filter on mobile — use cheaper CSS blur
+        filter: IS_MOBILE ? 'blur(1px)' : 'url(#goo-filter)',
         opacity: palette.goo,
       }}
     />
