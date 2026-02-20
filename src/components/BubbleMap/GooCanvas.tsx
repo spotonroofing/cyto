@@ -1,6 +1,5 @@
 import { useRef, useEffect } from 'react'
-import { useSettingsStore } from '@/stores/settingsStore'
-import { getPhaseColor } from '@/styles/theme'
+import { useTheme } from '@/themes'
 import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
 
 interface GooCanvasProps {
@@ -95,8 +94,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   const connectionsRef = useRef<ConnectionData[]>([])
   const blobsRef = useRef<BlobData[]>([])
   const animFrameRef = useRef<number>(0)
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { phaseColor, palette } = useTheme()
 
   // Precompute connection and blob data when layout changes
   useEffect(() => {
@@ -114,8 +112,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       conns.push({
         sx, sy, sr, tx, ty, tr,
         dx, dy, dist, ux, uy, nx, ny,
-        sourceColor: getPhaseColor(link.sourcePhaseIndex, isDark),
-        targetColor: getPhaseColor(link.targetPhaseIndex, isDark),
+        sourceColor: phaseColor(link.sourcePhaseIndex),
+        targetColor: phaseColor(link.targetPhaseIndex),
         phaseOffset: Math.random() * Math.PI * 2,
         flowSpeed: 0.4 + Math.random() * 0.3,
         wobbleFreq: 3 + Math.random() * 2,
@@ -147,7 +145,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       x: b.x,
       y: b.y,
       radius: b.radius,
-      color: getPhaseColor(b.phaseIndex, isDark),
+      color: phaseColor(b.phaseIndex),
       phaseIndex: b.phaseIndex,
       breathePhase: b.phaseIndex * 0.9 + Math.random() * 0.5,
       wobblePhase: Math.random() * Math.PI * 2,
@@ -158,7 +156,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       nucleusRotSpeed: 0.08 + Math.random() * 0.12,
     }))
     blobsRef.current = blobs
-  }, [links, bubbles, isDark])
+  }, [links, bubbles, palette])
 
   // Animation loop
   useEffect(() => {
@@ -335,7 +333,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         ctx.closePath()
 
         // Slightly brighter than the membrane blob
-        ctx.globalAlpha = 0.55
+        ctx.globalAlpha = palette.nucleus
         ctx.fillStyle = blob.color
         ctx.fill()
         ctx.globalAlpha = 1
@@ -347,7 +345,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
 
     animFrameRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(animFrameRef.current)
-  }, [width, height, transform, bubbles, isDark])
+  }, [width, height, transform, bubbles, palette])
 
   return (
     <canvas
@@ -357,7 +355,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         zIndex: 1,
         pointerEvents: 'none',
         filter: 'url(#goo-filter)',
-        opacity: 0.32,
+        opacity: palette.goo,
       }}
     />
   )

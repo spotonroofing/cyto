@@ -8,12 +8,11 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useDailyLogStore } from '@/stores/dailyLogStore'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 export function WeightChart() {
-  const theme = useSettingsStore((s) => s.theme)
+  const { palette } = useTheme()
   const getRecentLogs = useDailyLogStore((s) => s.getRecentLogs)
-  const isDark = theme === 'dark'
 
   const logs = getRecentLogs(90)
   const data = logs
@@ -35,16 +34,16 @@ export function WeightChart() {
           <LineChart data={data}>
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke={isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}
+              stroke={palette.border}
             />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 10, fill: isDark ? '#FFFFFE80' : '#2D2A3280' }}
+              tick={{ fontSize: 10, fill: palette.textSecondary }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              tick={{ fontSize: 10, fill: isDark ? '#FFFFFE80' : '#2D2A3280' }}
+              tick={{ fontSize: 10, fill: palette.textSecondary }}
               axisLine={false}
               tickLine={false}
               width={35}
@@ -52,7 +51,7 @@ export function WeightChart() {
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: isDark ? '#1a1a2e' : '#fff',
+                backgroundColor: palette.surface,
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '12px',
@@ -61,7 +60,7 @@ export function WeightChart() {
             <Line
               type="monotone"
               dataKey="weight"
-              stroke="#B8F3D4"
+              stroke={palette.done}
               strokeWidth={2}
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}

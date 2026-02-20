@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useDailyLogStore } from '@/stores/dailyLogStore'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 export function FlareCalendar() {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, isDark } = useTheme()
   const logs = useDailyLogStore((s) => s.logs)
 
   const now = new Date()
@@ -80,9 +79,14 @@ export function FlareCalendar() {
             const opacity = 0.3 + (severity / 5) * 0.5
             bg = `rgba(255, ${100 - severity * 15}, ${80 - severity * 15}, ${opacity})`
           } else if (log) {
-            bg = isDark ? 'rgba(91,191,138,0.2)' : 'rgba(184,243,212,0.4)'
+            // Green "logged" day using done color at low opacity
+            const doneHex = palette.done
+            const r = parseInt(doneHex.slice(1, 3), 16)
+            const g = parseInt(doneHex.slice(3, 5), 16)
+            const b = parseInt(doneHex.slice(5, 7), 16)
+            bg = `rgba(${r},${g},${b},${isDark ? 0.2 : 0.4})`
           } else {
-            bg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
+            bg = palette.border
           }
 
           return (

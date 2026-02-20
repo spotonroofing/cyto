@@ -1,5 +1,5 @@
 import { milestones, phases } from '@/stores/roadmapStore'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface BubbleProps {
   milestoneId: string
@@ -11,8 +11,7 @@ interface BubbleProps {
 }
 
 export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette } = useTheme()
 
   const milestone = milestones.find((m) => m.id === milestoneId)
   const phase = phases.find((p) => p.id === milestone?.phaseId)
@@ -35,7 +34,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
         fontSize={11}
         fontFamily="'Space Grotesk', sans-serif"
         fontWeight={600}
-        fill={isDark ? '#FFFFFE' : '#2D2A32'}
+        fill={palette.text}
         opacity={0.85}
       >
         {getShortPhaseName(phaseIndex)}
@@ -48,7 +47,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
         fontSize={8}
         fontFamily="'JetBrains Mono', monospace"
         fontWeight={400}
-        fill={isDark ? '#FFFFFE' : '#2D2A32'}
+        fill={palette.text}
         opacity={0.45}
         letterSpacing="0.5"
       >

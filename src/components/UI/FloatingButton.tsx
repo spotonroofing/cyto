@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface FloatingButtonProps {
   onClick: () => void
@@ -26,9 +26,8 @@ export function FloatingButton({
   position = 'bottom-center',
   phaseColor,
 }: FloatingButtonProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
-  const color = phaseColor ?? (isDark ? '#D4967E' : '#FCD5CE')
+  const { palette } = useTheme()
+  const color = phaseColor ?? palette.accent
 
   return (
     <motion.button
@@ -42,10 +41,10 @@ export function FloatingButton({
         opacity: { duration: 0.3 },
       }}
       onClick={onClick}
-      style={style}
+      style={{ ...style, color: palette.buttonText }}
       className={`${position === 'inline' ? '' : 'fixed'} ${positionClasses[position]} z-40
         rounded-full relative overflow-hidden
-        text-charcoal/70 dark:text-softwhite/70 ${className}`}
+        ${className}`}
     >
       {/* Membrane layer */}
       <span

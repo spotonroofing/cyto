@@ -1,4 +1,4 @@
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface LogSliderProps {
   label: string
@@ -10,9 +10,8 @@ interface LogSliderProps {
 }
 
 export function LogSlider({ label, value, min = 1, max = 10, onChange, color }: LogSliderProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
-  const trackColor = color ?? (isDark ? '#C49A6C' : '#D4A574')
+  const { palette } = useTheme()
+  const trackColor = color ?? palette.accent
 
   const percentage = ((value - min) / (max - min)) * 100
 
@@ -33,11 +32,7 @@ export function LogSlider({ label, value, min = 1, max = 10, onChange, color }: 
           onChange={(e) => onChange(Number(e.target.value))}
           className="w-full h-2 rounded-full appearance-none cursor-pointer"
           style={{
-            background: `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${percentage}%, ${
-              isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'
-            } ${percentage}%, ${
-              isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'
-            } 100%)`,
+            background: `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${percentage}%, ${palette.border} ${percentage}%, ${palette.border} 100%)`,
           }}
         />
       </div>

@@ -8,15 +8,14 @@ import {
   ReferenceDot,
 } from 'recharts'
 import { useRoadmapStore } from '@/stores/roadmapStore'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 import { actionItems } from '@/data/roadmap'
 
 // Baseline: ~50 common foods per spec
 const TOTAL_FOODS = 50
 
 export function FoodToleranceChart() {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, phaseColor } = useTheme()
   const getActionItem = useRoadmapStore((s) => s.getActionItem)
 
   // Get all food trial items
@@ -61,13 +60,13 @@ export function FoodToleranceChart() {
           <LineChart data={data}>
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 10, fill: isDark ? '#FFFFFE80' : '#2D2A3280' }}
+              tick={{ fontSize: 10, fill: palette.textSecondary }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               domain={[0, 100]}
-              tick={{ fontSize: 10, fill: isDark ? '#FFFFFE80' : '#2D2A3280' }}
+              tick={{ fontSize: 10, fill: palette.textSecondary }}
               axisLine={false}
               tickLine={false}
               width={30}
@@ -75,7 +74,7 @@ export function FoodToleranceChart() {
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: isDark ? '#1a1a2e' : '#fff',
+                backgroundColor: palette.surface,
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '12px',
@@ -85,7 +84,7 @@ export function FoodToleranceChart() {
             <Line
               type="monotone"
               dataKey="percentage"
-              stroke="#FFF3B0"
+              stroke={phaseColor(3)}
               strokeWidth={2}
               dot={{ r: 3 }}
             />

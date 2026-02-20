@@ -1,4 +1,4 @@
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface FlareToggleProps {
   flare: boolean
@@ -17,8 +17,7 @@ export function FlareToggle({
   onSeverityChange,
   onTriggerChange,
 }: FlareToggleProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, isDark } = useTheme()
 
   return (
     <div className="mb-4">
@@ -76,9 +75,10 @@ export function FlareToggle({
               placeholder="What triggered it?"
               className={`w-full px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 ${
                 isDark
-                  ? 'bg-white/5 focus:ring-copper/30 placeholder:text-white/20'
-                  : 'bg-black/[0.03] focus:ring-gold/30 placeholder:text-black/20'
+                  ? 'bg-white/5 placeholder:text-white/20'
+                  : 'bg-black/[0.03] placeholder:text-black/20'
               }`}
+              style={{ ['--tw-ring-color' as string]: palette.accent + '4D' }}
             />
           </div>
         </div>

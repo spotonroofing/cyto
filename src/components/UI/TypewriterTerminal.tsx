@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 const messages = [
   'initializing recovery protocol...',
@@ -12,8 +12,7 @@ const messages = [
 ]
 
 export function TypewriterTerminal() {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, phaseColor } = useTheme()
   const [displayText, setDisplayText] = useState('')
   const [messageIndex, setMessageIndex] = useState(0)
   const [showCursor, setShowCursor] = useState(true)
@@ -56,13 +55,13 @@ export function TypewriterTerminal() {
         opacity: 0.55,
       }}
     >
-      <span style={{ color: isDark ? '#9B72CF' : '#D8BBFF' }}>{'>'} </span>
-      <span style={{ color: isDark ? '#FFFFFE' : '#2D2A32' }}>
+      <span style={{ color: phaseColor(2) }}>{'>'} </span>
+      <span style={{ color: palette.text }}>
         {displayText}
       </span>
       <span
         style={{
-          color: isDark ? '#9B72CF' : '#D8BBFF',
+          color: phaseColor(2),
           opacity: showCursor ? 1 : 0,
         }}
       >

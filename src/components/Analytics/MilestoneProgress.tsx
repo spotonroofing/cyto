@@ -1,10 +1,9 @@
 import { useRoadmapStore, phases } from '@/stores/roadmapStore'
-import { useSettingsStore } from '@/stores/settingsStore'
-import { getPhaseColor, phaseNames } from '@/styles/theme'
+import { useTheme } from '@/themes'
+import { phaseNames } from '@/styles/theme'
 
 export function MilestoneProgress() {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { phaseColor, isDark } = useTheme()
   const getOverallProgress = useRoadmapStore((s) => s.getOverallProgress)
   const getPhaseProgress = useRoadmapStore((s) => s.getPhaseProgress)
 
@@ -25,7 +24,7 @@ export function MilestoneProgress() {
             className="h-full rounded-full transition-all duration-500"
             style={{
               width: `${overall.percentage}%`,
-              background: 'linear-gradient(90deg, #FFB5A7, #D8BBFF, #B8F3D4, #A2D2FF)',
+              background: `linear-gradient(90deg, ${phaseColor(0)}, ${phaseColor(2)}, ${phaseColor(3)}, ${phaseColor(5)})`,
             }}
           />
         </div>
@@ -38,7 +37,7 @@ export function MilestoneProgress() {
       <div className="space-y-2">
         {phases.map((phase, index) => {
           const progress = getPhaseProgress(phase.id)
-          const color = getPhaseColor(index, isDark)
+          const color = phaseColor(index)
           return (
             <div key={phase.id} className="flex items-center gap-3">
               <span

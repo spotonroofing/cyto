@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRoadmapStore, phases, milestones } from '@/stores/roadmapStore'
-import { useSettingsStore } from '@/stores/settingsStore'
-import { getPhaseColor } from '@/styles/theme'
+import { useTheme } from '@/themes'
 import { SubDetailView } from './SubDetailView'
 
 interface QuickStatsProps {
@@ -10,16 +9,15 @@ interface QuickStatsProps {
 }
 
 export function QuickStats({ milestoneId }: QuickStatsProps) {
-  const theme = useSettingsStore((s) => s.theme)
+  const { phaseColor, isDark } = useTheme()
   const getActionItemsForMilestone = useRoadmapStore((s) => s.getActionItemsForMilestone)
-  const isDark = theme === 'dark'
   const [expandedStat, setExpandedStat] = useState<string | null>(null)
 
   const items = getActionItemsForMilestone(milestoneId)
   const milestone = milestones.find((m) => m.id === milestoneId)
   const phase = phases.find((p) => p.id === milestone?.phaseId)
   const phaseIndex = phase ? phases.indexOf(phase) : 0
-  const color = getPhaseColor(phaseIndex, isDark)
+  const color = phaseColor(phaseIndex)
 
   // Generate phase-specific stats
   const stats = getStatsForMilestone(items, phaseIndex)

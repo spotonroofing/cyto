@@ -1,4 +1,4 @@
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface DateSelectorProps {
   date: string
@@ -6,8 +6,7 @@ interface DateSelectorProps {
 }
 
 export function DateSelector({ date, onChange }: DateSelectorProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, isDark } = useTheme()
   const today = new Date().toISOString().split('T')[0]!
   const isToday = date === today
 
@@ -20,16 +19,16 @@ export function DateSelector({ date, onChange }: DateSelectorProps) {
         onChange={(e) => onChange(e.target.value)}
         className={`px-3 py-1.5 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 ${
           isDark
-            ? 'bg-white/5 focus:ring-copper/30 text-softwhite'
-            : 'bg-black/[0.03] focus:ring-gold/30 text-charcoal'
+            ? 'bg-white/5'
+            : 'bg-black/[0.03]'
         }`}
+        style={{ color: palette.text, ['--tw-ring-color' as string]: palette.accent + '4D' }}
       />
       {!isToday && (
         <button
           onClick={() => onChange(today)}
-          className={`text-xs px-3 py-1 rounded-full ${
-            isDark ? 'bg-copper/20' : 'bg-gold/20'
-          }`}
+          className="text-xs px-3 py-1 rounded-full"
+          style={{ backgroundColor: palette.accent + '33' }}
         >
           Today
         </button>

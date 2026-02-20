@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme, themes } from '@/themes'
 import { useDailyLogStore } from '@/stores/dailyLogStore'
 import { useChatStore } from '@/stores/chatStore'
 import { useRoadmapStore } from '@/stores/roadmapStore'
@@ -12,13 +13,15 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
+  const { palette, isDark } = useTheme()
   const theme = useSettingsStore((s) => s.theme)
   const toggleTheme = useSettingsStore((s) => s.toggleTheme)
+  const themeId = useSettingsStore((s) => s.themeId)
+  const setThemeId = useSettingsStore((s) => s.setThemeId)
   const protocolStartDate = useSettingsStore((s) => s.protocolStartDate)
   const setProtocolStartDate = useSettingsStore((s) => s.setProtocolStartDate)
   const healthContext = useSettingsStore((s) => s.healthContext)
   const setHealthContext = useSettingsStore((s) => s.setHealthContext)
-  const isDark = theme === 'dark'
 
   const [editingContext, setEditingContext] = useState(false)
   const [contextDraft, setContextDraft] = useState(healthContext ?? defaultHealthContext)
@@ -101,7 +104,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-30"
-        style={{ backgroundColor: isDark ? 'rgba(15,14,23,0.5)' : 'rgba(255,248,240,0.5)' }}
+        style={{ backgroundColor: palette.backdrop }}
         onClick={onClose}
       />
 
@@ -111,11 +114,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.8, opacity: 0, y: -30 }}
         transition={{ type: 'spring', stiffness: 150, damping: 20 }}
-        className={`fixed z-40 overflow-y-auto overscroll-contain
+        className="fixed z-40 overflow-y-auto overscroll-contain
           inset-x-4 top-16 bottom-16
           md:inset-auto md:top-16 md:right-8 md:w-96 md:max-h-[80vh]
-          ${isDark ? 'bg-navy/95' : 'bg-cream/95'}
-          backdrop-blur-xl rounded-[28px] shadow-2xl`}
+          backdrop-blur-xl rounded-[28px] shadow-2xl"
+        style={{ backgroundColor: palette.surface + 'F2' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
@@ -138,20 +141,63 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             <span className="text-sm font-medium">Theme</span>
             <button
               onClick={toggleTheme}
-              className={`relative w-14 h-7 rounded-full transition-colors ${
-                isDark ? 'bg-copper/30' : 'bg-gold/30'
-              }`}
+              className="relative w-14 h-7 rounded-full transition-colors"
+              style={{ backgroundColor: palette.accent + '4D' }}
             >
               <span
                 className={`absolute top-0.5 w-6 h-6 rounded-full transition-transform shadow-sm flex items-center justify-center text-[10px] ${
-                  isDark
-                    ? 'translate-x-7 bg-navy text-softwhite'
-                    : 'translate-x-0.5 bg-cream text-charcoal'
+                  isDark ? 'translate-x-7' : 'translate-x-0.5'
                 }`}
+                style={{ backgroundColor: palette.surface, color: palette.text }}
               >
                 {isDark ? '🌙' : '☀'}
               </span>
             </button>
+          </div>
+
+          {/* Theme picker */}
+          <div className="mb-6">
+            <label className="text-sm font-medium block mb-2">Color Theme</label>
+            <div className="grid grid-cols-2 gap-2">
+              {themes.map((t) => {
+                const isActive = t.id === themeId
+                const preview = isDark ? t.dark : t.light
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setThemeId(t.id)}
+                    className="relative p-3 rounded-2xl text-left transition-shadow"
+                    style={{
+                      backgroundColor: preview.surface,
+                      boxShadow: isActive ? `0 0 0 2px ${palette.accent}` : 'none',
+                    }}
+                  >
+                    {isActive && (
+                      <span
+                        className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: palette.accent }}
+                      >
+                        <svg width={10} height={10} viewBox="0 0 10 10" fill="none">
+                          <path d="M2 5L4.5 7.5L8 3" stroke={preview.bg} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                    )}
+                    <span className="text-xs font-medium block mb-1.5" style={{ color: preview.text }}>
+                      {t.name}
+                    </span>
+                    <div className="flex gap-1">
+                      {preview.phaseColors.slice(0, 5).map((c, i) => (
+                        <span
+                          key={i}
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* Protocol start date */}
@@ -161,11 +207,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               type="date"
               value={protocolStartDate}
               onChange={(e) => setProtocolStartDate(e.target.value)}
-              className={`w-full px-3 py-2 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 ${
-                isDark
-                  ? 'bg-white/5 focus:ring-copper/30 text-softwhite'
-                  : 'bg-black/[0.03] focus:ring-gold/30 text-charcoal'
-              }`}
+              className="w-full px-3 py-2 rounded-xl text-sm font-mono focus:outline-none focus:ring-2"
+              style={{
+                backgroundColor: palette.border,
+                color: palette.text,
+                '--tw-ring-color': palette.accent + '4D',
+              } as React.CSSProperties}
             />
           </div>
 
@@ -186,11 +233,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   value={contextDraft}
                   onChange={(e) => setContextDraft(e.target.value)}
                   rows={10}
-                  className={`w-full px-3 py-2 rounded-xl text-xs font-mono resize-none focus:outline-none focus:ring-2 ${
-                    isDark
-                      ? 'bg-white/5 focus:ring-copper/30'
-                      : 'bg-black/[0.03] focus:ring-gold/30'
-                  }`}
+                  className="w-full px-3 py-2 rounded-xl text-xs font-mono resize-none focus:outline-none focus:ring-2"
+                  style={{
+                    backgroundColor: palette.border,
+                    '--tw-ring-color': palette.accent + '4D',
+                  } as React.CSSProperties}
                 />
                 <div className="flex gap-2 mt-2">
                   <button
@@ -198,9 +245,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                       setHealthContext(contextDraft)
                       setEditingContext(false)
                     }}
-                    className={`px-4 py-1.5 rounded-full text-xs font-medium ${
-                      isDark ? 'bg-copper/20' : 'bg-gold/20'
-                    }`}
+                    className="px-4 py-1.5 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: palette.accent + '33' }}
                   >
                     Save
                   </button>
@@ -217,9 +263,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 </div>
               </div>
             ) : (
-              <div className={`p-3 rounded-xl text-[10px] font-mono leading-relaxed max-h-32 overflow-y-auto ${
-                isDark ? 'bg-white/5' : 'bg-black/[0.03]'
-              }`}>
+              <div className="p-3 rounded-xl text-[10px] font-mono leading-relaxed max-h-32 overflow-y-auto"
+                style={{ backgroundColor: palette.border }}>
                 {(healthContext ?? defaultHealthContext).slice(0, 200)}...
               </div>
             )}
@@ -231,17 +276,17 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             <div className="flex gap-2">
               <button
                 onClick={handleExport}
-                className={`flex-1 px-4 py-2 rounded-xl text-xs font-medium ${
-                  isDark ? 'bg-copper/20 hover:bg-copper/30' : 'bg-gold/20 hover:bg-gold/30'
-                }`}
+                className="flex-1 px-4 py-2 rounded-xl text-xs font-medium"
+                style={{ backgroundColor: palette.accent + '33' }}
               >
                 Export JSON
               </button>
               <button
                 onClick={handleImport}
                 className={`flex-1 px-4 py-2 rounded-xl text-xs font-medium ${
-                  isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-black/[0.03] hover:bg-black/[0.06]'
+                  isDark ? 'hover:bg-white/10' : 'hover:bg-black/[0.06]'
                 }`}
+                style={{ backgroundColor: palette.border }}
               >
                 Import JSON
               </button>

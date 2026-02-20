@@ -9,7 +9,7 @@ import { useUIStore } from '@/stores/uiStore'
 import { BubbleMap } from '@/components/BubbleMap/BubbleMap'
 import { FloatingButton } from '@/components/UI/FloatingButton'
 import { TypewriterTerminal } from '@/components/UI/TypewriterTerminal'
-import { phaseColors } from '@/styles/theme'
+import { useTheme } from '@/themes'
 
 // Lazy-loaded overlays (not needed on initial render)
 const MilestoneDetail = lazy(() => import('@/components/MilestoneDetail/MilestoneDetail').then((m) => ({ default: m.MilestoneDetail })))
@@ -20,8 +20,8 @@ const SettingsPanel = lazy(() => import('@/components/Settings/SettingsPanel').t
 
 export function App() {
   const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
-  const colors = isDark ? phaseColors.dark : phaseColors.light
+  const { phaseColor, palette } = useTheme()
+
   const selectedMilestoneId = useUIStore((s) => s.selectedMilestoneId)
   const isLogOpen = useUIStore((s) => s.isLogOpen)
   const isAnalyticsOpen = useUIStore((s) => s.isAnalyticsOpen)
@@ -59,7 +59,7 @@ export function App() {
       <div className={`min-h-screen flex items-center justify-center ${
         theme === 'dark' ? 'bg-animated-dark' : 'bg-animated-light'
       }`}>
-        <div className="font-display text-2xl opacity-60 text-charcoal dark:text-softwhite">
+        <div className="font-display text-2xl opacity-60" style={{ color: palette.text }}>
           Loading...
         </div>
       </div>
@@ -75,9 +75,10 @@ export function App() {
   return (
     <ThemeProvider>
       <div
-        className={`min-h-screen text-charcoal dark:text-softwhite font-sans ${
+        className={`min-h-screen font-sans ${
           theme === 'dark' ? 'bg-animated-dark' : 'bg-animated-light'
         }`}
+        style={{ color: palette.text }}
       >
         {/* Bubble Map (always rendered) */}
         <BubbleMap />
@@ -118,7 +119,7 @@ export function App() {
               <FloatingButton
                 onClick={() => window.dispatchEvent(new CustomEvent('cyto-recenter'))}
                 position="inline"
-                phaseColor={colors[0]}
+                phaseColor={phaseColor(0)}
                 className="w-11 h-11 !px-0 flex items-center justify-center"
               >
                 {recenterMode === 'focus' ? (
@@ -137,7 +138,7 @@ export function App() {
               <FloatingButton
                 onClick={toggleLog}
                 position="inline"
-                phaseColor={colors[3]}
+                phaseColor={phaseColor(3)}
                 className="w-12 h-12 !px-0 flex items-center justify-center"
               >
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -149,7 +150,7 @@ export function App() {
               <FloatingButton
                 onClick={() => openChat()}
                 position="inline"
-                phaseColor={colors[2]}
+                phaseColor={phaseColor(2)}
                 className="w-12 h-12 !px-0 flex items-center justify-center"
               >
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -175,7 +176,7 @@ export function App() {
               <FloatingButton
                 onClick={toggleAnalytics}
                 position="inline"
-                phaseColor={colors[5]}
+                phaseColor={phaseColor(5)}
                 className="w-12 h-12 !px-0 flex items-center justify-center"
               >
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -201,7 +202,7 @@ export function App() {
               <FloatingButton
                 onClick={() => useUIStore.getState().toggleSettings()}
                 position="inline"
-                phaseColor={colors[2]}
+                phaseColor={phaseColor(2)}
                 className="w-11 h-11 !px-0 !p-0 flex items-center justify-center"
               >
                 <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">

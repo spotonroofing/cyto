@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 import type { RoadmapAction } from '@/types'
 
 interface ActionCardProps {
@@ -17,18 +17,17 @@ const actionLabels: Record<string, string> = {
 }
 
 export function ActionCard({ action, onApply, onDismiss }: ActionCardProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette } = useTheme()
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`mx-4 my-2 p-4 rounded-2xl border ${
-        isDark
-          ? 'bg-copper/10 border-copper/20'
-          : 'bg-gold/10 border-gold/20'
-      }`}
+      className="mx-4 my-2 p-4 rounded-2xl border"
+      style={{
+        backgroundColor: palette.accent + '1A',
+        borderColor: palette.accent + '33',
+      }}
     >
       <div className="text-xs font-medium opacity-60 mb-1">cyto wants to:</div>
       <div className="text-sm font-medium mb-1">
@@ -43,17 +42,15 @@ export function ActionCard({ action, onApply, onDismiss }: ActionCardProps) {
       <div className="flex gap-2">
         <button
           onClick={onApply}
-          className={`px-4 py-1.5 rounded-full text-xs font-medium ${
-            isDark ? 'bg-copper/30 hover:bg-copper/40' : 'bg-gold/30 hover:bg-gold/40'
-          }`}
+          className="px-4 py-1.5 rounded-full text-xs font-medium"
+          style={{ backgroundColor: palette.accent + '4D' }}
         >
           Apply
         </button>
         <button
           onClick={onDismiss}
-          className={`px-4 py-1.5 rounded-full text-xs font-medium opacity-50 hover:opacity-70 ${
-            isDark ? 'bg-white/5' : 'bg-black/5'
-          }`}
+          className="px-4 py-1.5 rounded-full text-xs font-medium opacity-50 hover:opacity-70"
+          style={{ backgroundColor: palette.border }}
         >
           Dismiss
         </button>

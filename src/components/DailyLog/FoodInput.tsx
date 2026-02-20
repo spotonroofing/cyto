@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface FoodInputProps {
   foods: string[]
@@ -7,8 +7,7 @@ interface FoodInputProps {
 }
 
 export function FoodInput({ foods, onChange }: FoodInputProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, isDark } = useTheme()
   const [input, setInput] = useState('')
 
   const addFood = () => {
@@ -67,16 +66,16 @@ export function FoodInput({ foods, onChange }: FoodInputProps) {
           placeholder="Add a food..."
           className={`flex-1 px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 ${
             isDark
-              ? 'bg-white/5 focus:ring-copper/30 placeholder:text-white/20'
-              : 'bg-black/[0.03] focus:ring-gold/30 placeholder:text-black/20'
+              ? 'bg-white/5 placeholder:text-white/20'
+              : 'bg-black/[0.03] placeholder:text-black/20'
           }`}
+          style={{ ['--tw-ring-color' as string]: palette.accent + '4D' }}
         />
         <button
           onClick={addFood}
           disabled={!input.trim()}
-          className={`px-3 py-1.5 rounded-xl text-xs font-medium ${
-            isDark ? 'bg-copper/20 hover:bg-copper/30' : 'bg-gold/20 hover:bg-gold/30'
-          } ${!input.trim() ? 'opacity-30' : ''}`}
+          className={`px-3 py-1.5 rounded-xl text-xs font-medium ${!input.trim() ? 'opacity-30' : ''}`}
+          style={{ backgroundColor: palette.accent + '33' }}
         >
           Add
         </button>

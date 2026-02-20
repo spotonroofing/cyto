@@ -1,6 +1,6 @@
-import { useSettingsStore } from '@/stores/settingsStore'
 import { useRoadmapStore, phases, milestones } from '@/stores/roadmapStore'
-import { getPhaseColor, phaseNames } from '@/styles/theme'
+import { phaseNames } from '@/styles/theme'
+import { useTheme } from '@/themes'
 import { calculateTimelineDates } from '@/utils/dependencyGraph'
 
 interface MilestoneHeaderProps {
@@ -8,16 +8,15 @@ interface MilestoneHeaderProps {
 }
 
 export function MilestoneHeader({ milestoneId }: MilestoneHeaderProps) {
-  const theme = useSettingsStore((s) => s.theme)
+  const { palette, phaseColor } = useTheme()
   const getMilestoneProgress = useRoadmapStore((s) => s.getMilestoneProgress)
-  const isDark = theme === 'dark'
 
   const milestone = milestones.find((m) => m.id === milestoneId)
   if (!milestone) return null
 
   const phase = phases.find((p) => p.id === milestone.phaseId)
   const phaseIndex = phase ? phases.indexOf(phase) : 0
-  const color = getPhaseColor(phaseIndex, isDark)
+  const color = phaseColor(phaseIndex)
   const { completed, total, percentage } = getMilestoneProgress(milestoneId)
 
   // Calculate dynamic dates
@@ -78,7 +77,7 @@ export function MilestoneHeader({ milestoneId }: MilestoneHeaderProps) {
               cy={24}
               r={20}
               fill="none"
-              stroke={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}
+              stroke={palette.border}
               strokeWidth={3}
             />
             <circle

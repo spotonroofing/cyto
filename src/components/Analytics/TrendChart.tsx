@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   LineChart,
   Line,
@@ -9,24 +9,23 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useDailyLogStore } from '@/stores/dailyLogStore'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
-const metrics = [
-  { key: 'energy', label: 'Energy', color: '#FFB5A7' },
-  { key: 'fog', label: 'Brain Fog', color: '#D8BBFF' },
-  { key: 'mood', label: 'Mood', color: '#FFAFCC' },
-  { key: 'sleep', label: 'Sleep', color: '#A2D2FF' },
-] as const
-
-type MetricKey = (typeof metrics)[number]['key']
+type MetricKey = 'energy' | 'fog' | 'mood' | 'sleep'
 
 export function TrendChart() {
-  const theme = useSettingsStore((s) => s.theme)
+  const { palette, phaseColor } = useTheme()
   const getRecentLogs = useDailyLogStore((s) => s.getRecentLogs)
-  const isDark = theme === 'dark'
   const [activeMetrics, setActiveMetrics] = useState<Set<MetricKey>>(
     new Set(['energy', 'fog', 'mood', 'sleep']),
   )
+
+  const metrics = useMemo(() => [
+    { key: 'energy' as const, label: 'Energy', color: phaseColor(0) },
+    { key: 'fog' as const, label: 'Brain Fog', color: phaseColor(2) },
+    { key: 'mood' as const, label: 'Mood', color: phaseColor(1) },
+    { key: 'sleep' as const, label: 'Sleep', color: phaseColor(5) },
+  ], [phaseColor])
 
   const logs = getRecentLogs(30)
   const data = logs
@@ -78,24 +77,24 @@ export function TrendChart() {
           <LineChart data={data}>
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke={isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}
+              stroke={palette.border}
             />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 10, fill: isDark ? '#FFFFFE80' : '#2D2A3280' }}
+              tick={{ fontSize: 10, fill: palette.textSecondary }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               domain={[1, 10]}
-              tick={{ fontSize: 10, fill: isDark ? '#FFFFFE80' : '#2D2A3280' }}
+              tick={{ fontSize: 10, fill: palette.textSecondary }}
               axisLine={false}
               tickLine={false}
               width={25}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: isDark ? '#1a1a2e' : '#fff',
+                backgroundColor: palette.surface,
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '12px',

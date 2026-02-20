@@ -5,15 +5,14 @@ import { FoodToleranceChart } from './FoodToleranceChart'
 import { FlareCalendar } from './FlareCalendar'
 import { MilestoneProgress } from './MilestoneProgress'
 import { SupplementTracker } from './SupplementTracker'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface AnalyticsDashboardProps {
   onClose: () => void
 }
 
 export function AnalyticsDashboard({ onClose }: AnalyticsDashboardProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, isDark } = useTheme()
 
   return (
     <>
@@ -23,7 +22,7 @@ export function AnalyticsDashboard({ onClose }: AnalyticsDashboardProps) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-30"
-        style={{ backgroundColor: isDark ? 'rgba(15,14,23,0.8)' : 'rgba(255,248,240,0.8)' }}
+        style={{ backgroundColor: palette.backdrop }}
         onClick={onClose}
       />
 
@@ -33,9 +32,8 @@ export function AnalyticsDashboard({ onClose }: AnalyticsDashboardProps) {
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 30 }}
         transition={{ type: 'spring', stiffness: 150, damping: 20 }}
-        className={`fixed inset-0 z-40 overflow-y-auto overscroll-contain ${
-          isDark ? 'bg-navy/98' : 'bg-cream/98'
-        } backdrop-blur-xl`}
+        className="fixed inset-0 z-40 overflow-y-auto overscroll-contain backdrop-blur-xl"
+        style={{ backgroundColor: palette.surface + 'FA' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="max-w-4xl mx-auto p-6 pb-20">

@@ -1,10 +1,9 @@
 import { motion } from 'framer-motion'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 export function TypingIndicator() {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
-  const dotColor = isDark ? '#C49A6C' : '#D4A574'
+  const { palette, isDark } = useTheme()
+  const dotColor = palette.accent
 
   return (
     <div className={`inline-flex items-center gap-1 px-4 py-2 rounded-2xl ${

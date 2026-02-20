@@ -5,7 +5,7 @@ import { FlareToggle } from './FlareToggle'
 import { FoodInput } from './FoodInput'
 import { DateSelector } from './DateSelector'
 import { useDailyLogStore, createEmptyLog } from '@/stores/dailyLogStore'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 import type { DailyLog } from '@/types'
 
 interface DailyLogPanelProps {
@@ -13,8 +13,7 @@ interface DailyLogPanelProps {
 }
 
 export function DailyLogPanel({ onClose }: DailyLogPanelProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, phaseColor, isDark } = useTheme()
   const getLogForDate = useDailyLogStore((s) => s.getLogForDate)
   const saveLog = useDailyLogStore((s) => s.saveLog)
 
@@ -49,7 +48,7 @@ export function DailyLogPanel({ onClose }: DailyLogPanelProps) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-30"
-        style={{ backgroundColor: isDark ? 'rgba(15,14,23,0.5)' : 'rgba(255,248,240,0.5)' }}
+        style={{ backgroundColor: palette.backdrop }}
         onClick={onClose}
       />
 
@@ -59,11 +58,11 @@ export function DailyLogPanel({ onClose }: DailyLogPanelProps) {
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.8, opacity: 0, y: 60 }}
         transition={{ type: 'spring', stiffness: 150, damping: 20 }}
-        className={`fixed z-40 overflow-y-auto overscroll-contain
+        className="fixed z-40 overflow-y-auto overscroll-contain
           inset-x-4 bottom-4 top-20
           md:inset-auto md:bottom-8 md:right-8 md:w-96 md:max-h-[80vh]
-          ${isDark ? 'bg-navy/95' : 'bg-cream/95'}
-          backdrop-blur-xl rounded-[28px] shadow-2xl`}
+          backdrop-blur-xl rounded-[28px] shadow-2xl"
+        style={{ backgroundColor: palette.surface + 'F2' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
@@ -88,25 +87,25 @@ export function DailyLogPanel({ onClose }: DailyLogPanelProps) {
             label="Energy"
             value={log.energy}
             onChange={(v) => update({ energy: v })}
-            color="#FFB5A7"
+            color={phaseColor(0)}
           />
           <LogSlider
             label="Brain Fog"
             value={log.fog}
             onChange={(v) => update({ fog: v })}
-            color="#D8BBFF"
+            color={phaseColor(2)}
           />
           <LogSlider
             label="Mood"
             value={log.mood}
             onChange={(v) => update({ mood: v })}
-            color="#FFAFCC"
+            color={phaseColor(1)}
           />
           <LogSlider
             label="Sleep Quality"
             value={log.sleep}
             onChange={(v) => update({ sleep: v })}
-            color="#A2D2FF"
+            color={phaseColor(5)}
           />
 
           <FlareToggle
@@ -128,9 +127,10 @@ export function DailyLogPanel({ onClose }: DailyLogPanelProps) {
               placeholder="e.g. 145"
               className={`w-full px-3 py-1.5 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 ${
                 isDark
-                  ? 'bg-white/5 focus:ring-copper/30 placeholder:text-white/20'
-                  : 'bg-black/[0.03] focus:ring-gold/30 placeholder:text-black/20'
+                  ? 'bg-white/5 placeholder:text-white/20'
+                  : 'bg-black/[0.03] placeholder:text-black/20'
               }`}
+              style={{ ['--tw-ring-color' as string]: palette.accent + '4D' }}
             />
           </div>
 
@@ -146,9 +146,10 @@ export function DailyLogPanel({ onClose }: DailyLogPanelProps) {
               rows={3}
               className={`w-full px-3 py-2 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 ${
                 isDark
-                  ? 'bg-white/5 focus:ring-copper/30 placeholder:text-white/20'
-                  : 'bg-black/[0.03] focus:ring-gold/30 placeholder:text-black/20'
+                  ? 'bg-white/5 placeholder:text-white/20'
+                  : 'bg-black/[0.03] placeholder:text-black/20'
               }`}
+              style={{ ['--tw-ring-color' as string]: palette.accent + '4D' }}
             />
           </div>
 

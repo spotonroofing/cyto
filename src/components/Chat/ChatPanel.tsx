@@ -5,7 +5,7 @@ import { TypingIndicator } from './TypingIndicator'
 import { ActionCard } from './ActionCard'
 import { useChatStore } from '@/stores/chatStore'
 import { useRoadmapStore } from '@/stores/roadmapStore'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 import { sendMessage } from '@/lib/anthropic'
 import { buildSystemPrompt } from '@/utils/cytoPrompt'
 import { parseActions } from '@/utils/actionParser'
@@ -17,8 +17,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ onClose, milestoneContext }: ChatPanelProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, isDark } = useTheme()
   const messages = useChatStore((s) => s.messages)
   const addMessage = useChatStore((s) => s.addMessage)
   const isLoading = useChatStore((s) => s.isLoading)
@@ -124,7 +123,7 @@ export function ChatPanel({ onClose, milestoneContext }: ChatPanelProps) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-30"
-        style={{ backgroundColor: isDark ? 'rgba(15,14,23,0.5)' : 'rgba(255,248,240,0.5)' }}
+        style={{ backgroundColor: palette.backdrop }}
         onClick={onClose}
       />
 
@@ -134,17 +133,16 @@ export function ChatPanel({ onClose, milestoneContext }: ChatPanelProps) {
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.8, opacity: 0, y: 60 }}
         transition={{ type: 'spring', stiffness: 150, damping: 20 }}
-        className={`fixed z-40 flex flex-col
+        className="fixed z-40 flex flex-col
           inset-x-4 bottom-4 top-16
           md:inset-auto md:bottom-8 md:right-8 md:w-[420px] md:h-[600px]
-          ${isDark ? 'bg-navy/95' : 'bg-cream/95'}
-          backdrop-blur-xl rounded-[28px] shadow-2xl overflow-hidden`}
+          backdrop-blur-xl rounded-[28px] shadow-2xl overflow-hidden"
+        style={{ backgroundColor: palette.surface + 'F2' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`flex items-center justify-between px-5 py-4 border-b ${
-          isDark ? 'border-white/5' : 'border-black/5'
-        }`}>
+        <div className="flex items-center justify-between px-5 py-4 border-b"
+          style={{ borderColor: palette.border }}>
           <div>
             <h2 className="font-display text-lg font-bold">cyto</h2>
             <p className="text-[10px] opacity-40">
@@ -191,7 +189,8 @@ export function ChatPanel({ onClose, milestoneContext }: ChatPanelProps) {
         </div>
 
         {/* Input */}
-        <div className={`px-4 py-3 border-t ${isDark ? 'border-white/5' : 'border-black/5'}`}>
+        <div className="px-4 py-3 border-t"
+          style={{ borderColor: palette.border }}>
           <div className="flex gap-2">
             <textarea
               value={input}
@@ -199,18 +198,17 @@ export function ChatPanel({ onClose, milestoneContext }: ChatPanelProps) {
               onKeyDown={handleKeyDown}
               placeholder="Message cyto..."
               rows={1}
-              className={`flex-1 px-4 py-2 rounded-2xl text-sm resize-none focus:outline-none focus:ring-2 ${
-                isDark
-                  ? 'bg-white/5 focus:ring-copper/30 placeholder:text-white/20'
-                  : 'bg-black/[0.03] focus:ring-gold/30 placeholder:text-black/20'
-              }`}
+              className="flex-1 px-4 py-2 rounded-2xl text-sm resize-none focus:outline-none focus:ring-2"
+              style={{
+                backgroundColor: palette.border,
+                '--tw-ring-color': palette.accent + '4D',
+              } as React.CSSProperties}
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
-              className={`self-end px-4 py-2 rounded-full text-sm font-medium transition-opacity ${
-                isDark ? 'bg-copper/20 hover:bg-copper/30' : 'bg-gold/20 hover:bg-gold/30'
-              } ${!input.trim() || isLoading ? 'opacity-30' : ''}`}
+              className={`self-end px-4 py-2 rounded-full text-sm font-medium transition-opacity ${!input.trim() || isLoading ? 'opacity-30' : ''}`}
+              style={{ backgroundColor: palette.accent + '33' }}
             >
               Send
             </button>

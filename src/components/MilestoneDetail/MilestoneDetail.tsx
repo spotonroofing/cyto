@@ -4,16 +4,15 @@ import { Checklist } from './Checklist'
 import { QuickStats } from './QuickStats'
 import { NotesLog } from './NotesLog'
 import { useUIStore } from '@/stores/uiStore'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface MilestoneDetailProps {
   milestoneId: string
 }
 
 export function MilestoneDetail({ milestoneId }: MilestoneDetailProps) {
-  const theme = useSettingsStore((s) => s.theme)
+  const { palette, isDark } = useTheme()
   const selectMilestone = useUIStore((s) => s.selectMilestone)
-  const isDark = theme === 'dark'
 
   const handleClose = () => selectMilestone(null)
 
@@ -22,7 +21,7 @@ export function MilestoneDetail({ milestoneId }: MilestoneDetailProps) {
       {/* Backdrop (desktop: map visible behind at reduced opacity) */}
       <div
         className="fixed inset-0 z-30"
-        style={{ backgroundColor: isDark ? 'rgba(15,14,23,0.7)' : 'rgba(255,248,240,0.7)' }}
+        style={{ backgroundColor: palette.backdrop }}
         onClick={handleClose}
       />
 
@@ -37,9 +36,8 @@ export function MilestoneDetail({ milestoneId }: MilestoneDetailProps) {
         className={`fixed z-40 overflow-y-auto overscroll-contain ${
           // Mobile: full screen. Desktop: centered 70-80% viewport
           'inset-0 md:inset-auto md:top-[10%] md:left-[10%] md:right-[10%] md:bottom-[10%]'
-        } ${
-          isDark ? 'bg-navy/95' : 'bg-cream/95'
         } backdrop-blur-xl md:rounded-[32px]`}
+        style={{ backgroundColor: palette.surface + 'F2' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 max-w-2xl mx-auto pb-24">

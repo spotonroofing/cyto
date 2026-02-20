@@ -1,18 +1,17 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRoadmapStore } from '@/stores/roadmapStore'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface NotesLogProps {
   milestoneId: string
 }
 
 export function NotesLog({ milestoneId }: NotesLogProps) {
-  const theme = useSettingsStore((s) => s.theme)
+  const { palette, isDark } = useTheme()
   const getNotesForMilestone = useRoadmapStore((s) => s.getNotesForMilestone)
   const addMilestoneNote = useRoadmapStore((s) => s.addMilestoneNote)
   const deleteMilestoneNote = useRoadmapStore((s) => s.deleteMilestoneNote)
-  const isDark = theme === 'dark'
 
   const [newNote, setNewNote] = useState('')
   const notes = getNotesForMilestone(milestoneId)
@@ -45,16 +44,18 @@ export function NotesLog({ milestoneId }: NotesLogProps) {
           rows={2}
           className={`flex-1 px-4 py-2 rounded-2xl text-sm resize-none focus:outline-none focus:ring-2 ${
             isDark
-              ? 'bg-white/5 focus:ring-copper/30 placeholder:text-white/30'
-              : 'bg-black/[0.03] focus:ring-gold/30 placeholder:text-black/30'
+              ? 'bg-white/5 placeholder:text-white/30'
+              : 'bg-black/[0.03] placeholder:text-black/30'
           }`}
+          style={{ '--tw-ring-color': palette.accent + '4D' } as React.CSSProperties}
         />
         <button
           onClick={handleAddNote}
           disabled={!newNote.trim()}
           className={`self-end px-4 py-2 rounded-full text-sm font-medium transition-opacity ${
-            isDark ? 'bg-copper/20 hover:bg-copper/30' : 'bg-gold/20 hover:bg-gold/30'
-          } ${!newNote.trim() ? 'opacity-30' : ''}`}
+            !newNote.trim() ? 'opacity-30' : ''
+          }`}
+          style={{ backgroundColor: palette.accent + '33' }}
         >
           Add
         </button>

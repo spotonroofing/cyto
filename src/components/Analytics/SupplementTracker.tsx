@@ -1,10 +1,9 @@
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { actionItems } from '@/data/roadmap'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 export function SupplementTracker() {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, isDark } = useTheme()
   const getActionItem = useRoadmapStore((s) => s.getActionItem)
 
   // Count active supplements (supplement category items that are not completed/tapered)
@@ -35,7 +34,7 @@ export function SupplementTracker() {
       <h3 className="font-display text-lg font-semibold mb-3">Supplement Count</h3>
 
       <div className={`p-4 rounded-2xl text-center ${isDark ? 'bg-white/5' : 'bg-black/[0.03]'}`}>
-        <div className="font-mono text-4xl font-bold mb-2" style={{ color: isDark ? '#C49A6C' : '#D4A574' }}>
+        <div className="font-mono text-4xl font-bold mb-2" style={{ color: palette.accent }}>
           {count}
         </div>
         <p className="text-xs opacity-50 italic">{quip}</p>

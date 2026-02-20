@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface SubDetailViewProps {
   title: string
@@ -9,8 +9,7 @@ interface SubDetailViewProps {
 }
 
 export function SubDetailView({ title, color, onClose, children }: SubDetailViewProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette, isDark } = useTheme()
 
   return (
     <motion.div
@@ -18,11 +17,11 @@ export function SubDetailView({ title, color, onClose, children }: SubDetailView
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
-      style={{ borderRadius: 24 }}
+      style={{ borderRadius: 24, backgroundColor: palette.surface + 'F2' }}
       className={`fixed inset-x-4 top-24 bottom-24 z-50
         md:inset-auto md:top-[15%] md:left-[15%] md:right-[15%] md:bottom-[15%]
         overflow-y-auto overscroll-contain shadow-2xl
-        ${isDark ? 'bg-navy/95' : 'bg-cream/95'} backdrop-blur-xl`}
+        backdrop-blur-xl`}
       onClick={(e) => e.stopPropagation()}
     >
       <div

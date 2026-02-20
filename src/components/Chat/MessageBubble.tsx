@@ -1,4 +1,4 @@
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 import type { ChatMessage } from '@/types'
 
 interface MessageBubbleProps {
@@ -6,8 +6,7 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette } = useTheme()
   const isUser = message.role === 'user'
 
   return (
@@ -15,9 +14,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       <div
         className={`max-w-[80%] px-4 py-2.5 text-sm whitespace-pre-wrap ${
           isUser
-            ? `rounded-[18px] rounded-br-md ${isDark ? 'bg-copper/20 text-softwhite' : 'bg-gold/20 text-charcoal'}`
-            : `rounded-[18px] rounded-bl-md ${isDark ? 'bg-white/5 text-softwhite' : 'bg-black/[0.04] text-charcoal'}`
+            ? 'rounded-[18px] rounded-br-md'
+            : 'rounded-[18px] rounded-bl-md'
         }`}
+        style={{
+          backgroundColor: isUser ? palette.accent + '33' : palette.border,
+          color: palette.text,
+        }}
       >
         {message.content}
       </div>

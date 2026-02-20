@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useSettingsStore } from '@/stores/settingsStore'
+import { useTheme } from '@/themes'
 
 interface Particle {
   x: number
@@ -17,8 +17,7 @@ export function BackgroundParticles() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const particlesRef = useRef<Particle[]>([])
   const animFrameRef = useRef<number>(0)
-  const theme = useSettingsStore((s) => s.theme)
-  const isDark = theme === 'dark'
+  const { palette } = useTheme()
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -50,24 +49,24 @@ export function BackgroundParticles() {
       axisRatio: 0.7 + Math.random() * 0.3,
     }))
 
+    // particle base is "rgb(r,g,b)" — extract for rgba usage
+    const particleBase = palette.particle
+
     // Check reduced motion preference
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     if (prefersReducedMotion) {
       // Render once, no animation loop
-      drawParticles(ctx, canvas.width, canvas.height, particlesRef.current, isDark)
+      drawParticles(ctx, canvas.width, canvas.height, particlesRef.current, particleBase)
       return () => {
         window.removeEventListener('resize', resize)
       }
     }
 
-    let time = 0
-
     const animate = () => {
       const w = canvas.width
       const h = canvas.height
       const particles = particlesRef.current
-      time += 16
 
       ctx.clearRect(0, 0, w, h)
 
@@ -90,35 +89,13 @@ export function BackgroundParticles() {
 
         ctx.beginPath()
         ctx.ellipse(p.x, p.y, rx, ry, p.wobblePhase * 0.5, 0, Math.PI * 2)
-        ctx.fillStyle = isDark
-          ? `rgba(160, 120, 100, ${p.opacity})`
-          : `rgba(200, 160, 140, ${p.opacity})`
+        // Use theme particle color with per-particle opacity
+        const rgbInner = particleBase.replace('rgb(', '').replace(')', '')
+        ctx.fillStyle = `rgba(${rgbInner}, ${p.opacity})`
         ctx.fill()
       }
 
-      // Draw faint membrane rings (petri dish culture rings)
-      const ringCount = 4
-      const centerX = w / 2
-      const centerY = h / 2
-      for (let r = 0; r < ringCount; r++) {
-        const baseRadius = (Math.min(w, h) * 0.25) + r * (Math.min(w, h) * 0.15)
-        const wobble = Math.sin(time * 0.0003 + r * 1.5) * 8
-        const rx = baseRadius + wobble
-        const ry = baseRadius * (0.85 + Math.sin(time * 0.0002 + r) * 0.05) + wobble * 0.5
-        const rotation = time * 0.00005 * (r % 2 === 0 ? 1 : -1) + r * 0.3
-
-        ctx.save()
-        ctx.translate(centerX, centerY)
-        ctx.rotate(rotation)
-        ctx.beginPath()
-        ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2)
-        ctx.strokeStyle = isDark
-          ? `rgba(160, 120, 110, ${0.025 + Math.sin(time * 0.0004 + r) * 0.01})`
-          : `rgba(200, 160, 150, ${0.035 + Math.sin(time * 0.0004 + r) * 0.015})`
-        ctx.lineWidth = 1.5 + Math.sin(time * 0.0005 + r * 2) * 0.5
-        ctx.stroke()
-        ctx.restore()
-      }
+      // Ghost orb / membrane rings removed (was center-screen petri dish rings)
 
       animFrameRef.current = requestAnimationFrame(animate)
     }
@@ -129,7 +106,7 @@ export function BackgroundParticles() {
       cancelAnimationFrame(animFrameRef.current)
       window.removeEventListener('resize', resize)
     }
-  }, [isDark])
+  }, [palette])
 
   return (
     <canvas
@@ -145,15 +122,14 @@ function drawParticles(
   w: number,
   h: number,
   particles: Particle[],
-  isDark: boolean
+  particleBase: string
 ) {
+  const rgbInner = particleBase.replace('rgb(', '').replace(')', '')
   ctx.clearRect(0, 0, w, h)
   for (const p of particles) {
     ctx.beginPath()
     ctx.ellipse(p.x, p.y, p.radius, p.radius * p.axisRatio, 0, 0, Math.PI * 2)
-    ctx.fillStyle = isDark
-      ? `rgba(160, 120, 100, ${p.opacity})`
-      : `rgba(200, 160, 140, ${p.opacity})`
+    ctx.fillStyle = `rgba(${rgbInner}, ${p.opacity})`
     ctx.fill()
   }
 }
