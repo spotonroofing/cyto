@@ -34,6 +34,8 @@ interface ConnectionData {
   targetFanOut: number
   // Bounding box for viewport culling (world coords, with padding)
   minX: number; minY: number; maxX: number; maxY: number
+  // Precomputed gradient blend stops for smooth color transitions
+  blendedColors: [string, string, string]
 }
 
 interface BlobData {
@@ -61,34 +63,36 @@ function sampleConnection(
   t: number, // 0..1 along path
   time: number,
 ): { x: number; y: number; width: number } {
-  // Very subtle organic curve — NOT a sag, just a gentle living wobble
+  // Gentle organic curve bow
   const curveBow = Math.sin(t * Math.PI) * conn.dist * 0.008
-  // Gentle flow wave, damped hard at endpoints
+  // Flow wave, damped at endpoints for clean junction merge
   const dampEnds = Math.sin(t * Math.PI)  // 0 at edges, 1 at center
   const flowWave = Math.sin(time * conn.flowSpeed + t * 4 + conn.phaseOffset) * 4 * dampEnds
 
   const x = conn.sx + conn.dx * t + conn.nx * (curveBow + flowWave)
   const y = conn.sy + conn.dy * t + conn.ny * (curveBow + flowWave)
 
-  // Taper: thick at cells, still substantial in middle
-  const distFromEdge = Math.min(t, 1 - t) * 2  // 0 at edges, 1 at center
+  // ── Width: consistent tube with smooth junction flare ──
   const smallerR = Math.min(conn.sr, conn.tr)
 
-  // Reduce thickness at fan-out points (where branches split)
-  const sourceFan = conn.sourceFanOut || 1
-  const targetFan = conn.targetFanOut || 1
-  const fanReduction = t < 0.5
-    ? (sourceFan > 2 ? 0.6 : 1)
-    : (targetFan > 2 ? 0.6 : 1)
+  // Minimum tube width: ~24% of smaller radius (half-width),
+  // total visible width ≈ 48% of radius ≈ 24% of diameter
+  const midWidth = smallerR * 0.24
 
-  const endWidth = smallerR * 0.45 * fanReduction
-  const midWidth = smallerR * 0.14
-  // Smooth taper — stays thick longer, narrows gently
-  const taper = midWidth + (endWidth - midWidth) * Math.pow(1 - distFromEdge, 1.2)
+  // Junction flare: use actual endpoint radius for organic merge into orb
+  const nearEndR = t < 0.5 ? conn.sr : conn.tr
+  const nearFan = t < 0.5 ? (conn.sourceFanOut || 1) : (conn.targetFanOut || 1)
+  const fanScale = nearFan > 2 ? 0.78 : 1.0
+  const endWidth = nearEndR * 0.52 * fanScale
 
-  // Subtle width pulse
-  const widthPulse = Math.sin(time * 0.5 + t * 3 + conn.phaseOffset) * 1.5 * dampEnds
-  const width = Math.max(midWidth * 0.8, taper + widthPulse)
+  // Smooth cosine flare over first/last 25% of connection path
+  const distFromEdge = Math.min(t, 1 - t) * 2  // 0 at edges, 1 at center
+  const flareZone = 0.5  // transition zone (distFromEdge 0→0.5 = first/last 25%)
+  const flareT = Math.min(distFromEdge / flareZone, 1)
+  const flareEase = 0.5 * (1 - Math.cos(Math.PI * flareT))
+
+  // Interpolate: endWidth at junctions, midWidth in tube section
+  const width = Math.max(midWidth * 0.9, endWidth + (midWidth - endWidth) * flareEase)
 
   return { x, y, width }
 }
@@ -109,6 +113,22 @@ function isInViewport(
   const pad = 60
   return screenMaxX >= -pad && screenMinX <= viewW + pad &&
          screenMaxY >= -pad && screenMinY <= viewH + pad
+}
+
+// ── Gamma-corrected color blend for perceptually smooth gradients ──
+
+function blendHex(c1: string, c2: string, t: number): string {
+  const r1 = parseInt(c1.slice(1, 3), 16)
+  const g1 = parseInt(c1.slice(3, 5), 16)
+  const b1 = parseInt(c1.slice(5, 7), 16)
+  const r2 = parseInt(c2.slice(1, 3), 16)
+  const g2 = parseInt(c2.slice(3, 5), 16)
+  const b2 = parseInt(c2.slice(5, 7), 16)
+  // Blend in squared (gamma) space for perceptual smoothness
+  const r = Math.round(Math.sqrt(r1 * r1 * (1 - t) + r2 * r2 * t))
+  const g = Math.round(Math.sqrt(g1 * g1 * (1 - t) + g2 * g2 * t))
+  const b = Math.round(Math.sqrt(b1 * b1 * (1 - t) + b2 * b2 * t))
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
 }
 
 // ── Main component ────────────────────────────────────────────
@@ -147,17 +167,24 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       const maxX = Math.max(sx, tx) + pad
       const maxY = Math.max(sy, ty) + pad
 
+      const sourceColor = phaseColor(link.sourcePhaseIndex)
+      const targetColor = phaseColor(link.targetPhaseIndex)
       conns.push({
         sx, sy, sr, tx, ty, tr,
         dx, dy, dist, ux, uy, nx, ny,
-        sourceColor: phaseColor(link.sourcePhaseIndex),
-        targetColor: phaseColor(link.targetPhaseIndex),
+        sourceColor,
+        targetColor,
         phaseOffset: Math.random() * Math.PI * 2,
         flowSpeed: 0.4 + Math.random() * 0.3,
         wobbleFreq: 3 + Math.random() * 2,
         sourceFanOut: 1,
         targetFanOut: 1,
         minX, minY, maxX, maxY,
+        blendedColors: [
+          blendHex(sourceColor, targetColor, 0.25),
+          blendHex(sourceColor, targetColor, 0.5),
+          blendHex(sourceColor, targetColor, 0.75),
+        ],
       })
     }
 
@@ -212,7 +239,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     canvas.style.height = `${height}px`
 
     const isMobile = IS_MOBILE || width < 768
-    const SAMPLES_PER_100PX = isMobile ? 4 : 8
+    const SAMPLES_PER_100PX = isMobile ? 7 : 10
+    const MIN_SEGMENTS = isMobile ? 20 : 28
     // Mobile: fewer steps for blob/nucleus shapes
     const BLOB_STEPS = isMobile ? 24 : 48
     const NUCLEUS_STEPS = isMobile ? 24 : 64
@@ -250,7 +278,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         if (!isInViewport(conn.minX, conn.minY, conn.maxX, conn.maxY,
             tf.x, tf.y, tf.scale, width, height)) continue
 
-        const segments = Math.max(8, Math.floor(conn.dist / 100 * SAMPLES_PER_100PX))
+        const segments = Math.max(MIN_SEGMENTS, Math.floor(conn.dist / 100 * SAMPLES_PER_100PX))
 
         // Sample points along the connection
         const points: { x: number; y: number; width: number }[] = []
@@ -283,8 +311,22 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
             const tlen = Math.sqrt(tdx * tdx + tdy * tdy) || 1
             lnx = -tdy / tlen; lny = tdx / tlen
           }
-          upper.push({ x: p.x + lnx * p.width, y: p.y + lny * p.width })
-          lower.push({ x: p.x - lnx * p.width, y: p.y - lny * p.width })
+          // Edge wobble — independent sine-wave displacement per edge for organic ripple
+          const edgeT = i / segments
+          const wDamp = Math.sin(edgeT * Math.PI)
+          const wobbleUpper = (
+            Math.sin(time * 3.2 + edgeT * 6 + conn.phaseOffset) * 2.5
+            + Math.sin(time * 2.1 + edgeT * 3.5 + conn.phaseOffset * 1.7) * 1.5
+          ) * wDamp
+          const wobbleLower = (
+            Math.sin(time * 2.8 + edgeT * 5.5 + conn.phaseOffset + 2.1) * 2.5
+            + Math.sin(time * 2.3 + edgeT * 3 + conn.phaseOffset * 1.3 + 1.0) * 1.5
+          ) * wDamp
+
+          const wU = p.width + wobbleUpper
+          const wL = p.width + wobbleLower
+          upper.push({ x: p.x + lnx * wU, y: p.y + lny * wU })
+          lower.push({ x: p.x - lnx * wL, y: p.y - lny * wL })
         }
 
         // Draw filled shape with smooth curves
@@ -313,9 +355,12 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
 
         ctx.closePath()
 
-        // Gradient fill from source to target color
+        // Smooth gradient — gamma-corrected intermediate stops
         const grad = ctx.createLinearGradient(conn.sx, conn.sy, conn.tx, conn.ty)
         grad.addColorStop(0, conn.sourceColor)
+        grad.addColorStop(0.25, conn.blendedColors[0]!)
+        grad.addColorStop(0.5, conn.blendedColors[1]!)
+        grad.addColorStop(0.75, conn.blendedColors[2]!)
         grad.addColorStop(1, conn.targetColor)
         ctx.fillStyle = grad
         ctx.fill()

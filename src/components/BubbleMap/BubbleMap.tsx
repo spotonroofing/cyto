@@ -3,6 +3,7 @@ import { useBubbleLayout } from './useBubbleLayout'
 import { Bubble } from './Bubble'
 import { GooCanvas } from './GooCanvas'
 import { BackgroundParticles } from './BackgroundParticles'
+import { DotGrid } from './DotGrid'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
 
@@ -276,6 +277,7 @@ export function BubbleMap() {
       style={{ touchAction: 'none' }}
     >
       <BackgroundParticles />
+      <DotGrid width={dimensions.width} height={dimensions.height} transform={transform} />
 
       {/* Hidden SVG for goo filter definition — stdDeviation is dynamic */}
       <svg width="0" height="0" style={{ position: 'absolute' }}>

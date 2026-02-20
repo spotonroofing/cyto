@@ -45,7 +45,7 @@ export function BackgroundParticles() {
 
     // Initialize particles with pre-computed fill styles
     particlesRef.current = Array.from({ length: count }, () => {
-      const opacity = 0.03 + Math.random() * 0.04
+      const opacity = 0.08 + Math.random() * 0.10
       return {
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
