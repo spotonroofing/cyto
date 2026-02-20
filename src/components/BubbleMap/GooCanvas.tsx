@@ -239,8 +239,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     canvas.style.height = `${height}px`
 
     const isMobile = IS_MOBILE || width < 768
-    const SAMPLES_PER_100PX = isMobile ? 7 : 10
-    const MIN_SEGMENTS = isMobile ? 20 : 28
+    const SAMPLES_PER_100PX = isMobile ? 9 : 10
+    const MIN_SEGMENTS = isMobile ? 24 : 28
     // Mobile: fewer steps for blob/nucleus shapes
     const BLOB_STEPS = isMobile ? 24 : 48
     const NUCLEUS_STEPS = isMobile ? 24 : 64
@@ -460,8 +460,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       style={{
         zIndex: 1,
         pointerEvents: 'none',
-        // Skip expensive SVG goo filter on mobile — use cheaper CSS blur
-        filter: IS_MOBILE ? 'blur(1px)' : 'url(#goo-filter)',
+        // Mobile uses lighter goo filter (stdDeviation=7 vs 12, ~4x cheaper)
+        filter: IS_MOBILE ? 'url(#goo-filter-mobile)' : 'url(#goo-filter)',
         opacity: palette.goo,
       }}
     />

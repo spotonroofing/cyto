@@ -11,11 +11,12 @@ interface BubbleProps {
 }
 
 export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
-  const { palette } = useTheme()
+  const { palette, phaseColor } = useTheme()
 
   const milestone = milestones.find((m) => m.id === milestoneId)
   const phase = phases.find((p) => p.id === milestone?.phaseId)
   const phaseIndex = phase ? phases.indexOf(phase) : 0
+  const color = phaseColor(phaseIndex)
 
   return (
     <g
@@ -25,6 +26,11 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       role="button"
       tabIndex={0}
     >
+      {/* Border ring — frames the orb outer edge */}
+      <circle cx={0} cy={0} r={radius} fill="none" stroke={color} strokeWidth={1.5} opacity={0.5} />
+      {/* Nucleus — dense core inside the membrane */}
+      <circle cx={0} cy={0} r={radius * 0.57} fill={color} opacity={0.7} />
+      {/* Hit target */}
       <circle cx={0} cy={0} r={radius} fill="transparent" />
 
       {/* Phase name — primary label */}
