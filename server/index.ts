@@ -2,14 +2,19 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const STATE_FILE = resolve(__dirname, 'state.json')
+const DATA_DIR = resolve(__dirname, 'data')
+const STATE_FILE = resolve(DATA_DIR, 'state.json')
 const DIST_DIR = resolve(__dirname, '..', 'dist')
 const PORT = Number(process.env.PORT) || 3000
+
+if (!process.env.PORT) {
+  console.warn('No PORT env var — using default 3000')
+}
 
 interface AppState {
   updatedAt: string
@@ -34,6 +39,15 @@ interface AppState {
   }>
 }
 
+// Ensure data directory exists (Railway starts fresh each deploy)
+try {
+  if (!existsSync(DATA_DIR)) {
+    mkdirSync(DATA_DIR, { recursive: true })
+  }
+} catch (err) {
+  console.warn('Could not create data directory:', err)
+}
+
 // In-memory state
 let currentState: AppState | null = null
 
@@ -53,6 +67,11 @@ const app = new Hono()
 // CORS for dev (Vite dev server runs on a different port)
 app.use('/api/*', cors())
 
+// Health check — Railway uses this to confirm the app is alive
+app.get('/health', (c) => {
+  return c.json({ status: 'ok' })
+})
+
 // GET /api/state — OpenClaw reads this
 app.get('/api/state', (c) => {
   if (!currentState) {
@@ -68,7 +87,7 @@ app.post('/api/state', async (c) => {
     body.updatedAt = new Date().toISOString()
     currentState = body
 
-    // Persist to file backup
+    // Persist to file backup (ephemeral on Railway — lost on redeploy)
     try {
       writeFileSync(STATE_FILE, JSON.stringify(currentState, null, 2))
     } catch (err) {
@@ -81,13 +100,13 @@ app.post('/api/state', async (c) => {
   }
 })
 
-// GET /api/health — Simple health check
+// GET /api/health — Kept for backward compat
 app.get('/api/health', (c) => {
   return c.json({ status: 'ok', hasState: currentState !== null })
 })
 
 // Serve static files from Vite build output
-app.use('/*', serveStatic({ root: '../dist' }))
+app.use('/*', serveStatic({ root: './dist' }))
 
 // SPA fallback — serve index.html for all non-API, non-static routes
 app.get('*', (c) => {
@@ -101,5 +120,5 @@ app.get('*', (c) => {
 })
 
 console.log(`cyto server starting on port ${PORT}`)
-serve({ fetch: app.fetch, port: PORT })
-console.log(`cyto server running at http://localhost:${PORT}`)
+serve({ fetch: app.fetch, port: PORT, hostname: '0.0.0.0' })
+console.log(`cyto server running on 0.0.0.0:${PORT}`)
