@@ -16,20 +16,27 @@ interface Particle {
   fillStyle: string // pre-computed rgba string
 }
 
-interface BackgroundParticlesProps {
-  transform: { x: number; y: number; scale: number }
+interface MapBounds {
+  minX: number; maxX: number; minY: number; maxY: number
 }
 
-export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
+interface BackgroundParticlesProps {
+  transform: { x: number; y: number; scale: number }
+  mapBounds: MapBounds | null
+}
+
+export function BackgroundParticles({ transform, mapBounds }: BackgroundParticlesProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const particlesRef = useRef<Particle[]>([])
   const animFrameRef = useRef<number>(0)
   const transformRef = useRef(transform)
+  const mapBoundsRef = useRef(mapBounds)
   const { palette } = useTheme()
   const debugParticleCount = useDebugStore((s) => s.particleCount)
 
-  // Keep transform ref in sync without re-running the main effect
+  // Keep refs in sync without re-running the main effect
   useEffect(() => { transformRef.current = transform }, [transform])
+  useEffect(() => { mapBoundsRef.current = mapBounds }, [mapBounds])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -52,13 +59,17 @@ export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
     const particleBase = palette.particle
     const rgbInner = particleBase.replace('rgb(', '').replace(')', '')
 
-    // Initialize particles in world space (same coordinate system as cells/paths)
-    const tf = transformRef.current
-    const pad = 200 // world-space padding beyond viewport edges
-    const worldLeft = -tf.x / tf.scale - pad
-    const worldTop = -tf.y / tf.scale - pad
-    const worldW = canvas.width / tf.scale + pad * 2
-    const worldH = canvas.height / tf.scale + pad * 2
+    // Initialize particles across the full map bounding box (world space)
+    const bounds = mapBoundsRef.current
+    if (!bounds) {
+      // No map bounds yet — clean up and wait for next run
+      return () => { window.removeEventListener('resize', resize) }
+    }
+    const pad = 200 // world-space padding beyond map edges
+    const worldLeft = bounds.minX - pad
+    const worldTop = bounds.minY - pad
+    const worldW = (bounds.maxX - bounds.minX) + pad * 2
+    const worldH = (bounds.maxY - bounds.minY) + pad * 2
 
     particlesRef.current = Array.from({ length: count }, () => {
       const opacity = 0.11 + Math.random() * 0.12
@@ -132,12 +143,13 @@ export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
       // Apply debug opacity multiplier
       if (dbg.particleOpacity < 1) ctx.globalAlpha = dbg.particleOpacity
 
-      // Visible world rect for wrapping (with padding so particles don't pop in at edges)
+      // Map world rect for wrapping (particles stay within map bounds, not viewport)
+      const mb = mapBoundsRef.current
       const wPad = 100
-      const wLeft = -tf.x / tf.scale - wPad
-      const wTop = -tf.y / tf.scale - wPad
-      const wW = w / tf.scale + wPad * 2
-      const wH = h / tf.scale + wPad * 2
+      const wLeft = mb ? mb.minX - wPad : -tf.x / tf.scale - wPad
+      const wTop = mb ? mb.minY - wPad : -tf.y / tf.scale - wPad
+      const wW = mb ? (mb.maxX - mb.minX) + wPad * 2 : w / tf.scale + wPad * 2
+      const wH = mb ? (mb.maxY - mb.minY) + wPad * 2 : h / tf.scale + wPad * 2
 
       for (const p of particles) {
         // Update position (world-space drift)
@@ -178,7 +190,7 @@ export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
       cancelAnimationFrame(animFrameRef.current)
       window.removeEventListener('resize', resize)
     }
-  }, [palette, debugParticleCount])
+  }, [palette, debugParticleCount, mapBounds])
 
   return (
     <canvas

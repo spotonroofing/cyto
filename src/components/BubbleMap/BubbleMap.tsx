@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useBubbleLayout } from './useBubbleLayout'
 import { Bubble } from './Bubble'
 import { GooCanvas } from './GooCanvas'
@@ -113,6 +113,21 @@ export function BubbleMap() {
   }, [])
 
   const { bubbles, links, settled } = useBubbleLayout(dimensions.width, dimensions.height)
+
+  // Compute world-space bounding box of all bubbles for particle distribution
+  const mapBounds = useMemo(() => {
+    if (bubbles.length === 0) return null
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    for (const b of bubbles) {
+      if (b.x - b.radius < minX) minX = b.x - b.radius
+      if (b.x + b.radius > maxX) maxX = b.x + b.radius
+      if (b.y - b.radius < minY) minY = b.y - b.radius
+      if (b.y + b.radius > maxY) maxY = b.y + b.radius
+    }
+    const padX = (maxX - minX) * 0.3
+    const padY = (maxY - minY) * 0.3
+    return { minX: minX - padX, maxX: maxX + padX, minY: minY - padY, maxY: maxY + padY }
+  }, [bubbles])
 
   useEffect(() => { transformRef.current = transform }, [transform])
   useEffect(() => { bubblesRef.current = bubbles }, [bubbles])
@@ -596,7 +611,7 @@ export function BubbleMap() {
       className="w-full h-dvh overflow-hidden relative"
       style={{ touchAction: 'none' }}
     >
-      <BackgroundParticles transform={transform} />
+      <BackgroundParticles transform={transform} mapBounds={mapBounds} />
       <DotGrid width={dimensions.width} height={dimensions.height} transform={transform} />
 
       {/* Hidden SVG for goo filter definition — stdDeviation is dynamic */}
