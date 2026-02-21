@@ -385,9 +385,9 @@ export function BubbleMap() {
       const vel = computeReleaseVelocity(moveHistoryRef.current)
       startPhysics(vel.x * 0.5, vel.y * 0.5)
     }
-    const ZOOM_IMPULSE = 0.04     // velocity added per scroll tick
-    const ZOOM_FRICTION = 0.85    // per-frame velocity retention (lower = shorter coast)
-    const ZOOM_STOP = 0.001       // velocity threshold to stop loop
+    const ZOOM_IMPULSE = 0.055    // velocity added per scroll tick
+    const ZOOM_FRICTION = 0.94    // per-frame velocity retention (lower = shorter coast)
+    const ZOOM_STOP = 0.0005     // velocity threshold to stop loop
 
     const runZoomMomentum = () => {
       const v = zoomVelocityRef.current
