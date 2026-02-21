@@ -50,6 +50,7 @@ interface BlobData {
   wobblePhase: number
   deformFreq: number
   // Nucleus-specific
+  nucleusBreathePhase: number // independent breathing phase (decoupled from membrane)
   nucleusHarmonics: number[]  // 4-6 random amplitudes for multi-harmonic shape
   nucleusPhases: number[]     // matching phase offsets
   nucleusRotSpeed: number     // rotation speed
@@ -232,6 +233,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       wobblePhase: Math.random() * Math.PI * 2,
       deformFreq: 2 + Math.random(),
       // Multi-harmonic nucleus shape — each blob gets unique deformation
+      nucleusBreathePhase: Math.random() * Math.PI * 2,  // independent from membrane breathePhase
       nucleusHarmonics: Array.from({ length: 5 }, () => 1.5 + Math.random() * 4),
       nucleusPhases: Array.from({ length: 5 }, () => Math.random() * Math.PI * 2),
       nucleusRotSpeed: 0.08 + Math.random() * 0.12,
@@ -446,7 +448,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
             tf.x, tf.y, tf.scale, width, height)) continue
 
         const nucleusR = blob.radius * 0.68
-        const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 2.5
+        const breathe = Math.sin(time * 0.7 + blob.nucleusBreathePhase) * 2.5
 
         // Multi-harmonic organic shape
         ctx.beginPath()
