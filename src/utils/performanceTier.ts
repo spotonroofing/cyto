@@ -12,21 +12,21 @@ export const Q = IS_MOBILE ? {
   // compositing/filter ghosting artifacts on high-DPR mobile browsers)
   canvasDpr: 1.5,
 
-  // GooCanvas connection rendering
-  gooSamplesPerPx: 7,        // samples per 100px of connection (desktop: 10)
-  gooMinSegments: 12,         // minimum segments per connection (desktop: 28)
-  gooBlobSteps: 12,           // polygon steps for blob outline (desktop: 48)
-  gooNucleusSteps: 12,        // polygon steps for nucleus outline (desktop: 64)
-  gooNucleusHarmonics: 3,     // harmonic count for nucleus deformation
-  gooEdgeWobble: false as const, // skip per-edge sine wobble (path wobble still active)
+  // GooCanvas connection rendering — shape quality matches desktop
+  gooSamplesPerPx: 10,        // samples per 100px of connection (same as desktop)
+  gooMinSegments: 28,          // minimum segments per connection (same as desktop)
+  gooBlobSteps: 48,            // polygon steps for blob outline (same as desktop)
+  gooNucleusSteps: 64,         // polygon steps for nucleus outline (same as desktop)
+  gooNucleusHarmonics: 5,      // harmonic count for nucleus deformation (same as desktop)
+  gooEdgeWobble: true as const, // enable per-edge sine wobble (same as desktop)
   gooTargetDt: 1000 / 24,     // 24fps target
   gooIdleDt: 1000 / 8,        // 8fps idle
-  gooCacheInterval: 5,         // update offscreen cache every 5 frames (~5fps wobble)
-  gooCacheQuality: 0.5,        // half resolution offscreen (reduces filter cost ~4x)
+  gooCacheInterval: 6,         // update offscreen cache every 6 frames (~4fps wobble)
+  gooCacheQuality: 1.0,        // full resolution offscreen (same as desktop)
 
   // SVG goo filter blur — must scale linearly with zoom (no cap) to keep goo
   // shape consistent across zoom levels. Capping breaks the feColorMatrix threshold.
-  baseBlurStdDev: 7,
+  baseBlurStdDev: 12,
   maxBlurStdDev: 999,
 
   // Background particles

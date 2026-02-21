@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useTheme } from '@/themes'
-import { IS_MOBILE, Q } from '@/utils/performanceTier'
+import { Q } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
 import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
 
@@ -368,8 +368,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   // Ref for the dedicated cache SVG filter's blur element
   const cacheBlurRef = useRef<SVGFEGaussianBlurElement>(null)
 
-  // Keep refs in sync without restarting animation loop
-  useEffect(() => { transformRef.current = transform }, [transform])
+  // Keep refs in sync without restarting animation loop.
+  // Transform uses inline assignment (not useEffect) to eliminate 1-frame lag
+  // between SVG overlay and canvas during panning.
+  transformRef.current = transform
   useEffect(() => { paletteRef.current = palette }, [palette])
 
   // Precompute connection and blob data when layout changes
@@ -488,7 +490,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     if (useCache) {
       canvas.style.filter = 'none'
     } else {
-      canvas.style.filter = IS_MOBILE ? 'url(#goo-filter-mobile)' : 'url(#goo-filter)'
+      canvas.style.filter = 'url(#goo-filter)'
     }
 
     // ── Compute world-space bounding box for offscreen cache ──
@@ -599,8 +601,13 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           needsCacheUpdate = true
         }
 
-        // Update cache on wobble ticks (every N frames)
-        if (needsCacheUpdate || frameCount % CACHE_INTERVAL === 0) {
+        // Skip cache updates during active panning/zooming to prevent stutter.
+        // The cached image is simply translated/scaled with the camera transform.
+        // Cache updates resume once the transform has been stable for 100ms.
+        const isPanning = (timestamp - lastTransformChangeTime) < 100
+
+        // Update cache on wobble ticks (every N frames) — paused during pan
+        if (needsCacheUpdate || (!isPanning && frameCount % CACHE_INTERVAL === 0)) {
           needsCacheUpdate = false
 
           // Update goo-cache filter stdDeviation for offscreen resolution
@@ -642,7 +649,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         // ── Fallback: direct draw with CSS filter on canvas element ──
         // Update CSS filter dynamically based on gooFilter toggle
         const desiredFilter = dbg.gooFilter
-          ? (IS_MOBILE ? 'url(#goo-filter-mobile)' : 'url(#goo-filter)')
+          ? 'url(#goo-filter)'
           : 'none'
         if (desiredFilter !== lastFallbackFilter) {
           canvas.style.filter = desiredFilter
@@ -668,10 +675,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   }, [width, height, bubbles, palette])
   // NOTE: transform removed from deps — read from ref instead
 
-  // Color matrix values differ between mobile and desktop
-  const cmValues = IS_MOBILE
-    ? '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7'
-    : '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8'
+  // Unified color matrix — same goo strength on all devices
+  const cmValues = '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8'
 
   return (
     <>
@@ -683,7 +688,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
             <feGaussianBlur
               ref={cacheBlurRef}
               in="SourceGraphic"
-              stdDeviation={IS_MOBILE ? '7' : '12'}
+              stdDeviation="12"
               result="blur"
             />
             <feColorMatrix
