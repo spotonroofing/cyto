@@ -1,5 +1,15 @@
 import { milestones, phases } from '@/stores/roadmapStore'
 import { useTheme } from '@/themes'
+import {
+  Microscope, FileSearch, Pill, HeartPulse,
+  Utensils, FlaskConical, Sparkles, ShieldCheck,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+
+const phaseIcons: Record<number, LucideIcon> = {
+  0: Microscope, 1: FileSearch, 2: Pill, 3: HeartPulse,
+  4: Utensils, 5: FlaskConical, 6: Sparkles, 7: ShieldCheck,
+}
 
 interface BubbleProps {
   milestoneId: string
@@ -32,9 +42,30 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       {/* Hit target */}
       <circle cx={0} cy={0} r={radius} fill="transparent" />
 
+      {/* Phase icon */}
+      {(() => {
+        const Icon = phaseIcons[phaseIndex]
+        if (!Icon) return null
+        const size = Math.round(radius * 0.28)
+        return (
+          <foreignObject
+            x={-size / 2} y={-size / 2 - 12}
+            width={size} height={size}
+            style={{ overflow: 'visible', pointerEvents: 'none' }}
+          >
+            <Icon
+              width={size} height={size}
+              color={palette.text}
+              opacity={0.7}
+              strokeWidth={2}
+            />
+          </foreignObject>
+        )
+      })()}
+
       {/* Phase name — primary label */}
       <text
-        x={0} y={-4}
+        x={0} y={5}
         textAnchor="middle" dominantBaseline="central"
         fontSize={11}
         fontFamily="'Space Grotesk', sans-serif"
@@ -47,7 +78,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
 
       {/* Phase number — secondary, smaller */}
       <text
-        x={0} y={12}
+        x={0} y={18}
         textAnchor="middle" dominantBaseline="central"
         fontSize={8}
         fontFamily="'JetBrains Mono', monospace"
