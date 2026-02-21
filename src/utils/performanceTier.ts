@@ -44,7 +44,7 @@ export const Q = IS_MOBILE ? {
   gooNucleusHarmonics: 5,
   gooEdgeWobble: true as const,
   gooTargetDt: 1000 / 45,
-  gooIdleDt: 1000 / 10,
+  gooIdleDt: 1000 / 45,    // same as active — desktop has headroom, no idle throttle
 
   baseBlurStdDev: 12,
   maxBlurStdDev: 999,          // effectively no cap on desktop
