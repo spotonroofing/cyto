@@ -9,7 +9,6 @@ import { useUIStore } from '@/stores/uiStore'
 import { BubbleMap } from '@/components/BubbleMap/BubbleMap'
 import { FloatingButton } from '@/components/UI/FloatingButton'
 import { TypewriterTerminal } from '@/components/UI/TypewriterTerminal'
-import { FpsCounter } from '@/components/UI/FpsCounter'
 import { useTheme } from '@/themes'
 
 // Lazy-loaded overlays (not needed on initial render)
@@ -84,17 +83,9 @@ export function App() {
         {/* Bubble Map (always rendered) */}
         <BubbleMap />
 
-        {/* Typewriter terminal + FPS counter — map view only */}
+        {/* Typewriter terminal — map view only */}
         {showMapOnlyButtons && (
-          <>
-            <TypewriterTerminal />
-            <div
-              className="fixed top-10 left-5 z-30 pointer-events-none select-none"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              <FpsCounter />
-            </div>
-          </>
+          <TypewriterTerminal />
         )}
 
         {/* Milestone Detail View (overlay) */}
