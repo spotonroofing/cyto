@@ -61,6 +61,11 @@ export function BubbleMap() {
   const springRafRef = useRef(0)
   const cameraAnimRafRef = useRef(0)
   const isAnimatingCameraRef = useRef(false)
+
+  // Scroll-zoom momentum refs
+  const zoomVelocityRef = useRef(0)
+  const zoomRafRef = useRef(0)
+  const zoomCursorRef = useRef({ x: 0, y: 0 })
   const pathBoundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; width: number; height: number } | null>(null)
   const dimensionsRef = useRef(dimensions)
 
@@ -171,6 +176,8 @@ export function BubbleMap() {
     cancelAnimationFrame(momentumRafRef.current)
     cancelAnimationFrame(springRafRef.current)
     cancelAnimationFrame(cameraAnimRafRef.current)
+    cancelAnimationFrame(zoomRafRef.current)
+    zoomVelocityRef.current = 0
     isAnimatingCameraRef.current = false
   }, [])
 
@@ -361,19 +368,48 @@ export function BubbleMap() {
       const vel = computeReleaseVelocity(moveHistoryRef.current)
       startPhysics(vel.x * 0.5, vel.y * 0.5)
     }
+    const ZOOM_IMPULSE = 0.04     // velocity added per scroll tick
+    const ZOOM_FRICTION = 0.85    // per-frame velocity retention (lower = shorter coast)
+    const ZOOM_STOP = 0.001       // velocity threshold to stop loop
+
+    const runZoomMomentum = () => {
+      const v = zoomVelocityRef.current
+      if (Math.abs(v) < ZOOM_STOP) {
+        zoomVelocityRef.current = 0
+        zoomRafRef.current = 0
+        return
+      }
+      const t = transformRef.current
+      const factor = 1 + v
+      const minS = getMinScale()
+      const ns = Math.max(minS, Math.min(3, t.scale * factor))
+      // Stop if clamped at limits
+      if (ns === t.scale) {
+        zoomVelocityRef.current = 0
+        zoomRafRef.current = 0
+        return
+      }
+      const r = ns / t.scale
+      const { x: cx, y: cy } = zoomCursorRef.current
+      setTransform({ x: cx - (cx - t.x) * r, y: cy - (cy - t.y) * r, scale: ns })
+      zoomVelocityRef.current *= ZOOM_FRICTION
+      zoomRafRef.current = requestAnimationFrame(runZoomMomentum)
+    }
+
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       if (isAnimatingCameraRef.current) return
-      cancelAnimations()
+      // Cancel pan/spring animations but NOT the zoom loop itself
+      cancelAnimationFrame(momentumRafRef.current)
+      cancelAnimationFrame(springRafRef.current)
+      cancelAnimationFrame(cameraAnimRafRef.current)
       const rect = el.getBoundingClientRect()
-      const cx = e.clientX - rect.left
-      const cy = e.clientY - rect.top
-      batchTransform((t) => {
-        const factor = e.deltaY > 0 ? 0.95 : 1.05
-        const ns = Math.max(getMinScale(), Math.min(3, t.scale * factor))
-        const r = ns / t.scale
-        return { x: cx - (cx - t.x) * r, y: cy - (cy - t.y) * r, scale: ns }
-      })
+      zoomCursorRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+      zoomVelocityRef.current += (e.deltaY > 0 ? -ZOOM_IMPULSE : ZOOM_IMPULSE)
+      // Start the momentum loop if not already running
+      if (!zoomRafRef.current) {
+        zoomRafRef.current = requestAnimationFrame(runZoomMomentum)
+      }
     }
     el.addEventListener('mousedown', onMouseDown)
     window.addEventListener('mousemove', onMouseMove)
@@ -387,6 +423,7 @@ export function BubbleMap() {
       cancelAnimationFrame(momentumRafRef.current)
       cancelAnimationFrame(springRafRef.current)
       cancelAnimationFrame(cameraAnimRafRef.current)
+      cancelAnimationFrame(zoomRafRef.current)
     }
   }, [batchTransform, cancelAnimations, getBoundaryLimits, getMinScale, startPhysics])
 
