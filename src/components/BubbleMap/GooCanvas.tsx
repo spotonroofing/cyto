@@ -385,10 +385,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   const { phaseColor, palette } = useTheme()
   const paletteRef = useRef(palette)
 
-  // Ref for the SVG filter's blur element (zoom-scaled stdDeviation)
+  // Ref for the SVG filter's blur element (used to sync stdDeviation with debug controls)
   const gooBlurRef = useRef<SVGFEGaussianBlurElement>(null)
-  // Track last applied stdDev to avoid unnecessary DOM mutations (which trigger relayout)
-  const lastStdDevRef = useRef(Q.baseBlurStdDev)
 
   // Keep refs in sync without restarting animation loop.
   // Transform uses inline assignment (not useEffect) to eliminate 1-frame lag
@@ -545,18 +543,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       // Sync CSS filter with debug toggle
       canvas.style.filter = dbg.gooFilter ? 'url(#goo-css)' : 'none'
 
-      // Scale SVG filter blur with zoom so goo contour stays constant in world-space.
-      // Without this, zooming out causes the fixed-pixel blur to cover more world-space,
-      // merging shapes together. Multiplying by scale keeps the blur proportional.
-      // Capped at 2x base to prevent expensive large-kernel blur when zoomed in.
+      // Sync SVG filter blur radius with debug slider
       if (gooBlurRef.current) {
-        const rawStdDev = Q.baseBlurStdDev * dbg.filterBlurRadius * tf.scale
-        const stdDev = Math.min(rawStdDev, Q.baseBlurStdDev * 2)
-        // Only update DOM when value changes by ≥0.5px (avoids relayout thrashing)
-        if (Math.abs(stdDev - lastStdDevRef.current) > 0.5) {
-          gooBlurRef.current.setAttribute('stdDeviation', String(Math.round(stdDev * 10) / 10))
-          lastStdDevRef.current = stdDev
-        }
+        const stdDev = Q.baseBlurStdDev * dbg.filterBlurRadius
+        gooBlurRef.current.setAttribute('stdDeviation', String(stdDev))
       }
 
       // Draw shapes directly to visible canvas with DPR + camera transform
@@ -619,10 +609,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           opacity: palette.goo,
           // CSS filter for goo — browser handles DPR automatically
           filter: 'url(#goo-css)',
-          // GPU compositing: promote to own layer so filter runs on GPU
-          willChange: 'filter, transform',
-          transform: 'translateZ(0)',
-          backfaceVisibility: 'hidden',
+          willChange: 'filter',
         }}
       />
     </>

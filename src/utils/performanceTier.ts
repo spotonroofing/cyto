@@ -6,19 +6,19 @@
 export const IS_MOBILE = typeof window !== 'undefined' &&
   (window.innerWidth < 768 || 'ontouchstart' in window)
 
-/** Quality settings — mobile reduced for performance while preserving goo visual style */
+/** Quality settings — mobile matches desktop for goo rendering (visual correctness first) */
 export const Q = IS_MOBILE ? {
-  canvasDpr: 1,                // 1x DPR — 4x fewer pixels; goo blur hides the lower res
+  canvasDpr: 2,
 
-  // GooCanvas — reduced polygon counts (goo blur hides the difference)
+  // GooCanvas — identical to desktop for visual parity
   gooSamplesPerPx: 10,
-  gooMinSegments: 20,
-  gooBlobSteps: 32,
-  gooNucleusSteps: 40,
-  gooNucleusHarmonics: 3,
-  gooEdgeWobble: false as const, // skip edge wobble sin() calls — not visible at mobile res
-  gooTargetDt: 1000 / 30,     // 30fps — smooth enough for organic wobble animation
-  gooIdleDt: 1000 / 12,       // 12fps idle — saves battery, wobble barely perceptible
+  gooMinSegments: 28,
+  gooBlobSteps: 48,
+  gooNucleusSteps: 64,
+  gooNucleusHarmonics: 5,
+  gooEdgeWobble: true as const,
+  gooTargetDt: 1000 / 60,     // 60fps — ensures every frame draws on 60Hz displays
+  gooIdleDt: 1000 / 60,       // match active — consistent wobble when idle
 
   // SVG goo filter blur (applied via CSS, browser handles DPR)
   baseBlurStdDev: 12,
@@ -28,8 +28,8 @@ export const Q = IS_MOBILE ? {
   particleTargetDt: 1000 / 12, // ~12fps — half goo rate, non-critical layer
 
   // Dot grid
-  dotDpr: 1,
-  dotSpacing: 50,
+  dotDpr: 1,                   // (was 2)
+  dotSpacing: 50,              // (was 35) — fewer dots rendered
 } : {
   canvasDpr: 2,
 
