@@ -34,13 +34,6 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
   const { palette } = useTheme()
   const debugParticleCount = useDebugStore((s) => s.particleCount)
 
-  // DEBUG: Register rendering path C
-  useEffect(() => {
-    const w = window as unknown as Record<string, unknown>
-    if (!w.__cytoDebugPaths) w.__cytoDebugPaths = {}
-    ;(w.__cytoDebugPaths as Record<string, string>).C = 'BackgroundParticles canvas'
-  }, [])
-
   // Inline ref assignment eliminates 1-frame lag between particles and map during panning
   transformRef.current = transform
   mapBoundsRef.current = mapBounds
@@ -201,11 +194,7 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
     <canvas
       ref={canvasRef}
       className="absolute inset-0 pointer-events-none"
-      style={{
-        zIndex: 0,
-        // DEBUG: Path C — BackgroundParticles canvas
-        border: '3px solid blue',
-      }}
+      style={{ zIndex: 0 }}
     />
   )
 }

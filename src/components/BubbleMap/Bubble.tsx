@@ -36,13 +36,6 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
   const { palette, phaseColor } = useTheme()
   const nucleusRef = useRef<SVGPathElement>(null)
 
-  // DEBUG: Register rendering path B (once per app — multiple Bubble instances)
-  useEffect(() => {
-    const w = window as unknown as Record<string, unknown>
-    if (!w.__cytoDebugPaths) w.__cytoDebugPaths = {}
-    ;(w.__cytoDebugPaths as Record<string, string>).B = 'SVG nucleus path + #nucleus-goo filter'
-  }, [])
-
   const milestone = milestones.find((m) => m.id === milestoneId)
   const phase = phases.find((p) => p.id === milestone?.phaseId)
   const phaseIndex = phase ? phases.indexOf(phase) : 0
