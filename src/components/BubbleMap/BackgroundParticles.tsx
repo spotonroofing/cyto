@@ -14,11 +14,19 @@ interface Particle {
   fillStyle: string // pre-computed rgba string
 }
 
-export function BackgroundParticles() {
+interface BackgroundParticlesProps {
+  scale?: number
+}
+
+export function BackgroundParticles({ scale = 1 }: BackgroundParticlesProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const particlesRef = useRef<Particle[]>([])
   const animFrameRef = useRef<number>(0)
+  const scaleRef = useRef(scale)
   const { palette } = useTheme()
+
+  // Keep scale ref in sync without re-running the main effect
+  useEffect(() => { scaleRef.current = scale }, [scale])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -37,7 +45,7 @@ export function BackgroundParticles() {
     const isMobile = window.innerWidth < 768 || 'ontouchstart' in window
 
     // Particle count scaled by screen size — fewer on mobile
-    const count = isMobile ? 20 : 70
+    const count = isMobile ? 30 : 105
 
     // particle base is "rgb(r,g,b)" — extract for rgba usage
     const particleBase = palette.particle
@@ -45,7 +53,7 @@ export function BackgroundParticles() {
 
     // Initialize particles with pre-computed fill styles
     particlesRef.current = Array.from({ length: count }, () => {
-      const opacity = 0.08 + Math.random() * 0.10
+      const opacity = 0.13 + Math.random() * 0.15
       return {
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
@@ -65,7 +73,7 @@ export function BackgroundParticles() {
 
     if (prefersReducedMotion) {
       // Render once, no animation loop
-      drawParticles(ctx, canvas.width, canvas.height, particlesRef.current)
+      drawParticles(ctx, canvas.width, canvas.height, particlesRef.current, scaleRef.current)
       return () => {
         window.removeEventListener('resize', resize)
       }
@@ -88,6 +96,8 @@ export function BackgroundParticles() {
 
       ctx.clearRect(0, 0, w, h)
 
+      const s = scaleRef.current
+
       for (const p of particles) {
         // Update position
         p.x += p.vx
@@ -100,10 +110,10 @@ export function BackgroundParticles() {
         if (p.y < -p.radius) p.y = h + p.radius
         if (p.y > h + p.radius) p.y = -p.radius
 
-        // Draw organic ellipse
+        // Draw organic ellipse — scale radius with map zoom
         const wobble = Math.sin(p.wobblePhase) * 0.15
-        const rx = p.radius * (1 + wobble)
-        const ry = p.radius * p.axisRatio * (1 - wobble)
+        const rx = p.radius * (1 + wobble) * s
+        const ry = p.radius * p.axisRatio * (1 - wobble) * s
 
         ctx.beginPath()
         ctx.ellipse(p.x, p.y, rx, ry, p.wobblePhase * 0.5, 0, Math.PI * 2)
@@ -136,11 +146,12 @@ function drawParticles(
   w: number,
   h: number,
   particles: Particle[],
+  s: number = 1,
 ) {
   ctx.clearRect(0, 0, w, h)
   for (const p of particles) {
     ctx.beginPath()
-    ctx.ellipse(p.x, p.y, p.radius, p.radius * p.axisRatio, 0, 0, Math.PI * 2)
+    ctx.ellipse(p.x, p.y, p.radius * s, p.radius * p.axisRatio * s, 0, 0, Math.PI * 2)
     ctx.fillStyle = p.fillStyle
     ctx.fill()
   }
