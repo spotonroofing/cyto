@@ -6,6 +6,7 @@ import { BackgroundParticles } from './BackgroundParticles'
 import { DotGrid } from './DotGrid'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
+import { Q } from '@/utils/performanceTier'
 
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
@@ -116,11 +117,13 @@ export function BubbleMap() {
       // The filter operates in screen space on already-zoomed canvas content, so
       // stdDeviation must scale proportionally with zoom to maintain the same
       // relative blur radius (σ / feature_size = constant).
-      blurRef.current.setAttribute('stdDeviation', String(12 * transform.scale))
+      // Capped by Q.maxBlurStdDev to prevent quadratic GPU cost at high zoom on mobile.
+      const stdDev = Math.min(Q.maxBlurStdDev, Q.baseBlurStdDev * transform.scale)
+      blurRef.current.setAttribute('stdDeviation', String(stdDev))
     }
     if (mobileBlurRef.current) {
-      // Mobile: also scale linearly for consistent goo shape across zoom levels
-      mobileBlurRef.current.setAttribute('stdDeviation', String(7 * transform.scale))
+      const stdDev = Math.min(Q.maxBlurStdDev, Q.baseBlurStdDev * transform.scale)
+      mobileBlurRef.current.setAttribute('stdDeviation', String(stdDev))
     }
   }, [transform.scale])
 

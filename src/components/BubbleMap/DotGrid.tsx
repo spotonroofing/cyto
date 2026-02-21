@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useTheme } from '@/themes'
+import { Q } from '@/utils/performanceTier'
 
 interface DotGridProps {
   width: number
@@ -7,7 +8,7 @@ interface DotGridProps {
   transform: { x: number; y: number; scale: number }
 }
 
-const DOT_SPACING = 35
+const DOT_SPACING = Q.dotSpacing
 const DOT_RADIUS = 1.5
 
 export function DotGrid({ width, height, transform }: DotGridProps) {
@@ -25,7 +26,7 @@ export function DotGrid({ width, height, transform }: DotGridProps) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const dpr = Math.min(window.devicePixelRatio || 1, Q.dotDpr)
     canvas.width = width * dpr
     canvas.height = height * dpr
     canvas.style.width = `${width}px`

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useTheme } from '@/themes'
+import { Q } from '@/utils/performanceTier'
 
 interface Particle {
   x: number
@@ -42,10 +43,8 @@ export function BackgroundParticles({ scale = 1 }: BackgroundParticlesProps) {
     resize()
     window.addEventListener('resize', resize)
 
-    const isMobile = window.innerWidth < 768 || 'ontouchstart' in window
-
-    // Particle count scaled by screen size — fewer on mobile
-    const count = isMobile ? 30 : 105
+    // Particle count from quality tier — fewer on mobile
+    const count = Q.particleCount
 
     // particle base is "rgb(r,g,b)" — extract for rgba usage
     const particleBase = palette.particle
@@ -80,7 +79,7 @@ export function BackgroundParticles({ scale = 1 }: BackgroundParticlesProps) {
     }
 
     let lastFrameTime = 0
-    const TARGET_DT = isMobile ? 1000 / 20 : 1000 / 30 // 20fps mobile, 30fps desktop (slow-moving particles don't need more)
+    const TARGET_DT = Q.particleTargetDt
 
     const animate = (timestamp: number) => {
       // Frame rate limiting

@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useTheme } from '@/themes'
+import { IS_MOBILE, Q } from '@/utils/performanceTier'
 import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
 
 interface GooCanvasProps {
@@ -55,10 +56,6 @@ interface BlobData {
   nucleusPhases: number[]     // matching phase offsets
   nucleusRotSpeed: number     // rotation speed
 }
-
-// ── Detect mobile once at module level ──
-const IS_MOBILE = typeof window !== 'undefined' &&
-  (window.innerWidth < 768 || 'ontouchstart' in window)
 
 // ── Sampling helpers ──────────────────────────────────────────
 
@@ -249,24 +246,22 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const dpr = Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 2)
+    const dpr = Math.min(window.devicePixelRatio || 1, Q.canvasDpr)
     canvas.width = width * dpr
     canvas.height = height * dpr
     canvas.style.width = `${width}px`
     canvas.style.height = `${height}px`
 
-    const isMobile = IS_MOBILE || width < 768
-    const SAMPLES_PER_100PX = isMobile ? 9 : 10
-    const MIN_SEGMENTS = isMobile ? 24 : 28
-    // Mobile: fewer steps for blob/nucleus shapes
-    const BLOB_STEPS = isMobile ? 24 : 48
-    const NUCLEUS_STEPS = isMobile ? 24 : 64
-    const NUCLEUS_HARMONICS = isMobile ? 3 : 5
+    const SAMPLES_PER_100PX = Q.gooSamplesPerPx
+    const MIN_SEGMENTS = Q.gooMinSegments
+    const BLOB_STEPS = Q.gooBlobSteps
+    const NUCLEUS_STEPS = Q.gooNucleusSteps
+    const NUCLEUS_HARMONICS = Q.gooNucleusHarmonics
 
     let time = 0
     let lastFrameTime = 0
-    const TARGET_DT = isMobile ? 1000 / 30 : 1000 / 45 // 30fps mobile, 45fps desktop
-    const IDLE_DT = 1000 / 10 // 10fps when idle — ambient animations are slow enough
+    const TARGET_DT = Q.gooTargetDt
+    const IDLE_DT = Q.gooIdleDt
     const IDLE_THRESHOLD = 2000 // ms of no transform change before entering idle
     let lastKnownTf = { x: 0, y: 0, scale: 0 }
     let lastTransformChangeTime = performance.now()
@@ -344,19 +339,25 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
             lnx = -tdy / tlen; lny = tdx / tlen
           }
           // Edge wobble — independent sine-wave displacement per edge for organic ripple
-          const edgeT = i / segments
-          const wDamp = Math.sin(edgeT * Math.PI)
-          const wobbleUpper = (
-            Math.sin(time * 3.2 + edgeT * 6 + conn.phaseOffset) * 2.5
-            + Math.sin(time * 2.1 + edgeT * 3.5 + conn.phaseOffset * 1.7) * 1.5
-          ) * wDamp
-          const wobbleLower = (
-            Math.sin(time * 2.8 + edgeT * 5.5 + conn.phaseOffset + 2.1) * 2.5
-            + Math.sin(time * 2.3 + edgeT * 3 + conn.phaseOffset * 1.3 + 1.0) * 1.5
-          ) * wDamp
-
-          const wU = p.width + wobbleUpper
-          const wL = p.width + wobbleLower
+          // Skipped on mobile (Q.gooEdgeWobble === false) — saves 4 sin() per segment per connection
+          let wU: number, wL: number
+          if (Q.gooEdgeWobble) {
+            const edgeT = i / segments
+            const wDamp = Math.sin(edgeT * Math.PI)
+            const wobbleUpper = (
+              Math.sin(time * 3.2 + edgeT * 6 + conn.phaseOffset) * 2.5
+              + Math.sin(time * 2.1 + edgeT * 3.5 + conn.phaseOffset * 1.7) * 1.5
+            ) * wDamp
+            const wobbleLower = (
+              Math.sin(time * 2.8 + edgeT * 5.5 + conn.phaseOffset + 2.1) * 2.5
+              + Math.sin(time * 2.3 + edgeT * 3 + conn.phaseOffset * 1.3 + 1.0) * 1.5
+            ) * wDamp
+            wU = p.width + wobbleUpper
+            wL = p.width + wobbleLower
+          } else {
+            wU = p.width
+            wL = p.width
+          }
           upper.push({ x: p.x + lnx * wU, y: p.y + lny * wU })
           lower.push({ x: p.x - lnx * wL, y: p.y - lny * wL })
         }
