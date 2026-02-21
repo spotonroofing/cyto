@@ -197,7 +197,6 @@ function renderShapes(
         lnx = -tdy / tlen; lny = tdx / tlen
       }
       // Edge wobble — independent sine-wave displacement per edge for organic ripple
-      // Skipped on mobile (Q.gooEdgeWobble === false) — saves 4 sin() per segment per connection
       let wU: number, wL: number
       if (Q.gooEdgeWobble) {
         const edgeT = i / segments
@@ -473,10 +472,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     if (!ctx) return
 
     const dpr = Math.min(window.devicePixelRatio || 1, Q.canvasDpr)
-    canvas.width = width * dpr
-    canvas.height = height * dpr
-    canvas.style.width = `${width}px`
-    canvas.style.height = `${height}px`
 
     // ── Detect ctx.filter support for offscreen caching ──
     let useCache = false
@@ -485,13 +480,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       useCache = ctx.filter !== 'none' && ctx.filter !== ''
       ctx.filter = 'none'
     } catch { useCache = false }
-
-    // Set CSS filter: only needed for fallback (no ctx.filter support)
-    if (useCache) {
-      canvas.style.filter = 'none'
-    } else {
-      canvas.style.filter = 'url(#goo-filter)'
-    }
 
     // ── Compute world-space bounding box for offscreen cache ──
     const PAD = 60 // padding for blur bleed + wobble amplitude
@@ -510,6 +498,33 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     }
     const worldW = wMaxX - wMinX
     const worldH = wMaxY - wMinY
+
+    // ── Canvas sizing (depends on rendering path) ──
+    if (useCache) {
+      // Desktop: viewport-sized canvas, offscreen cache handles goo filter
+      canvas.width = width * dpr
+      canvas.height = height * dpr
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${height}px`
+      canvas.style.filter = 'none'
+      canvas.style.transform = ''
+      canvas.style.transformOrigin = ''
+    } else {
+      // Fallback: world-sized canvas with CSS goo filter + CSS transform for camera.
+      // Filter operates in world space (same as desktop offscreen cache), preserving
+      // all wobble/taper detail. CSS transform handles pan/zoom with zero lag.
+      const fbW = Math.max(1, worldW)
+      const fbH = Math.max(1, worldH)
+      canvas.width = Math.max(1, Math.ceil(fbW * dpr))
+      canvas.height = Math.max(1, Math.ceil(fbH * dpr))
+      canvas.style.width = `${fbW}px`
+      canvas.style.height = `${fbH}px`
+      canvas.style.transformOrigin = '0 0'
+      canvas.style.filter = 'url(#goo-cache)'
+      if (cacheBlurRef.current) {
+        cacheBlurRef.current.setAttribute('stdDeviation', String(Q.baseBlurStdDev))
+      }
+    }
 
     // ── Offscreen canvas setup (cached path only) ──
     const CACHE_QUALITY = Q.gooCacheQuality
@@ -551,7 +566,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     let lastKnownTf = { x: 0, y: 0, scale: 0 }
     let lastTransformChangeTime = performance.now()
     let lastGooFilter = true
-    let lastFallbackFilter = ''
+    let lastFallbackFilter = useCache ? '' : 'url(#goo-cache)'
 
     const draw = (timestamp: number) => {
       const dbg = useDebugStore.getState()
@@ -601,13 +616,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           needsCacheUpdate = true
         }
 
-        // Skip cache updates during active panning/zooming to prevent stutter.
-        // The cached image is simply translated/scaled with the camera transform.
-        // Cache updates resume once the transform has been stable for 100ms.
-        const isPanning = (timestamp - lastTransformChangeTime) < 100
-
-        // Update cache on wobble ticks (every N frames) — paused during pan
-        if (needsCacheUpdate || (!isPanning && frameCount % CACHE_INTERVAL === 0)) {
+        // Update cache on wobble ticks (every N frames)
+        if (needsCacheUpdate || frameCount % CACHE_INTERVAL === 0) {
           needsCacheUpdate = false
 
           // Update goo-cache filter stdDeviation for offscreen resolution
@@ -646,11 +656,15 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         ctx.drawImage(filteredCanvas, 0, 0, cacheW, cacheH, wMinX, wMinY, worldW, worldH)
         ctx.restore()
       } else {
-        // ── Fallback: direct draw with CSS filter on canvas element ──
-        // Update CSS filter dynamically based on gooFilter toggle
-        const desiredFilter = dbg.gooFilter
-          ? 'url(#goo-filter)'
-          : 'none'
+        // ── Fallback: world-space draw with CSS filter + CSS transform ──
+        // Shapes drawn in world space so the CSS filter processes at world resolution
+        // (identical to desktop offscreen cache). CSS transform handles camera.
+        if (cacheBlurRef.current) {
+          const stdDev = Q.baseBlurStdDev * dbg.filterBlurRadius
+          cacheBlurRef.current.setAttribute('stdDeviation', String(stdDev))
+        }
+
+        const desiredFilter = dbg.gooFilter ? 'url(#goo-cache)' : 'none'
         if (desiredFilter !== lastFallbackFilter) {
           canvas.style.filter = desiredFilter
           lastFallbackFilter = desiredFilter
@@ -659,12 +673,13 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         ctx.save()
         ctx.scale(dpr, dpr)
-        ctx.translate(tf.x, tf.y)
-        ctx.scale(tf.scale, tf.scale)
-        renderShapes(ctx, connections, blobs, time, pal.nucleus,
-          { tx: tf.x, ty: tf.y, scale: tf.scale, viewW: width, viewH: height },
+        ctx.translate(-wMinX, -wMinY)
+        renderShapes(ctx, connections, blobs, time, pal.nucleus, null,
           wobbleI, dbg.nucleusWobble, dbg.connectionGradients)
         ctx.restore()
+
+        // Position via CSS transform — pan/zoom is instant, no re-filtering
+        canvas.style.transform = `translate(${wMinX * tf.scale + tf.x}px, ${wMinY * tf.scale + tf.y}px) scale(${tf.scale})`
       }
 
       animFrameRef.current = requestAnimationFrame(draw)
@@ -707,8 +722,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         style={{
           zIndex: 1,
           pointerEvents: 'none',
-          // CSS filter is set dynamically in the animation loop:
-          // 'none' when using offscreen cache, 'url(#goo-filter[-mobile])' for fallback
+          // CSS filter/transform set dynamically in the animation loop
           opacity: palette.goo,
         }}
       />

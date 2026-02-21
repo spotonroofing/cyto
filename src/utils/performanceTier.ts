@@ -6,23 +6,21 @@
 export const IS_MOBILE = typeof window !== 'undefined' &&
   (window.innerWidth < 768 || 'ontouchstart' in window)
 
-/** Quality settings — mobile tier trades visual fidelity for 30fps+ performance */
+/** Quality settings — mobile matches desktop for goo rendering (visual correctness first) */
 export const Q = IS_MOBILE ? {
-  // Canvas device pixel ratio — 1.5 on mobile (must stay above 1 to avoid
-  // compositing/filter ghosting artifacts on high-DPR mobile browsers)
-  canvasDpr: 1.5,
+  canvasDpr: 2,
 
-  // GooCanvas connection rendering — shape quality matches desktop
-  gooSamplesPerPx: 10,        // samples per 100px of connection (same as desktop)
-  gooMinSegments: 28,          // minimum segments per connection (same as desktop)
-  gooBlobSteps: 48,            // polygon steps for blob outline (same as desktop)
-  gooNucleusSteps: 64,         // polygon steps for nucleus outline (same as desktop)
-  gooNucleusHarmonics: 5,      // harmonic count for nucleus deformation (same as desktop)
-  gooEdgeWobble: true as const, // enable per-edge sine wobble (same as desktop)
-  gooTargetDt: 1000 / 24,     // 24fps target
-  gooIdleDt: 1000 / 8,        // 8fps idle
-  gooCacheInterval: 6,         // update offscreen cache every 6 frames (~4fps wobble)
-  gooCacheQuality: 1.0,        // full resolution offscreen (same as desktop)
+  // GooCanvas — identical to desktop for visual parity
+  gooSamplesPerPx: 10,
+  gooMinSegments: 28,
+  gooBlobSteps: 48,
+  gooNucleusSteps: 64,
+  gooNucleusHarmonics: 5,
+  gooEdgeWobble: true as const,
+  gooTargetDt: 1000 / 45,     // match desktop
+  gooIdleDt: 1000 / 45,       // match desktop — no idle throttle
+  gooCacheInterval: 2,         // match desktop
+  gooCacheQuality: 1.0,
 
   // SVG goo filter blur — must scale linearly with zoom (no cap) to keep goo
   // shape consistent across zoom levels. Capping breaks the feColorMatrix threshold.

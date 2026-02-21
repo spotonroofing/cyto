@@ -21,7 +21,7 @@ function hashPhase(id: string): number {
   return h * 0.37
 }
 
-const NUCLEUS_WOBBLE_STEPS = IS_MOBILE ? 16 : 24
+const NUCLEUS_WOBBLE_STEPS = IS_MOBILE ? 20 : 24
 
 interface BubbleProps {
   milestoneId: string
@@ -47,7 +47,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
     if (!el) return
     const nucleusR = radius * 0.57
     const p = hashPhase(milestoneId)
-    const targetDt = IS_MOBILE ? 1000 / 24 : 0
+    const targetDt = 0
     let rafId = 0
     let lastFrame = 0
 
@@ -72,10 +72,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
           r += Math.sin(2 * angle + t * 0.6 + p) * nucleusR * 0.035
           // 3-lobe deformation — freq 0.45 (membrane uses 0.25)
           r += Math.sin(3 * angle + t * 0.45 + p * 1.3) * nucleusR * 0.025
-          // 5-lobe — skip on mobile for performance
-          if (!IS_MOBILE) {
-            r += Math.sin(5 * angle - t * 0.35 + p * 0.7) * nucleusR * 0.015
-          }
+          r += Math.sin(5 * angle - t * 0.35 + p * 0.7) * nucleusR * 0.015
           const px = Math.cos(angle) * r
           const py = Math.sin(angle) * r
           d += `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`

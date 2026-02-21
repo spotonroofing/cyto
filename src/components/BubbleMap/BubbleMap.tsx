@@ -6,8 +6,6 @@ import { BackgroundParticles } from './BackgroundParticles'
 import { DotGrid } from './DotGrid'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
-import { Q } from '@/utils/performanceTier'
-import { useDebugStore } from '@/stores/debugStore'
 
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
@@ -39,8 +37,6 @@ function overdragResist(pos: number, min: number, max: number): number {
 
 export function BubbleMap() {
   const containerRef = useRef<HTMLDivElement>(null)
-  const blurRef = useRef<SVGFEGaussianBlurElement>(null)
-  const mobileBlurRef = useRef<SVGFEGaussianBlurElement>(null)
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
 
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 })
@@ -98,7 +94,6 @@ export function BubbleMap() {
 
   const selectMilestone = useUIStore((s) => s.selectMilestone)
   const getCurrentMilestone = useRoadmapStore((s) => s.getCurrentMilestone)
-  const filterBlurRadius = useDebugStore((s) => s.filterBlurRadius)
 
   useEffect(() => {
     const measure = () => {
@@ -132,23 +127,6 @@ export function BubbleMap() {
   useEffect(() => { transformRef.current = transform }, [transform])
   useEffect(() => { bubblesRef.current = bubbles }, [bubbles])
   useEffect(() => { dimensionsRef.current = dimensions }, [dimensions])
-
-  // Update goo filter stdDeviation when zoom or debug blur radius changes
-  useEffect(() => {
-    if (blurRef.current) {
-      // Scale blur linearly with zoom — keeps goo shape identical at all zoom levels.
-      // The filter operates in screen space on already-zoomed canvas content, so
-      // stdDeviation must scale proportionally with zoom to maintain the same
-      // relative blur radius (σ / feature_size = constant).
-      // Capped by Q.maxBlurStdDev to prevent quadratic GPU cost at high zoom on mobile.
-      const stdDev = Math.min(Q.maxBlurStdDev, Q.baseBlurStdDev * transform.scale * filterBlurRadius)
-      blurRef.current.setAttribute('stdDeviation', String(stdDev))
-    }
-    if (mobileBlurRef.current) {
-      const stdDev = Math.min(Q.maxBlurStdDev, Q.baseBlurStdDev * transform.scale * filterBlurRadius)
-      mobileBlurRef.current.setAttribute('stdDeviation', String(stdDev))
-    }
-  }, [transform.scale, filterBlurRadius])
 
   // Compute path bounding box when bubbles change
   useEffect(() => {
@@ -614,40 +592,9 @@ export function BubbleMap() {
       <BackgroundParticles transform={transform} mapBounds={mapBounds} />
       <DotGrid width={dimensions.width} height={dimensions.height} transform={transform} />
 
-      {/* Hidden SVG for goo filter definition — stdDeviation is dynamic */}
+      {/* Hidden SVG for nucleus goo filter */}
       <svg width="0" height="0" style={{ position: 'absolute' }}>
         <defs>
-          <filter id="goo-filter" colorInterpolationFilters="sRGB">
-            <feGaussianBlur
-              ref={blurRef}
-              in="SourceGraphic"
-              stdDeviation="12"
-              result="blur"
-            />
-            <feColorMatrix
-              in="blur"
-              type="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8"
-              result="goo"
-            />
-            <feBlend in="SourceGraphic" in2="goo" />
-          </filter>
-          {/* Lighter goo filter for mobile — smaller blur radius (~4x cheaper) */}
-          <filter id="goo-filter-mobile" colorInterpolationFilters="sRGB">
-            <feGaussianBlur
-              ref={mobileBlurRef}
-              in="SourceGraphic"
-              stdDeviation="7"
-              result="blur"
-            />
-            <feColorMatrix
-              in="blur"
-              type="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7"
-              result="goo"
-            />
-            <feBlend in="SourceGraphic" in2="goo" />
-          </filter>
           {/* Lightweight goo filter for nucleus wobble — small blur keeps it cheap */}
           <filter id="nucleus-goo" colorInterpolationFilters="sRGB">
             <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
