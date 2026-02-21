@@ -203,7 +203,7 @@ export function BubbleMap() {
     // Lookahead padding prevents jitter at fork boundaries: without this,
     // bands at the viewport edge pop in/out causing the target scale to
     // oscillate between fork-zoom and single-column zoom.
-    const pad = (visYEnd - visYStart) * 0.35
+    const pad = (visYEnd - visYStart) * 0.15
 
     // Find widest content among visible row bands (with padding)
     let maxContentWidth = 0
@@ -305,18 +305,6 @@ export function BubbleMap() {
         const newScale = t.scale + (targetScale - t.scale) * AUTO_ZOOM_EASE
         const newX = computeX(newScale)
 
-        // Compensate Y when auto-zoom changes scale to keep viewport center
-        // anchored at the same world-space point. Without this, scale changes
-        // shift the scroll bounds, pushing the position out of bounds and
-        // triggering a spring -> auto-zoom feedback loop (fork bounce bug).
-        let baseY = t.y
-        if (Math.abs(newScale - t.scale) > 0.0001) {
-          const dims = dimensionsRef.current
-          const viewH = Math.min(dims.height, window.innerHeight || dims.height)
-          const centerWorldY = (viewH / 2 - t.y) / t.scale
-          baseY = viewH / 2 - centerWorldY * newScale
-        }
-
         // Settle check
         const scaleSettled = Math.abs(targetScale - newScale) < 0.001
         if (Math.abs(vy) < 0.3 && Math.abs(overY) < 0.5 && scaleSettled) {
@@ -330,7 +318,7 @@ export function BubbleMap() {
           return
         }
 
-        setTransform({ x: newX, y: baseY + vy, scale: newScale })
+        setTransform({ x: newX, y: t.y + vy, scale: newScale })
         momentumRafRef.current = requestAnimationFrame(animate)
       }
 
