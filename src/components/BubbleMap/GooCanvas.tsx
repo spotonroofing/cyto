@@ -36,6 +36,9 @@ interface ConnectionData {
   minX: number; minY: number; maxX: number; maxY: number
   // Precomputed gradient blend stops for smooth color transitions
   blendedColors: [string, string, string]
+  // Fraction of gradient covered by source/target cell radii (for edge-aligned stops)
+  sourceEdgeFrac: number
+  targetEdgeFrac: number
 }
 
 interface BlobData {
@@ -169,6 +172,16 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
 
       const sourceColor = phaseColor(link.sourcePhaseIndex)
       const targetColor = phaseColor(link.targetPhaseIndex)
+
+      // Fraction of gradient hidden under each cell — the gradient should stay
+      // at pure source/target color through these zones so no "hint" of the
+      // other color appears at the cell membrane edge.
+      const rawSourceEdge = sr / dist
+      const rawTargetEdge = 1 - tr / dist
+      // Clamp so the visible transition zone is at least 20% of the gradient
+      const sourceEdgeFrac = Math.min(rawSourceEdge, 0.4)
+      const targetEdgeFrac = Math.max(rawTargetEdge, 0.6)
+
       conns.push({
         sx, sy, sr, tx, ty, tr,
         dx, dy, dist, ux, uy, nx, ny,
@@ -185,6 +198,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           blendHex(sourceColor, targetColor, 0.5),
           blendHex(sourceColor, targetColor, 0.75),
         ],
+        sourceEdgeFrac,
+        targetEdgeFrac,
       })
     }
 
@@ -368,12 +383,18 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
 
         ctx.closePath()
 
-        // Smooth gradient — gamma-corrected intermediate stops
+        // Smooth gradient — edge-aligned so pure colors extend through cell radii
+        // and the visible transition only occurs in the gap between cell edges
         const grad = ctx.createLinearGradient(conn.sx, conn.sy, conn.tx, conn.ty)
+        const s = conn.sourceEdgeFrac
+        const e = conn.targetEdgeFrac
+        const range = e - s
         grad.addColorStop(0, conn.sourceColor)
-        grad.addColorStop(0.25, conn.blendedColors[0]!)
-        grad.addColorStop(0.5, conn.blendedColors[1]!)
-        grad.addColorStop(0.75, conn.blendedColors[2]!)
+        grad.addColorStop(s, conn.sourceColor)
+        grad.addColorStop(s + range * 0.25, conn.blendedColors[0]!)
+        grad.addColorStop(s + range * 0.5, conn.blendedColors[1]!)
+        grad.addColorStop(s + range * 0.75, conn.blendedColors[2]!)
+        grad.addColorStop(e, conn.targetColor)
         grad.addColorStop(1, conn.targetColor)
         ctx.fillStyle = grad
         ctx.fill()
