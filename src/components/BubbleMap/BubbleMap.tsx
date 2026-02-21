@@ -594,6 +594,17 @@ export function BubbleMap() {
             />
             <feBlend in="SourceGraphic" in2="goo" />
           </filter>
+          {/* Lightweight goo filter for nucleus wobble — small blur keeps it cheap */}
+          <filter id="nucleus-goo" colorInterpolationFilters="sRGB">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+            <feColorMatrix
+              in="blur"
+              type="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7"
+              result="goo"
+            />
+            <feBlend in="SourceGraphic" in2="goo" />
+          </filter>
         </defs>
       </svg>
 
