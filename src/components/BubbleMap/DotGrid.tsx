@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useTheme } from '@/themes'
-import { Q } from '@/utils/performanceTier'
+import { Q, IS_MOBILE } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
 
 interface DotGridProps {
@@ -40,11 +40,23 @@ export function DotGrid({ width, height, transform }: DotGridProps) {
 
     let lastTf = { x: NaN, y: NaN, scale: NaN }
     let rafId = 0
+    let idleTimeout = 0
     const TAU = Math.PI * 2
 
-    const draw = () => {
-      rafId = requestAnimationFrame(draw)
+    // On mobile, use slow polling when nothing to draw instead of continuous rAF.
+    // This prevents the browser from spending JS scheduler time on no-op callbacks.
+    const scheduleNext = (changed: boolean) => {
+      if (IS_MOBILE && !changed) {
+        idleTimeout = window.setTimeout(() => {
+          idleTimeout = 0
+          rafId = requestAnimationFrame(draw)
+        }, 100)
+      } else {
+        rafId = requestAnimationFrame(draw)
+      }
+    }
 
+    const draw = () => {
       const tf = transformRef.current
 
       // Skip drawing when grid toggle is OFF
@@ -53,11 +65,15 @@ export function DotGrid({ width, height, transform }: DotGridProps) {
           ctx.clearRect(0, 0, canvas.width, canvas.height)
           lastTf = { x: NaN, y: NaN, scale: -1 }
         }
+        scheduleNext(false)
         return
       }
 
       // Only redraw when transform actually changes
-      if (tf.x === lastTf.x && tf.y === lastTf.y && tf.scale === lastTf.scale) return
+      if (tf.x === lastTf.x && tf.y === lastTf.y && tf.scale === lastTf.scale) {
+        scheduleNext(false)
+        return
+      }
       lastTf = { x: tf.x, y: tf.y, scale: tf.scale }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -70,6 +86,7 @@ export function DotGrid({ width, height, transform }: DotGridProps) {
       // Skip drawing if dots would be invisibly small
       if (scaledRadius < 0.3) {
         ctx.restore()
+        scheduleNext(true)
         return
       }
 
@@ -100,10 +117,14 @@ export function DotGrid({ width, height, transform }: DotGridProps) {
       ctx.fill()
 
       ctx.restore()
+      scheduleNext(true)
     }
 
     rafId = requestAnimationFrame(draw)
-    return () => cancelAnimationFrame(rafId)
+    return () => {
+      cancelAnimationFrame(rafId)
+      clearTimeout(idleTimeout)
+    }
   }, [width, height, isDark]) // transform removed from deps — read from ref
 
   return (

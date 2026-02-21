@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useTheme } from '@/themes'
-import { Q } from '@/utils/performanceTier'
+import { Q, IS_MOBILE, mobileIdle } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
 
 interface Particle {
@@ -110,8 +110,19 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
 
     let lastFrameTime = 0
     const TARGET_DT = Q.particleTargetDt
+    let idlePollTimeout = 0
 
     const animate = (timestamp: number) => {
+      // On mobile idle: pause particle animation to save CPU.
+      // Particles are non-critical background decoration — no visual impact from pausing.
+      if (IS_MOBILE && mobileIdle.active) {
+        idlePollTimeout = window.setTimeout(() => {
+          idlePollTimeout = 0
+          animFrameRef.current = requestAnimationFrame(animate)
+        }, 500)
+        return
+      }
+
       const dbg = useDebugStore.getState()
 
       // Frame rate limiting — debug fpsCap overrides component default
@@ -186,6 +197,7 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
 
     return () => {
       cancelAnimationFrame(animFrameRef.current)
+      clearTimeout(idlePollTimeout)
       window.removeEventListener('resize', resize)
     }
   }, [palette, debugParticleCount, mapBounds])

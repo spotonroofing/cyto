@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { milestones, phases } from '@/stores/roadmapStore'
 import { useTheme } from '@/themes'
 import { useDebugStore } from '@/stores/debugStore'
+import { Q, IS_MOBILE, mobileIdle } from '@/utils/performanceTier'
 import {
   Microscope, FileSearch, Pill, HeartPulse,
   Utensils, FlaskConical, Sparkles, ShieldCheck,
@@ -47,11 +48,21 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
     if (!el) return
     const nucleusR = radius * 0.655
     const p = hashPhase(milestoneId)
-    const targetDt = 0
+    // On mobile: 4fps (saves 24 SVG filter re-evals/sec across 8 bubbles).
+    // On desktop: uncapped (runs at display refresh rate).
+    const targetDt = Q.bubbleTargetDt
     let rafId = 0
     let lastFrame = 0
 
     const tick = (now: number) => {
+      // On mobile idle: skip path update → SVG filter (#nucleus-goo) not re-evaluated.
+      // Each of the 8 Bubble instances has its own filter (3 GPU shader passes each),
+      // so pausing all 8 saves 24 GPU passes per frame.
+      if (IS_MOBILE && mobileIdle.active) {
+        rafId = requestAnimationFrame(tick)
+        return
+      }
+
       const dbg = useDebugStore.getState()
       const effectiveDt = dbg.fpsCap > 0 ? 1000 / dbg.fpsCap : targetDt
       if (effectiveDt > 0 && now - lastFrame < effectiveDt) {

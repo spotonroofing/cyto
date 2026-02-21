@@ -6,6 +6,13 @@
 export const IS_MOBILE = typeof window !== 'undefined' &&
   (window.innerWidth < 768 || 'ontouchstart' in window)
 
+/**
+ * Shared mobile idle state — set by GooCanvas (owns the primary animation loop),
+ * read by Bubble, BackgroundParticles, DotGrid to pause their own loops.
+ * Using a plain object so reads in rAF hot paths are zero-cost (no function call).
+ */
+export const mobileIdle = { active: false }
+
 /** Quality settings — mobile matches desktop for goo rendering (visual correctness first) */
 export const Q = IS_MOBILE ? {
   canvasDpr: 2,
@@ -26,6 +33,9 @@ export const Q = IS_MOBILE ? {
   // Background particles
   particleCount: 15,           // (desktop: 105) — minimal on mobile
   particleTargetDt: 1000 / 12, // ~12fps — half goo rate, non-critical layer
+
+  // Bubble nucleus (SVG layer)
+  bubbleTargetDt: 1000 / 4,   // 4fps nucleus animation on mobile (was uncapped)
 
   // Dot grid
   dotDpr: 1,                   // (was 2)
@@ -48,6 +58,9 @@ export const Q = IS_MOBILE ? {
   // Background particles
   particleCount: 105,
   particleTargetDt: 1000 / 30,
+
+  // Bubble nucleus (SVG layer)
+  bubbleTargetDt: 0,           // uncapped on desktop
 
   // Dot grid
   dotDpr: 2,

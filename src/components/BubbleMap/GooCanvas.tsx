@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useTheme } from '@/themes'
-import { Q } from '@/utils/performanceTier'
+import { Q, IS_MOBILE, mobileIdle } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
 import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
 
@@ -508,6 +508,9 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     const IDLE_THRESHOLD = 2000 // ms of no transform change before entering idle
     let lastKnownTf = { x: 0, y: 0, scale: 0 }
     let lastTransformChangeTime = performance.now()
+    // Cache last-written style values to avoid redundant DOM writes every frame
+    let lastFilterStr = ''
+    let lastStdDevStr = ''
 
     const draw = (timestamp: number) => {
       const dbg = useDebugStore.getState()
@@ -520,6 +523,22 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       }
 
       const isIdle = (timestamp - lastTransformChangeTime) > IDLE_THRESHOLD
+
+      // ── Mobile idle freeze: skip drawing → canvas pixels stay static → SVG filter not re-evaluated ──
+      // The CSS SVG filter (feGaussianBlur + feColorMatrix + feBlend = 3 GPU shader passes on the
+      // full-viewport canvas at DPR 2) is the #1 performance killer on mobile. When the canvas
+      // content doesn't change, the browser can skip filter re-evaluation entirely.
+      if (IS_MOBILE && isIdle) {
+        mobileIdle.active = true
+        // Continue rAF loop at 60fps for instant wake-up when transform changes,
+        // but skip all drawing — near-zero CPU cost (just a timestamp comparison).
+        animFrameRef.current = requestAnimationFrame(draw)
+        return
+      }
+      if (IS_MOBILE) {
+        mobileIdle.active = false
+      }
+
       // FPS cap override: when set, overrides component default
       const effectiveDT = dbg.fpsCap > 0
         ? 1000 / dbg.fpsCap
@@ -540,13 +559,21 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       const blobs = blobsRef.current
       const wobbleI = dbg.gooWobble ? dbg.gooWobbleIntensity : 0
 
-      // Sync CSS filter with debug toggle
-      canvas.style.filter = dbg.gooFilter ? 'url(#goo-css)' : 'none'
+      // Sync CSS filter with debug toggle (cached to avoid redundant style writes)
+      const filterStr = dbg.gooFilter ? 'url(#goo-css)' : 'none'
+      if (filterStr !== lastFilterStr) {
+        canvas.style.filter = filterStr
+        lastFilterStr = filterStr
+      }
 
-      // Sync SVG filter blur radius with debug slider
+      // Sync SVG filter blur radius with debug slider (cached)
       if (gooBlurRef.current) {
         const stdDev = Q.baseBlurStdDev * dbg.filterBlurRadius
-        gooBlurRef.current.setAttribute('stdDeviation', String(stdDev))
+        const stdDevStr = String(stdDev)
+        if (stdDevStr !== lastStdDevStr) {
+          gooBlurRef.current.setAttribute('stdDeviation', stdDevStr)
+          lastStdDevStr = stdDevStr
+        }
       }
 
       // Draw shapes directly to visible canvas with DPR + camera transform
@@ -609,7 +636,9 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           opacity: palette.goo,
           // CSS filter for goo — browser handles DPR automatically
           filter: 'url(#goo-css)',
-          willChange: 'filter',
+          // On mobile, omit willChange so the browser can cache the filter result
+          // when canvas content is frozen during idle. On desktop, hint for smooth updates.
+          willChange: IS_MOBILE ? 'auto' : 'filter',
         }}
       />
     </>
