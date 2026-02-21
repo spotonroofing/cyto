@@ -251,21 +251,73 @@ export function BubbleMap() {
     momentumRafRef.current = requestAnimationFrame(animate)
   }, [getBoundaryLimits])
 
-  // Auto-zoom to current milestone
+  // Intro animation: show full map, then fly to current milestone
   useEffect(() => {
     if (!settled || hasAutoZoomedRef.current || bubbles.length === 0) return
     hasAutoZoomedRef.current = true
+
     const current = getCurrentMilestone()
     if (!current) return
     const bubble = bubbles.find((b) => b.milestoneId === current.id)
     if (!bubble) return
-    const scale = 1.2
-    setTransform({
-      x: dimensions.width / 2 - bubble.x * scale,
-      y: dimensions.height / 2 - bubble.y * scale,
-      scale,
-    })
-  }, [settled, bubbles, dimensions, getCurrentMilestone])
+
+    // 1. Compute zoom-to-fit (show entire map)
+    const minX = Math.min(...bubbles.map(b => b.x - b.radius))
+    const maxX = Math.max(...bubbles.map(b => b.x + b.radius))
+    const minY = Math.min(...bubbles.map(b => b.y - b.radius))
+    const maxY = Math.max(...bubbles.map(b => b.y + b.radius))
+    const mapW = maxX - minX + 100
+    const mapH = maxY - minY + 100
+    const fitScale = Math.max(getMinScale(), Math.min(dimensions.width / mapW, dimensions.height / mapH, 1))
+    const cx = (minX + maxX) / 2
+    const cy = (minY + maxY) / 2
+    const fitView = {
+      x: dimensions.width / 2 - cx * fitScale,
+      y: dimensions.height / 2 - cy * fitScale,
+      scale: fitScale,
+    }
+
+    // 2. Show full map instantly, block input
+    setTransform(fitView)
+    isAnimatingCameraRef.current = true
+
+    // 3. After hold, fly to current milestone with ease-in-out
+    const HOLD_MS = 900
+    const FLY_MS = 1100
+    const targetScale = 1.2
+    const target = {
+      x: dimensions.width / 2 - bubble.x * targetScale,
+      y: dimensions.height / 2 - bubble.y * targetScale,
+      scale: targetScale,
+    }
+
+    const holdTimer = setTimeout(() => {
+      const start = { ...fitView }
+      const startTime = performance.now()
+      const tick = (now: number) => {
+        const rawT = Math.min((now - startTime) / FLY_MS, 1)
+        // Ease-in-out cubic
+        const t = rawT < 0.5 ? 4 * rawT * rawT * rawT : 1 - Math.pow(-2 * rawT + 2, 3) / 2
+        setTransform({
+          x: start.x + (target.x - start.x) * t,
+          y: start.y + (target.y - start.y) * t,
+          scale: start.scale + (target.scale - start.scale) * t,
+        })
+        if (rawT < 1) {
+          cameraAnimRafRef.current = requestAnimationFrame(tick)
+        } else {
+          isAnimatingCameraRef.current = false
+        }
+      }
+      cameraAnimRafRef.current = requestAnimationFrame(tick)
+    }, HOLD_MS)
+
+    return () => {
+      clearTimeout(holdTimer)
+      cancelAnimationFrame(cameraAnimRafRef.current)
+      isAnimatingCameraRef.current = false
+    }
+  }, [settled, bubbles, dimensions, getCurrentMilestone, getMinScale])
 
   // Native mouse handlers
   useEffect(() => {
