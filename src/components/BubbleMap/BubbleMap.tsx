@@ -10,6 +10,24 @@ import { useUIStore } from '@/stores/uiStore'
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
 
+/** Compute release velocity from recent move deltas (last 80ms window). */
+function computeReleaseVelocity(history: Array<{dx: number; dy: number; time: number}>): { x: number; y: number } {
+  if (history.length < 2) return { x: 0, y: 0 }
+  const now = performance.now()
+  // Only use moves within the last 80ms — stale data means the user paused
+  let i = 0
+  while (i < history.length && now - history[i]!.time > 80) i++
+  if (i >= history.length) return { x: 0, y: 0 }
+  let totalDx = 0, totalDy = 0
+  for (let j = i; j < history.length; j++) {
+    totalDx += history[j]!.dx
+    totalDy += history[j]!.dy
+  }
+  const dt = now - history[i]!.time
+  if (dt < 16) return { x: totalDx, y: totalDy } // single frame — use delta as velocity
+  return { x: totalDx / dt * 16, y: totalDy / dt * 16 } // normalize to px/frame at 60fps
+}
+
 export function BubbleMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const blurRef = useRef<SVGFEGaussianBlurElement>(null)
@@ -29,8 +47,7 @@ export function BubbleMap() {
   const bubblesRef = useRef<ReturnType<typeof useBubbleLayout>['bubbles']>([])
 
   // Momentum & boundary refs
-  const velocityRef = useRef({ x: 0, y: 0 })
-  const lastMoveTimeRef = useRef(0)
+  const moveHistoryRef = useRef<Array<{dx: number; dy: number; time: number}>>([])
   const momentumRafRef = useRef(0)
   const springRafRef = useRef(0)
   const pathBoundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; width: number; height: number } | null>(null)
@@ -140,62 +157,56 @@ export function BubbleMap() {
     cancelAnimationFrame(springRafRef.current)
   }, [])
 
-  const startSpringBack = useCallback(() => {
-    cancelAnimationFrame(springRafRef.current)
-    const startTime = performance.now()
-    const duration = 300
-    const start = { ...transformRef.current }
-    const limits = getBoundaryLimits(start.scale)
-    const targetX = Math.max(limits.minX, Math.min(limits.maxX, start.x))
-    const targetY = Math.max(limits.minY, Math.min(limits.maxY, start.y))
-    if (Math.abs(targetX - start.x) < 0.5 && Math.abs(targetY - start.y) < 0.5) return
-
-    const animate = (now: number) => {
-      const elapsed = now - startTime
-      const t = Math.min(1, elapsed / duration)
-      const ease = 1 - Math.pow(1 - t, 3) // ease-out cubic
-      setTransform(prev => ({
-        ...prev,
-        x: start.x + (targetX - start.x) * ease,
-        y: start.y + (targetY - start.y) * ease,
-      }))
-      if (t < 1) springRafRef.current = requestAnimationFrame(animate)
-    }
-    springRafRef.current = requestAnimationFrame(animate)
-  }, [getBoundaryLimits])
-
-  const startMomentum = useCallback(() => {
+  const startPhysics = useCallback((vx0: number, vy0: number) => {
     cancelAnimationFrame(momentumRafRef.current)
-    let vx = velocityRef.current.x
-    let vy = velocityRef.current.y
+    cancelAnimationFrame(springRafRef.current)
+    let vx = vx0, vy = vy0
 
-    if (Math.abs(vx) < 0.5 && Math.abs(vy) < 0.5) {
-      startSpringBack()
-      return
-    }
+    // Skip if nothing to animate
+    const cur = transformRef.current
+    const lim0 = getBoundaryLimits(cur.scale)
+    const ox0 = cur.x > lim0.maxX ? cur.x - lim0.maxX : cur.x < lim0.minX ? cur.x - lim0.minX : 0
+    const oy0 = cur.y > lim0.maxY ? cur.y - lim0.maxY : cur.y < lim0.minY ? cur.y - lim0.minY : 0
+    if (Math.abs(vx) < 0.5 && Math.abs(vy) < 0.5 && Math.abs(ox0) < 0.5 && Math.abs(oy0) < 0.5) return
 
-    const friction = 0.94
+    const FRICTION = 0.97     // free-space per-frame velocity retention (long coast)
+    const TENSION = 0.2       // spring force per px of overdrag
+    const SPRING_DAMP = 0.5   // velocity retention when spring is active (fast settle)
+
     const animate = () => {
       const t = transformRef.current
       const limits = getBoundaryLimits(t.scale)
 
-      // Extra friction when past boundary
-      if (t.x > limits.maxX || t.x < limits.minX) vx *= 0.85
-      if (t.y > limits.maxY || t.y < limits.minY) vy *= 0.85
+      const overX = t.x > limits.maxX ? t.x - limits.maxX : t.x < limits.minX ? t.x - limits.minX : 0
+      const overY = t.y > limits.maxY ? t.y - limits.maxY : t.y < limits.minY ? t.y - limits.minY : 0
 
-      vx *= friction
-      vy *= friction
+      // Spring force: pulls back when past boundary (0 when in bounds)
+      vx -= overX * TENSION
+      vy -= overY * TENSION
 
-      if (Math.abs(vx) < 0.5 && Math.abs(vy) < 0.5) {
-        startSpringBack()
+      // Damping: heavy when spring active (rubber band), light in free space (coast)
+      const inSpring = overX !== 0 || overY !== 0
+      vx *= inSpring ? SPRING_DAMP : FRICTION
+      vy *= inSpring ? SPRING_DAMP : FRICTION
+
+      // Settle: low velocity AND near/in bounds
+      if (Math.abs(vx) < 0.3 && Math.abs(vy) < 0.3 && Math.abs(overX) < 0.5 && Math.abs(overY) < 0.5) {
+        if (overX !== 0 || overY !== 0) {
+          setTransform(prev => ({
+            ...prev,
+            x: Math.max(limits.minX, Math.min(limits.maxX, prev.x)),
+            y: Math.max(limits.minY, Math.min(limits.maxY, prev.y)),
+          }))
+        }
         return
       }
 
       setTransform(prev => ({ ...prev, x: prev.x + vx, y: prev.y + vy }))
       momentumRafRef.current = requestAnimationFrame(animate)
     }
+
     momentumRafRef.current = requestAnimationFrame(animate)
-  }, [getBoundaryLimits, startSpringBack])
+  }, [getBoundaryLimits])
 
   // Auto-zoom to current milestone
   useEffect(() => {
@@ -221,8 +232,7 @@ export function BubbleMap() {
       if (e.button !== 0) return
       isPanningRef.current = true
       lastPanRef.current = { x: e.clientX, y: e.clientY }
-      lastMoveTimeRef.current = performance.now()
-      velocityRef.current = { x: 0, y: 0 }
+      moveHistoryRef.current = []
       cancelAnimations()
       recenterModeRef.current = 'focus'
       window.dispatchEvent(new CustomEvent('cyto-recenter-mode', { detail: 'focus' }))
@@ -233,22 +243,14 @@ export function BubbleMap() {
       const dy = e.clientY - lastPanRef.current.y
       lastPanRef.current = { x: e.clientX, y: e.clientY }
 
-      // Track velocity (based on actual visual movement after resistance)
+      // Track movement for release velocity computation
       const cur = transformRef.current
       const limits = getBoundaryLimits(cur.scale)
       const resistX = (cur.x > limits.maxX || cur.x < limits.minX) ? 0.3 : 1.0
       const resistY = (cur.y > limits.maxY || cur.y < limits.minY) ? 0.3 : 1.0
-      const now = performance.now()
-      const dt = now - lastMoveTimeRef.current
-      lastMoveTimeRef.current = now
-      if (dt > 0 && dt < 100) {
-        const newVx = (dx * resistX) / dt * 16
-        const newVy = (dy * resistY) / dt * 16
-        velocityRef.current = {
-          x: velocityRef.current.x * 0.7 + newVx * 0.3,
-          y: velocityRef.current.y * 0.7 + newVy * 0.3,
-        }
-      }
+      const history = moveHistoryRef.current
+      history.push({ dx: dx * resistX, dy: dy * resistY, time: performance.now() })
+      if (history.length > 5) history.shift()
 
       batchTransform((t) => {
         const lim = getBoundaryLimits(t.scale)
@@ -260,7 +262,8 @@ export function BubbleMap() {
     const onMouseUp = () => {
       if (!isPanningRef.current) return
       isPanningRef.current = false
-      startMomentum()
+      const vel = computeReleaseVelocity(moveHistoryRef.current)
+      startPhysics(vel.x, vel.y)
     }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
@@ -287,7 +290,7 @@ export function BubbleMap() {
       cancelAnimationFrame(momentumRafRef.current)
       cancelAnimationFrame(springRafRef.current)
     }
-  }, [batchTransform, cancelAnimations, getBoundaryLimits, getMinScale, startMomentum])
+  }, [batchTransform, cancelAnimations, getBoundaryLimits, getMinScale, startPhysics])
 
   // Native touch handlers
   useEffect(() => {
@@ -300,8 +303,7 @@ export function BubbleMap() {
         hasPannedRef.current = false
         lastPanRef.current = { x: t.clientX, y: t.clientY }
         touchStartRef.current = { x: t.clientX, y: t.clientY, time: Date.now() }
-        lastMoveTimeRef.current = performance.now()
-        velocityRef.current = { x: 0, y: 0 }
+        moveHistoryRef.current = []
         cancelAnimations()
         recenterModeRef.current = 'focus'
         window.dispatchEvent(new CustomEvent('cyto-recenter-mode', { detail: 'focus' }))
@@ -309,7 +311,7 @@ export function BubbleMap() {
         isPanningRef.current = false
         hasPannedRef.current = false
         touchStartRef.current = null
-        velocityRef.current = { x: 0, y: 0 }
+        moveHistoryRef.current = []
         cancelAnimations()
         const dx = e.touches[0]!.clientX - e.touches[1]!.clientX
         const dy = e.touches[0]!.clientY - e.touches[1]!.clientY
@@ -329,22 +331,14 @@ export function BubbleMap() {
         }
         if (hasPannedRef.current) e.preventDefault()
 
-        // Track velocity (based on actual visual movement after resistance)
+        // Track movement for release velocity computation
         const cur = transformRef.current
         const limits = getBoundaryLimits(cur.scale)
         const resistX = (cur.x > limits.maxX || cur.x < limits.minX) ? 0.3 : 1.0
         const resistY = (cur.y > limits.maxY || cur.y < limits.minY) ? 0.3 : 1.0
-        const now = performance.now()
-        const dt = now - lastMoveTimeRef.current
-        lastMoveTimeRef.current = now
-        if (dt > 0 && dt < 100) {
-          const newVx = (dx * resistX) / dt * 16
-          const newVy = (dy * resistY) / dt * 16
-          velocityRef.current = {
-            x: velocityRef.current.x * 0.7 + newVx * 0.3,
-            y: velocityRef.current.y * 0.7 + newVy * 0.3,
-          }
-        }
+        const history = moveHistoryRef.current
+        history.push({ dx: dx * resistX, dy: dy * resistY, time: performance.now() })
+        if (history.length > 5) history.shift()
 
         batchTransform((tr) => {
           const lim = getBoundaryLimits(tr.scale)
@@ -391,8 +385,12 @@ export function BubbleMap() {
       touchStartRef.current = null
       hasPannedRef.current = false
       // Start momentum if user was panning, otherwise spring-back after pinch zoom
-      if (wasPanning) startMomentum()
-      else if (e.touches.length === 0) startSpringBack()
+      if (wasPanning) {
+        const vel = computeReleaseVelocity(moveHistoryRef.current)
+        startPhysics(vel.x, vel.y)
+      } else if (e.touches.length === 0) {
+        startPhysics(0, 0)
+      }
     }
     el.addEventListener('touchstart', onTouchStart, { passive: false })
     el.addEventListener('touchmove', onTouchMove, { passive: false })
@@ -404,7 +402,7 @@ export function BubbleMap() {
       cancelAnimationFrame(momentumRafRef.current)
       cancelAnimationFrame(springRafRef.current)
     }
-  }, [selectMilestone, batchTransform, cancelAnimations, getBoundaryLimits, getMinScale, startMomentum, startSpringBack])
+  }, [selectMilestone, batchTransform, cancelAnimations, getBoundaryLimits, getMinScale, startPhysics])
 
   const handleRecenter = useCallback(() => {
     cancelAnimations()
