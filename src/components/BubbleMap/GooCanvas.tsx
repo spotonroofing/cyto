@@ -285,8 +285,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         animFrameRef.current = requestAnimationFrame(draw)
         return
       }
+      const prevFrame = lastFrameTime
       lastFrameTime = timestamp
-      time += 0.016
+      // Use real elapsed time so wobble speed is independent of frame rate
+      time += prevFrame > 0 ? Math.min((timestamp - prevFrame) / 1000, 0.1) : 0.016
 
       const pal = paletteRef.current
 
