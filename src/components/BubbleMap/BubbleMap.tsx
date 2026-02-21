@@ -505,7 +505,7 @@ export function BubbleMap() {
       className="w-full h-screen overflow-hidden relative"
       style={{ touchAction: 'none' }}
     >
-      <BackgroundParticles scale={transform.scale} />
+      <BackgroundParticles transform={transform} />
       <DotGrid width={dimensions.width} height={dimensions.height} transform={transform} />
 
       {/* Hidden SVG for goo filter definition — stdDeviation is dynamic */}
