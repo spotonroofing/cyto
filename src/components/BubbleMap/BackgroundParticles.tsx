@@ -136,6 +136,11 @@ export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
         if (p.y < wTop) p.y += wH
         else if (p.y > wTop + wH) p.y -= wH
 
+        // Viewport culling — skip particles outside visible screen
+        const screenX = p.x * tf.scale + tf.x
+        const screenY = p.y * tf.scale + tf.y
+        if (screenX < -20 || screenX > w + 20 || screenY < -20 || screenY > h + 20) continue
+
         // Draw organic ellipse — radius is in world units, camera transform handles scaling
         const wobble = Math.sin(p.wobblePhase) * 0.15
         const rx = p.radius * (1 + wobble)

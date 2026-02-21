@@ -13,14 +13,14 @@ export const Q = IS_MOBILE ? {
   canvasDpr: 1.5,
 
   // GooCanvas connection rendering
-  gooSamplesPerPx: 7,        // samples per 100px of connection (was 9)
-  gooMinSegments: 16,         // minimum segments per connection (was 24)
-  gooBlobSteps: 16,           // polygon steps for blob outline (was 24)
-  gooNucleusSteps: 16,        // polygon steps for nucleus outline (was 24)
+  gooSamplesPerPx: 7,        // samples per 100px of connection (desktop: 10)
+  gooMinSegments: 12,         // minimum segments per connection (desktop: 28)
+  gooBlobSteps: 12,           // polygon steps for blob outline (desktop: 48)
+  gooNucleusSteps: 12,        // polygon steps for nucleus outline (desktop: 64)
   gooNucleusHarmonics: 3,     // harmonic count for nucleus deformation
   gooEdgeWobble: false as const, // skip per-edge sine wobble (path wobble still active)
-  gooTargetDt: 1000 / 24,     // 24fps target (was 30fps)
-  gooIdleDt: 1000 / 8,        // 8fps idle (was 10fps)
+  gooTargetDt: 1000 / 24,     // 24fps target
+  gooIdleDt: 1000 / 8,        // 8fps idle
 
   // SVG goo filter blur — must scale linearly with zoom (no cap) to keep goo
   // shape consistent across zoom levels. Capping breaks the feColorMatrix threshold.
@@ -28,8 +28,8 @@ export const Q = IS_MOBILE ? {
   maxBlurStdDev: 999,
 
   // Background particles
-  particleCount: 25,           // (was 30)
-  particleTargetDt: 1000 / 20,
+  particleCount: 15,           // (desktop: 105) — minimal on mobile
+  particleTargetDt: 1000 / 12, // ~12fps — half goo rate, non-critical layer
 
   // Dot grid
   dotDpr: 1,                   // (was 2)
