@@ -396,7 +396,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         // Organic blob shape: draw with sinusoidal radius variation
         const deformA = Math.sin(time * 0.3 + blob.wobblePhase) * 3
         const deformB = Math.cos(time * 0.25 + blob.wobblePhase * 1.3) * 2
-        const rotPhase = time * 0.15 + blob.phaseIndex * 0.5
+        const rotPhase = time * -0.15 + blob.phaseIndex * 0.5
 
         ctx.beginPath()
         for (let i = 0; i <= BLOB_STEPS; i++) {
@@ -412,6 +412,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         ctx.closePath()
         ctx.fillStyle = blob.color
         ctx.fill()
+        // Organic border ring — follows membrane contour (visible through goo blend)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
       }
 
       // ── Draw nucleus shapes ──
@@ -436,7 +440,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           for (let h = 0; h < harmonicCount; h++) {
             const freq = h + 2  // frequencies 2, 3, 4, 5, 6
             const amp = blob.nucleusHarmonics[h]!
-            const phase = blob.nucleusPhases[h]! + time * blob.nucleusRotSpeed * (h % 2 === 0 ? 1 : -0.7)
+            const phase = blob.nucleusPhases[h]! + time * blob.nucleusRotSpeed * (h % 2 === 0 ? -1 : 0.7)
             r += amp * Math.sin(freq * angle + phase)
           }
 

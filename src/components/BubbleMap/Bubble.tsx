@@ -26,8 +26,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       role="button"
       tabIndex={0}
     >
-      {/* Border ring — frames the orb outer edge */}
-      <circle cx={0} cy={0} r={radius} fill="none" stroke={color} strokeWidth={1.5} opacity={0.5} />
+      {/* Border ring drawn in GooCanvas — follows organic membrane contour */}
       {/* Nucleus — dense core inside the membrane */}
       <circle cx={0} cy={0} r={radius * 0.57} fill={color} opacity={0.7} />
       {/* Hit target */}
