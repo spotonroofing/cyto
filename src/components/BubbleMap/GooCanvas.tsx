@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useLayoutEffect } from 'react'
 import { useTheme } from '@/themes'
 import { Q } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
@@ -75,27 +75,48 @@ function sampleConnection(
   const x = conn.sx + conn.dx * t + conn.nx * (curveBow + flowWave)
   const y = conn.sy + conn.dy * t + conn.ny * (curveBow + flowWave)
 
-  // ── Width: consistent tube with smooth junction flare ──
+  // ── Width: organic fillet at cell junctions ──
   const smallerR = Math.min(conn.sr, conn.tr)
 
-  // Minimum tube width: ~24% of smaller radius (half-width),
-  // total visible width ≈ 48% of radius ≈ 24% of diameter
-  const midWidth = smallerR * 0.24
+  // Tube half-width in mid-section
+  const tubeWidth = smallerR * 0.24
 
-  // Junction flare: use actual endpoint radius for organic merge into orb
-  const nearEndR = t < 0.5 ? conn.sr : conn.tr
+  // Cell edge positions in t-space
+  const tSE = conn.sr / conn.dist  // source cell edge
+  const tTE = 1 - conn.tr / conn.dist  // target cell edge
+
+  // Fillet: wider than tube at cell edge for smooth goo merge.
+  // Zero at cell centers to prevent asymmetric goo offset.
+  const filletWidth = tubeWidth * 1.4
+
+  // Fan-out scaling for branching nodes
   const nearFan = t < 0.5 ? (conn.sourceFanOut || 1) : (conn.targetFanOut || 1)
   const fanScale = nearFan > 2 ? 0.78 : 1.0
-  const endWidth = nearEndR * 0.52 * fanScale
 
-  // Smooth cosine flare over first/last 25% of connection path
-  const distFromEdge = Math.min(t, 1 - t) * 2  // 0 at edges, 1 at center
-  const flareZone = 0.5  // transition zone (distFromEdge 0→0.5 = first/last 25%)
-  const flareT = Math.min(distFromEdge / flareZone, 1)
-  const flareEase = 0.5 * (1 - Math.cos(Math.PI * flareT))
+  let width: number
 
-  // Interpolate: endWidth at junctions, midWidth in tube section
-  const width = Math.max(midWidth * 0.9, endWidth + (midWidth - endWidth) * flareEase)
+  if (tSE >= tTE) {
+    // Cells overlap or touch — bell-curve profile
+    width = filletWidth * Math.sin(t * Math.PI) * fanScale
+  } else if (t <= tSE) {
+    // Inside source cell: smoothstep 0 → filletWidth (thin at center, wide at edge)
+    const u = tSE > 0.001 ? t / tSE : 1
+    width = filletWidth * u * u * (3 - 2 * u) * fanScale
+  } else if (t >= tTE) {
+    // Inside target cell: smoothstep filletWidth → 0 (wide at edge, thin at center)
+    const span = 1 - tTE
+    const u = span > 0.001 ? (1 - t) / span : 1
+    width = filletWidth * u * u * (3 - 2 * u) * fanScale
+  } else {
+    // Between cells: smooth fillet → tube → fillet transition
+    const gap = tTE - tSE
+    const g = (t - tSE) / gap  // 0 at source edge, 1 at target edge
+    const edgeDist = Math.min(g, 1 - g)  // 0 at edges, 0.5 at center
+    const transZone = 0.3  // transition over first/last 30% of gap
+    const fade = Math.min(edgeDist / transZone, 1)
+    const eased = 0.5 * (1 - Math.cos(Math.PI * fade))
+    width = (filletWidth + (tubeWidth - filletWidth) * eased) * fanScale
+  }
 
   return { x, y, width }
 }
@@ -310,7 +331,7 @@ function renderShapes(
           cull.tx, cull.ty, cull.scale, cull.viewW, cull.viewH)) continue
     }
 
-    const nucleusR = blob.radius * 0.68
+    const nucleusR = blob.radius * 0.782
 
     ctx.beginPath()
     if (nucleusAnimate) {
@@ -367,11 +388,26 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   // Ref for the dedicated cache SVG filter's blur element
   const cacheBlurRef = useRef<SVGFEGaussianBlurElement>(null)
 
+  // Refs for layout-sync: allow useLayoutEffect to position canvas in sync with SVG
+  const worldBoundsRef = useRef<{ wMinX: number; wMinY: number } | null>(null)
+  const useCacheRef = useRef(false)
+
   // Keep refs in sync without restarting animation loop.
   // Transform uses inline assignment (not useEffect) to eliminate 1-frame lag
   // between SVG overlay and canvas during panning.
   transformRef.current = transform
   useEffect(() => { paletteRef.current = palette }, [palette])
+
+  // Sync canvas CSS transform with React's DOM commit to eliminate mobile pan lag.
+  // On the fallback path (mobile), CSS transform positions the world-space canvas.
+  // Without this, the draw loop's rAF updates CSS transform 1+ frames after React
+  // updates the SVG overlay, causing the goo to visibly drag behind cells.
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current
+    const wb = worldBoundsRef.current
+    if (!canvas || !wb || useCacheRef.current) return
+    canvas.style.transform = `translate(${wb.wMinX * transform.scale + transform.x}px, ${wb.wMinY * transform.scale + transform.y}px) scale(${transform.scale})`
+  }, [transform])
 
   // Precompute connection and blob data when layout changes
   useEffect(() => {
@@ -480,6 +516,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       useCache = ctx.filter !== 'none' && ctx.filter !== ''
       ctx.filter = 'none'
     } catch { useCache = false }
+    useCacheRef.current = useCache
 
     // ── Compute world-space bounding box for offscreen cache ──
     const PAD = 60 // padding for blur bleed + wobble amplitude
@@ -498,6 +535,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     }
     const worldW = wMaxX - wMinX
     const worldH = wMaxY - wMinY
+    worldBoundsRef.current = { wMinX, wMinY }
 
     // ── Canvas sizing (depends on rendering path) ──
     if (useCache) {

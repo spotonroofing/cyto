@@ -21,7 +21,8 @@ function hashPhase(id: string): number {
   return h * 0.37
 }
 
-const NUCLEUS_WOBBLE_STEPS = IS_MOBILE ? 20 : 24
+const NUCLEUS_WOBBLE_STEPS = IS_MOBILE ? 48 : 64
+const ICON_LABEL_GAP = 5 // px of extra vertical spacing between phase icon and text label
 
 interface BubbleProps {
   milestoneId: string
@@ -45,7 +46,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
   useEffect(() => {
     const el = nucleusRef.current
     if (!el) return
-    const nucleusR = radius * 0.57
+    const nucleusR = radius * 0.655
     const p = hashPhase(milestoneId)
     const targetDt = 0
     let rafId = 0
@@ -115,7 +116,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
         if (!Icon) return null
         const size = Math.round(radius * 0.28)
         return (
-          <g transform={`translate(${-size / 2} ${-size / 2 - 12})`}>
+          <g transform={`translate(${-size / 2} ${-size / 2 - 12 - ICON_LABEL_GAP})`}>
             <Icon
               width={size} height={size}
               color={palette.text}
