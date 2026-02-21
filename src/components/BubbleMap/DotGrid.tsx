@@ -17,6 +17,13 @@ export function DotGrid({ width, height, transform }: DotGridProps) {
   const transformRef = useRef(transform)
   const { isDark } = useTheme()
 
+  // DEBUG: Register rendering path D
+  useEffect(() => {
+    const w = window as unknown as Record<string, unknown>
+    if (!w.__cytoDebugPaths) w.__cytoDebugPaths = {}
+    ;(w.__cytoDebugPaths as Record<string, string>).D = 'DotGrid canvas'
+  }, [])
+
   // Keep transform in sync via ref — avoids redraw on every React re-render
   useEffect(() => { transformRef.current = transform }, [transform])
 
@@ -110,7 +117,11 @@ export function DotGrid({ width, height, transform }: DotGridProps) {
     <canvas
       ref={canvasRef}
       className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 0 }}
+      style={{
+        zIndex: 0,
+        // DEBUG: Path D — DotGrid canvas
+        border: '3px solid yellow',
+      }}
     />
   )
 }
