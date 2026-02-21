@@ -21,6 +21,8 @@ export const Q = IS_MOBILE ? {
   gooEdgeWobble: false as const, // skip per-edge sine wobble (path wobble still active)
   gooTargetDt: 1000 / 24,     // 24fps target
   gooIdleDt: 1000 / 8,        // 8fps idle
+  gooCacheInterval: 5,         // update offscreen cache every 5 frames (~5fps wobble)
+  gooCacheQuality: 0.5,        // half resolution offscreen (reduces filter cost ~4x)
 
   // SVG goo filter blur — must scale linearly with zoom (no cap) to keep goo
   // shape consistent across zoom levels. Capping breaks the feColorMatrix threshold.
@@ -45,6 +47,8 @@ export const Q = IS_MOBILE ? {
   gooEdgeWobble: true as const,
   gooTargetDt: 1000 / 45,
   gooIdleDt: 1000 / 45,    // same as active — desktop has headroom, no idle throttle
+  gooCacheInterval: 2,      // update offscreen cache every 2 frames (~22fps wobble)
+  gooCacheQuality: 1.0,     // full resolution offscreen
 
   baseBlurStdDev: 12,
   maxBlurStdDev: 999,          // effectively no cap on desktop

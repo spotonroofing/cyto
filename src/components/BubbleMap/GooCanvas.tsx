@@ -132,6 +132,212 @@ function blendHex(c1: string, c2: string, t: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
 }
 
+// ── Extracted shape drawing ──────────────────────────────────
+// Draws connections, blobs, and nuclei to the given context.
+// When cull is null, all shapes are drawn (for offscreen cache).
+// When cull is provided, viewport culling is applied (for fallback direct draw).
+
+function renderShapes(
+  ctx: CanvasRenderingContext2D,
+  connections: ConnectionData[],
+  blobs: BlobData[],
+  time: number,
+  nucleusAlpha: number,
+  cull: { tx: number; ty: number; scale: number; viewW: number; viewH: number } | null,
+) {
+  const SAMPLES_PER_100PX = Q.gooSamplesPerPx
+  const MIN_SEGMENTS = Q.gooMinSegments
+  const BLOB_STEPS = Q.gooBlobSteps
+  const NUCLEUS_STEPS = Q.gooNucleusSteps
+  const NUCLEUS_HARMONICS = Q.gooNucleusHarmonics
+
+  // ── Draw connections as thick tapered filled paths ──
+
+  for (const conn of connections) {
+    // Viewport culling (skip when rendering to full-world offscreen cache)
+    if (cull && !isInViewport(conn.minX, conn.minY, conn.maxX, conn.maxY,
+        cull.tx, cull.ty, cull.scale, cull.viewW, cull.viewH)) continue
+
+    const segments = Math.max(MIN_SEGMENTS, Math.floor(conn.dist / 100 * SAMPLES_PER_100PX))
+
+    // Sample points along the connection
+    const points: { x: number; y: number; width: number }[] = []
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments
+      points.push(sampleConnection(conn, t, time))
+    }
+
+    // Compute upper and lower outlines
+    const upper: { x: number; y: number }[] = []
+    const lower: { x: number; y: number }[] = []
+
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i]!
+      // Compute local normal direction
+      let lnx: number, lny: number
+      if (i === 0) {
+        const next = points[1]!
+        const tdx = next.x - p.x, tdy = next.y - p.y
+        const tlen = Math.sqrt(tdx * tdx + tdy * tdy) || 1
+        lnx = -tdy / tlen; lny = tdx / tlen
+      } else if (i === points.length - 1) {
+        const prev = points[i - 1]!
+        const tdx = p.x - prev.x, tdy = p.y - prev.y
+        const tlen = Math.sqrt(tdx * tdx + tdy * tdy) || 1
+        lnx = -tdy / tlen; lny = tdx / tlen
+      } else {
+        const prev = points[i - 1]!, next = points[i + 1]!
+        const tdx = next.x - prev.x, tdy = next.y - prev.y
+        const tlen = Math.sqrt(tdx * tdx + tdy * tdy) || 1
+        lnx = -tdy / tlen; lny = tdx / tlen
+      }
+      // Edge wobble — independent sine-wave displacement per edge for organic ripple
+      // Skipped on mobile (Q.gooEdgeWobble === false) — saves 4 sin() per segment per connection
+      let wU: number, wL: number
+      if (Q.gooEdgeWobble) {
+        const edgeT = i / segments
+        const wDamp = Math.sin(edgeT * Math.PI)
+        const wobbleUpper = (
+          Math.sin(time * 3.2 + edgeT * 6 + conn.phaseOffset) * 2.5
+          + Math.sin(time * 2.1 + edgeT * 3.5 + conn.phaseOffset * 1.7) * 1.5
+        ) * wDamp
+        const wobbleLower = (
+          Math.sin(time * 2.8 + edgeT * 5.5 + conn.phaseOffset + 2.1) * 2.5
+          + Math.sin(time * 2.3 + edgeT * 3 + conn.phaseOffset * 1.3 + 1.0) * 1.5
+        ) * wDamp
+        wU = p.width + wobbleUpper
+        wL = p.width + wobbleLower
+      } else {
+        wU = p.width
+        wL = p.width
+      }
+      upper.push({ x: p.x + lnx * wU, y: p.y + lny * wU })
+      lower.push({ x: p.x - lnx * wL, y: p.y - lny * wL })
+    }
+
+    // Draw filled shape with smooth curves
+    ctx.beginPath()
+
+    // Upper edge: forward
+    ctx.moveTo(upper[0]!.x, upper[0]!.y)
+    for (let i = 1; i < upper.length; i++) {
+      const prev = upper[i - 1]!
+      const curr = upper[i]!
+      const cpx = (prev.x + curr.x) / 2
+      const cpy = (prev.y + curr.y) / 2
+      ctx.quadraticCurveTo(prev.x, prev.y, cpx, cpy)
+    }
+    ctx.lineTo(upper[upper.length - 1]!.x, upper[upper.length - 1]!.y)
+
+    // Lower edge: reverse
+    for (let i = lower.length - 2; i >= 0; i--) {
+      const next = lower[i + 1]!
+      const curr = lower[i]!
+      const cpx = (next.x + curr.x) / 2
+      const cpy = (next.y + curr.y) / 2
+      ctx.quadraticCurveTo(next.x, next.y, cpx, cpy)
+    }
+    ctx.lineTo(lower[0]!.x, lower[0]!.y)
+
+    ctx.closePath()
+
+    // Smooth gradient — edge-aligned so pure colors extend through cell radii
+    // and the visible transition only occurs in the gap between cell edges
+    const grad = ctx.createLinearGradient(conn.sx, conn.sy, conn.tx, conn.ty)
+    const s = conn.sourceEdgeFrac
+    const e = conn.targetEdgeFrac
+    const range = e - s
+    grad.addColorStop(0, conn.sourceColor)
+    grad.addColorStop(s, conn.sourceColor)
+    grad.addColorStop(s + range * 0.25, conn.blendedColors[0]!)
+    grad.addColorStop(s + range * 0.5, conn.blendedColors[1]!)
+    grad.addColorStop(s + range * 0.75, conn.blendedColors[2]!)
+    grad.addColorStop(e, conn.targetColor)
+    grad.addColorStop(1, conn.targetColor)
+    ctx.fillStyle = grad
+    ctx.fill()
+  }
+
+  // ── Draw milestone blobs with organic deformation ──
+
+  for (const blob of blobs) {
+    if (cull) {
+      const blobPad = blob.radius + 10
+      if (!isInViewport(blob.x - blobPad, blob.y - blobPad,
+          blob.x + blobPad, blob.y + blobPad,
+          cull.tx, cull.ty, cull.scale, cull.viewW, cull.viewH)) continue
+    }
+
+    // Breathing radius
+    const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 3.6
+    const baseR = blob.radius + breathe
+
+    // Organic blob shape: draw with sinusoidal radius variation
+    const deformA = Math.sin(time * 0.3 + blob.wobblePhase) * 3.6
+    const deformB = Math.cos(time * 0.25 + blob.wobblePhase * 1.3) * 2.4
+    const rotPhase = time * -0.15 + blob.phaseIndex * 0.5
+
+    ctx.beginPath()
+    for (let i = 0; i <= BLOB_STEPS; i++) {
+      const angle = (i / BLOB_STEPS) * Math.PI * 2
+      const r = baseR
+        + deformA * Math.sin(blob.deformFreq * angle + rotPhase)
+        + deformB * Math.cos((blob.deformFreq + 1) * angle - rotPhase * 0.7)
+      const px = blob.x + Math.cos(angle) * r
+      const py = blob.y + Math.sin(angle) * r
+      if (i === 0) ctx.moveTo(px, py)
+      else ctx.lineTo(px, py)
+    }
+    ctx.closePath()
+    ctx.fillStyle = blob.color
+    ctx.fill()
+  }
+
+  // ── Draw nucleus shapes ──
+  for (const blob of blobs) {
+    if (cull) {
+      const blobPad = blob.radius + 10
+      if (!isInViewport(blob.x - blobPad, blob.y - blobPad,
+          blob.x + blobPad, blob.y + blobPad,
+          cull.tx, cull.ty, cull.scale, cull.viewW, cull.viewH)) continue
+    }
+
+    const nucleusR = blob.radius * 0.68
+    const breathe = Math.sin(time * 0.7 + blob.nucleusBreathePhase) * 2.5
+
+    // Multi-harmonic organic shape
+    ctx.beginPath()
+    for (let i = 0; i <= NUCLEUS_STEPS; i++) {
+      const angle = (i / NUCLEUS_STEPS) * Math.PI * 2
+      let r = nucleusR + breathe
+
+      // Sum harmonics (fewer on mobile)
+      const harmonicCount = Math.min(NUCLEUS_HARMONICS, blob.nucleusHarmonics.length)
+      for (let h = 0; h < harmonicCount; h++) {
+        const freq = h + 2  // frequencies 2, 3, 4, 5, 6
+        const amp = blob.nucleusHarmonics[h]!
+        const phase = blob.nucleusPhases[h]! + time * blob.nucleusRotSpeed * (h % 2 === 0 ? -1 : 0.7)
+        r += amp * Math.sin(freq * angle + phase)
+      }
+
+      // Clamp so it doesn't exceed membrane
+      r = Math.max(nucleusR * 0.6, Math.min(nucleusR * 1.25, r))
+
+      const px = blob.x + Math.cos(angle) * r
+      const py = blob.y + Math.sin(angle) * r
+      if (i === 0) ctx.moveTo(px, py)
+      else ctx.lineTo(px, py)
+    }
+    ctx.closePath()
+
+    // Slightly brighter than the membrane blob
+    ctx.globalAlpha = nucleusAlpha
+    ctx.fillStyle = blob.color
+    ctx.fill()
+    ctx.globalAlpha = 1
+  }
+}
+
 // ── Main component ────────────────────────────────────────────
 
 export function GooCanvas({ width, height, bubbles, links, transform }: GooCanvasProps) {
@@ -143,6 +349,9 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   const transformRef = useRef(transform)
   const { phaseColor, palette } = useTheme()
   const paletteRef = useRef(palette)
+
+  // Ref for the dedicated cache SVG filter's blur element
+  const cacheBlurRef = useRef<SVGFEGaussianBlurElement>(null)
 
   // Keep refs in sync without restarting animation loop
   useEffect(() => { transformRef.current = transform }, [transform])
@@ -252,12 +461,71 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     canvas.style.width = `${width}px`
     canvas.style.height = `${height}px`
 
-    const SAMPLES_PER_100PX = Q.gooSamplesPerPx
-    const MIN_SEGMENTS = Q.gooMinSegments
-    const BLOB_STEPS = Q.gooBlobSteps
-    const NUCLEUS_STEPS = Q.gooNucleusSteps
-    const NUCLEUS_HARMONICS = Q.gooNucleusHarmonics
+    // ── Detect ctx.filter support for offscreen caching ──
+    let useCache = false
+    try {
+      ctx.filter = 'url(#goo-cache)'
+      useCache = ctx.filter !== 'none' && ctx.filter !== ''
+      ctx.filter = 'none'
+    } catch { useCache = false }
 
+    // Set CSS filter: only needed for fallback (no ctx.filter support)
+    if (useCache) {
+      canvas.style.filter = 'none'
+    } else {
+      canvas.style.filter = IS_MOBILE ? 'url(#goo-filter-mobile)' : 'url(#goo-filter)'
+    }
+
+    // ── Compute world-space bounding box for offscreen cache ──
+    const PAD = 60 // padding for blur bleed + wobble amplitude
+    let wMinX = Infinity, wMaxX = -Infinity, wMinY = Infinity, wMaxY = -Infinity
+    for (const b of blobsRef.current) {
+      wMinX = Math.min(wMinX, b.x - b.radius - PAD)
+      wMaxX = Math.max(wMaxX, b.x + b.radius + PAD)
+      wMinY = Math.min(wMinY, b.y - b.radius - PAD)
+      wMaxY = Math.max(wMaxY, b.y + b.radius + PAD)
+    }
+    for (const c of connectionsRef.current) {
+      wMinX = Math.min(wMinX, c.minX - 20)
+      wMaxX = Math.max(wMaxX, c.maxX + 20)
+      wMinY = Math.min(wMinY, c.minY - 20)
+      wMaxY = Math.max(wMaxY, c.maxY + 20)
+    }
+    const worldW = wMaxX - wMinX
+    const worldH = wMaxY - wMinY
+
+    // ── Offscreen canvas setup (cached path only) ──
+    const CACHE_QUALITY = Q.gooCacheQuality
+    const CACHE_INTERVAL = Q.gooCacheInterval
+    let shapeCanvas: HTMLCanvasElement | null = null
+    let shapeCtx: CanvasRenderingContext2D | null = null
+    let filteredCanvas: HTMLCanvasElement | null = null
+    let filteredCtx: CanvasRenderingContext2D | null = null
+    let cacheW = 0, cacheH = 0
+    let cacheScale = transformRef.current.scale
+
+    function initCache(_scale: number) {
+      cacheScale = _scale
+      cacheW = Math.max(1, Math.ceil(worldW * CACHE_QUALITY))
+      cacheH = Math.max(1, Math.ceil(worldH * CACHE_QUALITY))
+      if (!shapeCanvas) {
+        shapeCanvas = document.createElement('canvas')
+        filteredCanvas = document.createElement('canvas')
+      }
+      shapeCanvas.width = cacheW
+      shapeCanvas.height = cacheH
+      filteredCanvas!.width = cacheW
+      filteredCanvas!.height = cacheH
+      shapeCtx = shapeCanvas.getContext('2d')
+      filteredCtx = filteredCanvas!.getContext('2d')
+    }
+
+    if (useCache && worldW > 0 && worldH > 0) {
+      initCache(transformRef.current.scale)
+    }
+
+    let frameCount = 0
+    let needsCacheUpdate = true
     let time = 0
     let lastFrameTime = 0
     const TARGET_DT = Q.gooTargetDt
@@ -288,202 +556,66 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       time += prevFrame > 0 ? Math.min((timestamp - prevFrame) / 1000, 0.1) : 0.016
 
       const pal = paletteRef.current
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.save()
-      ctx.scale(dpr, dpr)
-      ctx.translate(tf.x, tf.y)
-      ctx.scale(tf.scale, tf.scale)
-
       const connections = connectionsRef.current
       const blobs = blobsRef.current
 
-      // ── Draw connections as thick tapered filled paths ──
+      if (useCache && shapeCtx && filteredCtx && shapeCanvas && filteredCanvas) {
+        // ── Cached rendering path ──
+        frameCount++
 
-      for (const conn of connections) {
-        // Viewport culling
-        if (!isInViewport(conn.minX, conn.minY, conn.maxX, conn.maxY,
-            tf.x, tf.y, tf.scale, width, height)) continue
-
-        const segments = Math.max(MIN_SEGMENTS, Math.floor(conn.dist / 100 * SAMPLES_PER_100PX))
-
-        // Sample points along the connection
-        const points: { x: number; y: number; width: number }[] = []
-        for (let i = 0; i <= segments; i++) {
-          const t = i / segments
-          points.push(sampleConnection(conn, t, time))
+        // Check if zoom changed significantly (>20%) — re-render cache at new resolution
+        const zoomDelta = Math.abs(tf.scale - cacheScale) / Math.max(cacheScale, 0.01)
+        if (zoomDelta > 0.2) {
+          initCache(tf.scale)
+          needsCacheUpdate = true
         }
 
-        // Compute upper and lower outlines
-        const upper: { x: number; y: number }[] = []
-        const lower: { x: number; y: number }[] = []
+        // Update cache on wobble ticks (every N frames)
+        if (needsCacheUpdate || frameCount % CACHE_INTERVAL === 0) {
+          needsCacheUpdate = false
 
-        for (let i = 0; i < points.length; i++) {
-          const p = points[i]!
-          // Compute local normal direction
-          let lnx: number, lny: number
-          if (i === 0) {
-            const next = points[1]!
-            const tdx = next.x - p.x, tdy = next.y - p.y
-            const tlen = Math.sqrt(tdx * tdx + tdy * tdy) || 1
-            lnx = -tdy / tlen; lny = tdx / tlen
-          } else if (i === points.length - 1) {
-            const prev = points[i - 1]!
-            const tdx = p.x - prev.x, tdy = p.y - prev.y
-            const tlen = Math.sqrt(tdx * tdx + tdy * tdy) || 1
-            lnx = -tdy / tlen; lny = tdx / tlen
-          } else {
-            const prev = points[i - 1]!, next = points[i + 1]!
-            const tdx = next.x - prev.x, tdy = next.y - prev.y
-            const tlen = Math.sqrt(tdx * tdx + tdy * tdy) || 1
-            lnx = -tdy / tlen; lny = tdx / tlen
-          }
-          // Edge wobble — independent sine-wave displacement per edge for organic ripple
-          // Skipped on mobile (Q.gooEdgeWobble === false) — saves 4 sin() per segment per connection
-          let wU: number, wL: number
-          if (Q.gooEdgeWobble) {
-            const edgeT = i / segments
-            const wDamp = Math.sin(edgeT * Math.PI)
-            const wobbleUpper = (
-              Math.sin(time * 3.2 + edgeT * 6 + conn.phaseOffset) * 2.5
-              + Math.sin(time * 2.1 + edgeT * 3.5 + conn.phaseOffset * 1.7) * 1.5
-            ) * wDamp
-            const wobbleLower = (
-              Math.sin(time * 2.8 + edgeT * 5.5 + conn.phaseOffset + 2.1) * 2.5
-              + Math.sin(time * 2.3 + edgeT * 3 + conn.phaseOffset * 1.3 + 1.0) * 1.5
-            ) * wDamp
-            wU = p.width + wobbleUpper
-            wL = p.width + wobbleLower
-          } else {
-            wU = p.width
-            wL = p.width
-          }
-          upper.push({ x: p.x + lnx * wU, y: p.y + lny * wU })
-          lower.push({ x: p.x - lnx * wL, y: p.y - lny * wL })
-        }
-
-        // Draw filled shape with smooth curves
-        ctx.beginPath()
-
-        // Upper edge: forward
-        ctx.moveTo(upper[0]!.x, upper[0]!.y)
-        for (let i = 1; i < upper.length; i++) {
-          const prev = upper[i - 1]!
-          const curr = upper[i]!
-          const cpx = (prev.x + curr.x) / 2
-          const cpy = (prev.y + curr.y) / 2
-          ctx.quadraticCurveTo(prev.x, prev.y, cpx, cpy)
-        }
-        ctx.lineTo(upper[upper.length - 1]!.x, upper[upper.length - 1]!.y)
-
-        // Lower edge: reverse
-        for (let i = lower.length - 2; i >= 0; i--) {
-          const next = lower[i + 1]!
-          const curr = lower[i]!
-          const cpx = (next.x + curr.x) / 2
-          const cpy = (next.y + curr.y) / 2
-          ctx.quadraticCurveTo(next.x, next.y, cpx, cpy)
-        }
-        ctx.lineTo(lower[0]!.x, lower[0]!.y)
-
-        ctx.closePath()
-
-        // Smooth gradient — edge-aligned so pure colors extend through cell radii
-        // and the visible transition only occurs in the gap between cell edges
-        const grad = ctx.createLinearGradient(conn.sx, conn.sy, conn.tx, conn.ty)
-        const s = conn.sourceEdgeFrac
-        const e = conn.targetEdgeFrac
-        const range = e - s
-        grad.addColorStop(0, conn.sourceColor)
-        grad.addColorStop(s, conn.sourceColor)
-        grad.addColorStop(s + range * 0.25, conn.blendedColors[0]!)
-        grad.addColorStop(s + range * 0.5, conn.blendedColors[1]!)
-        grad.addColorStop(s + range * 0.75, conn.blendedColors[2]!)
-        grad.addColorStop(e, conn.targetColor)
-        grad.addColorStop(1, conn.targetColor)
-        ctx.fillStyle = grad
-        ctx.fill()
-
-      }
-
-      // ── Draw milestone blobs with organic deformation ──
-
-      for (const blob of blobs) {
-        // Viewport culling
-        const blobPad = blob.radius + 10
-        if (!isInViewport(blob.x - blobPad, blob.y - blobPad,
-            blob.x + blobPad, blob.y + blobPad,
-            tf.x, tf.y, tf.scale, width, height)) continue
-
-        // Breathing radius
-        const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 3.6
-        const baseR = blob.radius + breathe
-
-        // Organic blob shape: draw with sinusoidal radius variation
-        const deformA = Math.sin(time * 0.3 + blob.wobblePhase) * 3.6
-        const deformB = Math.cos(time * 0.25 + blob.wobblePhase * 1.3) * 2.4
-        const rotPhase = time * -0.15 + blob.phaseIndex * 0.5
-
-        ctx.beginPath()
-        for (let i = 0; i <= BLOB_STEPS; i++) {
-          const angle = (i / BLOB_STEPS) * Math.PI * 2
-          const r = baseR
-            + deformA * Math.sin(blob.deformFreq * angle + rotPhase)
-            + deformB * Math.cos((blob.deformFreq + 1) * angle - rotPhase * 0.7)
-          const px = blob.x + Math.cos(angle) * r
-          const py = blob.y + Math.sin(angle) * r
-          if (i === 0) ctx.moveTo(px, py)
-          else ctx.lineTo(px, py)
-        }
-        ctx.closePath()
-        ctx.fillStyle = blob.color
-        ctx.fill()
-      }
-
-      // ── Draw nucleus shapes ──
-      for (const blob of blobs) {
-        // Viewport culling (same bounds as blob)
-        const blobPad = blob.radius + 10
-        if (!isInViewport(blob.x - blobPad, blob.y - blobPad,
-            blob.x + blobPad, blob.y + blobPad,
-            tf.x, tf.y, tf.scale, width, height)) continue
-
-        const nucleusR = blob.radius * 0.68
-        const breathe = Math.sin(time * 0.7 + blob.nucleusBreathePhase) * 2.5
-
-        // Multi-harmonic organic shape
-        ctx.beginPath()
-        for (let i = 0; i <= NUCLEUS_STEPS; i++) {
-          const angle = (i / NUCLEUS_STEPS) * Math.PI * 2
-          let r = nucleusR + breathe
-
-          // Sum harmonics (fewer on mobile)
-          const harmonicCount = Math.min(NUCLEUS_HARMONICS, blob.nucleusHarmonics.length)
-          for (let h = 0; h < harmonicCount; h++) {
-            const freq = h + 2  // frequencies 2, 3, 4, 5, 6
-            const amp = blob.nucleusHarmonics[h]!
-            const phase = blob.nucleusPhases[h]! + time * blob.nucleusRotSpeed * (h % 2 === 0 ? -1 : 0.7)
-            r += amp * Math.sin(freq * angle + phase)
+          // Update goo-cache filter stdDeviation for offscreen resolution
+          if (cacheBlurRef.current) {
+            const stdDev = Q.baseBlurStdDev * CACHE_QUALITY
+            cacheBlurRef.current.setAttribute('stdDeviation', String(stdDev))
           }
 
-          // Clamp so it doesn't exceed membrane
-          r = Math.max(nucleusR * 0.6, Math.min(nucleusR * 1.25, r))
+          // 1. Draw raw shapes to shape canvas — CLEAR FIRST
+          shapeCtx.clearRect(0, 0, cacheW, cacheH)
+          shapeCtx.save()
+          shapeCtx.scale(CACHE_QUALITY, CACHE_QUALITY)
+          shapeCtx.translate(-wMinX, -wMinY)
+          renderShapes(shapeCtx, connections, blobs, time, pal.nucleus, null)
+          shapeCtx.restore()
 
-          const px = blob.x + Math.cos(angle) * r
-          const py = blob.y + Math.sin(angle) * r
-          if (i === 0) ctx.moveTo(px, py)
-          else ctx.lineTo(px, py)
+          // 2. Apply goo filter to cache — CLEAR FIRST
+          filteredCtx.clearRect(0, 0, cacheW, cacheH)
+          filteredCtx.filter = 'url(#goo-cache)'
+          filteredCtx.drawImage(shapeCanvas, 0, 0)
+          filteredCtx.filter = 'none'
         }
-        ctx.closePath()
 
-        // Slightly brighter than the membrane blob
-        ctx.globalAlpha = pal.nucleus
-        ctx.fillStyle = blob.color
-        ctx.fill()
-        ctx.globalAlpha = 1
+        // 3. Composite cached result to main canvas — CLEAR FIRST
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.save()
+        ctx.scale(dpr, dpr)
+        ctx.translate(tf.x, tf.y)
+        ctx.scale(tf.scale, tf.scale)
+        // Draw filtered cache at world position, scaling from cache coords to world coords
+        ctx.drawImage(filteredCanvas, 0, 0, cacheW, cacheH, wMinX, wMinY, worldW, worldH)
+        ctx.restore()
+      } else {
+        // ── Fallback: direct draw with CSS filter on canvas element ──
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.save()
+        ctx.scale(dpr, dpr)
+        ctx.translate(tf.x, tf.y)
+        ctx.scale(tf.scale, tf.scale)
+        renderShapes(ctx, connections, blobs, time, pal.nucleus,
+          { tx: tf.x, ty: tf.y, scale: tf.scale, viewW: width, viewH: height })
+        ctx.restore()
       }
 
-      ctx.restore()
       animFrameRef.current = requestAnimationFrame(draw)
     }
 
@@ -492,17 +624,45 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   }, [width, height, bubbles, palette])
   // NOTE: transform removed from deps — read from ref instead
 
+  // Color matrix values differ between mobile and desktop
+  const cmValues = IS_MOBILE
+    ? '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7'
+    : '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8'
+
   return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0"
-      style={{
-        zIndex: 1,
-        pointerEvents: 'none',
-        // Mobile uses lighter goo filter (stdDeviation=7 vs 12, ~4x cheaper)
-        filter: IS_MOBILE ? 'url(#goo-filter-mobile)' : 'url(#goo-filter)',
-        opacity: palette.goo,
-      }}
-    />
+    <>
+      {/* Hidden SVG with dedicated goo filter for offscreen cache rendering.
+          Separate from BubbleMap's filters so we can control stdDeviation independently. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }}>
+        <defs>
+          <filter id="goo-cache" colorInterpolationFilters="sRGB">
+            <feGaussianBlur
+              ref={cacheBlurRef}
+              in="SourceGraphic"
+              stdDeviation={IS_MOBILE ? '7' : '12'}
+              result="blur"
+            />
+            <feColorMatrix
+              in="blur"
+              type="matrix"
+              values={cmValues}
+              result="goo"
+            />
+            <feBlend in="SourceGraphic" in2="goo" />
+          </filter>
+        </defs>
+      </svg>
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0"
+        style={{
+          zIndex: 1,
+          pointerEvents: 'none',
+          // CSS filter is set dynamically in the animation loop:
+          // 'none' when using offscreen cache, 'url(#goo-filter[-mobile])' for fallback
+          opacity: palette.goo,
+        }}
+      />
+    </>
   )
 }
