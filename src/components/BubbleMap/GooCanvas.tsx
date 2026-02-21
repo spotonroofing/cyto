@@ -385,6 +385,13 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   const { phaseColor, palette } = useTheme()
   const paletteRef = useRef(palette)
 
+  // DEBUG: Register rendering path A
+  useEffect(() => {
+    const w = window as unknown as Record<string, unknown>
+    if (!w.__cytoDebugPaths) w.__cytoDebugPaths = {}
+    ;(w.__cytoDebugPaths as Record<string, string>).A = 'GooCanvas offscreen cache + #goo-cache SVG filter'
+  }, [])
+
   // Ref for the dedicated cache SVG filter's blur element
   const cacheBlurRef = useRef<SVGFEGaussianBlurElement>(null)
 
@@ -692,6 +699,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           pointerEvents: 'none',
           // Goo filter applied via offscreen cache, not CSS
           opacity: palette.goo,
+          // DEBUG: Path A — GooCanvas offscreen cache + #goo-cache SVG filter pipeline
+          border: '3px solid red',
         }}
       />
     </>

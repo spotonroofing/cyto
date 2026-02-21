@@ -6,6 +6,69 @@ import { BackgroundParticles } from './BackgroundParticles'
 import { DotGrid } from './DotGrid'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
+import { IS_MOBILE } from '@/utils/performanceTier'
+
+// DEBUG: Rendering path debug overlay
+function RenderPathDebugOverlay() {
+  const [paths, setPaths] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    // Poll for registered paths (components register on mount)
+    const id = setInterval(() => {
+      const w = window as unknown as Record<string, unknown>
+      const p = w.__cytoDebugPaths as Record<string, string> | undefined
+      if (p) setPaths({ ...p })
+    }, 500)
+    return () => clearInterval(id)
+  }, [])
+
+  const colorMap: Record<string, string> = {
+    A: 'red', B: 'lime', C: 'blue', D: 'yellow',
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 8,
+      left: 8,
+      zIndex: 99999,
+      background: 'rgba(0,0,0,0.85)',
+      color: '#fff',
+      padding: '8px 12px',
+      borderRadius: 6,
+      fontSize: 11,
+      fontFamily: 'monospace',
+      lineHeight: 1.6,
+      pointerEvents: 'none',
+      maxWidth: 340,
+    }}>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>
+        Render Paths ({IS_MOBILE ? 'MOBILE' : 'DESKTOP'})
+      </div>
+      {Object.entries(paths).sort().map(([key, desc]) => (
+        <div key={key}>
+          <span style={{
+            display: 'inline-block',
+            width: 10,
+            height: 10,
+            background: colorMap[key] || '#888',
+            border: '1px solid #fff',
+            marginRight: 6,
+            verticalAlign: 'middle',
+          }} />
+          <strong>{key}</strong>: {desc}
+        </div>
+      ))}
+      {Object.keys(paths).length === 0 && (
+        <div style={{ opacity: 0.5 }}>Waiting for paths to register...</div>
+      )}
+      <div style={{ marginTop: 6, opacity: 0.6, fontSize: 10 }}>
+        DPR: {typeof window !== 'undefined' ? window.devicePixelRatio : '?'} |
+        Canvas filter API: {typeof document !== 'undefined' && document.createElement('canvas').getContext('2d')?.filter !== undefined ? 'YES' : 'NO'}
+      </div>
+    </div>
+  )
+}
 
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
@@ -692,6 +755,9 @@ export function BubbleMap() {
       className="w-full h-dvh overflow-hidden relative"
       style={{ touchAction: 'none' }}
     >
+        {/* DEBUG: Rendering path debug overlay */}
+        <RenderPathDebugOverlay />
+
         <BackgroundParticles transform={transform} mapBounds={mapBounds} />
         <DotGrid width={dimensions.width} height={dimensions.height} transform={transform} />
 
@@ -725,7 +791,12 @@ export function BubbleMap() {
           width={dimensions.width}
           height={dimensions.height}
           className="absolute inset-0"
-          style={{ zIndex: 2, pointerEvents: 'none' }}
+          style={{
+            zIndex: 2,
+            pointerEvents: 'none',
+            // DEBUG: Path B — SVG nuclei with #nucleus-goo filter
+            border: '3px solid lime',
+          }}
         >
           <g
             transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}
