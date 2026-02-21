@@ -6,6 +6,7 @@ import { BackgroundParticles } from './BackgroundParticles'
 import { DotGrid } from './DotGrid'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useTuningStore } from '@/stores/tuningStore'
 
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
@@ -112,6 +113,7 @@ export function BubbleMap() {
   }, [])
 
   const { bubbles, links, settled, rowBands } = useBubbleLayout(dimensions.width, dimensions.height)
+  const particleSpreadX = useTuningStore((s) => s.particleSpreadX)
 
   // World center X for horizontal centering
   const worldCenterX = useMemo(() => {
@@ -120,7 +122,7 @@ export function BubbleMap() {
     return (Math.min(...xs) + Math.max(...xs)) / 2
   }, [bubbles, dimensions.width])
 
-  // Map bounds for particles
+  // Map bounds for particles (particleSpreadX widens the horizontal range)
   const mapBounds = useMemo(() => {
     if (bubbles.length === 0) return null
     let minX = Infinity,
@@ -133,10 +135,18 @@ export function BubbleMap() {
       if (b.y - b.radius < minY) minY = b.y - b.radius
       if (b.y + b.radius > maxY) maxY = b.y + b.radius
     }
-    const padX = (maxX - minX) * 0.12
+    const rawW = maxX - minX
+    const midX = (minX + maxX) / 2
+    const spreadW = rawW * particleSpreadX
+    const padX = spreadW * 0.12
     const padY = (maxY - minY) * 0.12
-    return { minX: minX - padX, maxX: maxX + padX, minY: minY - padY, maxY: maxY + padY }
-  }, [bubbles])
+    return {
+      minX: midX - spreadW / 2 - padX,
+      maxX: midX + spreadW / 2 + padX,
+      minY: minY - padY,
+      maxY: maxY + padY,
+    }
+  }, [bubbles, particleSpreadX])
 
   // Sync refs
   useEffect(() => {

@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { useTheme } from '@/themes'
 import { Q, IS_MOBILE, mobileIdle } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
+import { useTuningStore } from '@/stores/tuningStore'
 import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
 
 interface GooCanvasProps {
@@ -65,6 +66,8 @@ function sampleConnection(
   t: number, // 0..1 along path
   time: number,
   wobbleI = 1,
+  tubeWidthRatio = 0.24,
+  filletRatio = 1.4,
 ): { x: number; y: number; width: number } {
   // Gentle organic curve bow
   const curveBow = Math.sin(t * Math.PI) * conn.dist * 0.008
@@ -79,7 +82,7 @@ function sampleConnection(
   const smallerR = Math.min(conn.sr, conn.tr)
 
   // Tube half-width in mid-section
-  const tubeWidth = smallerR * 0.24
+  const tubeWidth = smallerR * tubeWidthRatio
 
   // Cell edge positions in t-space
   const tSE = conn.sr / conn.dist  // source cell edge
@@ -87,7 +90,7 @@ function sampleConnection(
 
   // Fillet: wider than tube at cell edge for smooth goo merge.
   // Zero at cell centers to prevent asymmetric goo offset.
-  const filletWidth = tubeWidth * 1.4
+  const filletWidth = tubeWidth * filletRatio
 
   // Fan-out scaling for branching nodes
   const nearFan = t < 0.5 ? (conn.sourceFanOut || 1) : (conn.targetFanOut || 1)
@@ -170,6 +173,9 @@ function renderShapes(
   wobbleI = 1,
   nucleusAnimate = true,
   useGradients = true,
+  tubeWidthRatio = 0.24,
+  filletRatio = 1.4,
+  nucleusRatio = 0.782,
 ) {
   const SAMPLES_PER_100PX = Q.gooSamplesPerPx
   const MIN_SEGMENTS = Q.gooMinSegments
@@ -190,7 +196,7 @@ function renderShapes(
     const points: { x: number; y: number; width: number }[] = []
     for (let i = 0; i <= segments; i++) {
       const t = i / segments
-      points.push(sampleConnection(conn, t, time, wobbleI))
+      points.push(sampleConnection(conn, t, time, wobbleI, tubeWidthRatio, filletRatio))
     }
 
     // Compute upper and lower outlines
@@ -331,7 +337,7 @@ function renderShapes(
           cull.tx, cull.ty, cull.scale, cull.viewW, cull.viewH)) continue
     }
 
-    const nucleusR = blob.radius * 0.782
+    const nucleusR = blob.radius * nucleusRatio
 
     ctx.beginPath()
     if (nucleusAnimate) {
@@ -566,9 +572,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         lastFilterStr = filterStr
       }
 
-      // Sync SVG filter blur radius with debug slider (cached)
+      // Sync SVG filter blur radius with tuning + debug slider (cached)
+      const tuning = useTuningStore.getState()
       if (gooBlurRef.current) {
-        const stdDev = Q.baseBlurStdDev * dbg.filterBlurRadius
+        const stdDev = tuning.blurStdDev * dbg.filterBlurRadius
         const stdDevStr = String(stdDev)
         if (stdDevStr !== lastStdDevStr) {
           gooBlurRef.current.setAttribute('stdDeviation', stdDevStr)
@@ -588,7 +595,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         viewW: width, viewH: height,
       }
       renderShapes(ctx, connections, blobs, time, pal.nucleus, cull,
-        wobbleI, dbg.nucleusWobble, dbg.connectionGradients)
+        wobbleI, dbg.nucleusWobble, dbg.connectionGradients,
+        tuning.tubeWidthRatio, tuning.filletWidthRatio, tuning.nucleusRatioCanvas)
 
       ctx.restore()
 

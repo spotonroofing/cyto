@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useTheme } from '@/themes'
 import { Q, IS_MOBILE, mobileIdle } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
+import { useTuningStore } from '@/stores/tuningStore'
 
 interface Particle {
   x: number
@@ -33,6 +34,7 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
   const mapBoundsRef = useRef(mapBounds)
   const { palette } = useTheme()
   const debugParticleCount = useDebugStore((s) => s.particleCount)
+  const tuningParticleCount = useTuningStore((s) => s.particleCount)
 
   // Inline ref assignment eliminates 1-frame lag between particles and map during panning
   transformRef.current = transform
@@ -52,8 +54,8 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
     resize()
     window.addEventListener('resize', resize)
 
-    // Particle count from quality tier, scaled by debug multiplier
-    const count = Math.round(Q.particleCount * debugParticleCount)
+    // Particle count from tuning store, scaled by debug multiplier
+    const count = Math.round(tuningParticleCount * debugParticleCount)
 
     // particle base is "rgb(r,g,b)" — extract for rgba usage
     const particleBase = palette.particle
@@ -200,7 +202,7 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
       clearTimeout(idlePollTimeout)
       window.removeEventListener('resize', resize)
     }
-  }, [palette, debugParticleCount, mapBounds])
+  }, [palette, debugParticleCount, tuningParticleCount, mapBounds])
 
   return (
     <canvas

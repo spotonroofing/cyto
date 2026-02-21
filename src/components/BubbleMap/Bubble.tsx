@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { milestones, phases } from '@/stores/roadmapStore'
 import { useTheme } from '@/themes'
 import { useDebugStore } from '@/stores/debugStore'
+import { useTuningStore } from '@/stores/tuningStore'
 import { Q, IS_MOBILE, mobileIdle } from '@/utils/performanceTier'
 import {
   Microscope, FileSearch, Pill, HeartPulse,
@@ -36,6 +37,9 @@ interface BubbleProps {
 export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
   const { palette, phaseColor } = useTheme()
   const nucleusRef = useRef<SVGPathElement>(null)
+  const iconSizeRatio = useTuningStore((s) => s.iconSizeRatio)
+  const phaseNameFontSize = useTuningStore((s) => s.phaseNameFontSize)
+  const phaseIndicatorFontSize = useTuningStore((s) => s.phaseIndicatorFontSize)
 
   const milestone = milestones.find((m) => m.id === milestoneId)
   const phase = phases.find((p) => p.id === milestone?.phaseId)
@@ -46,7 +50,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
   useEffect(() => {
     const el = nucleusRef.current
     if (!el) return
-    const nucleusR = radius * 0.655
+    const nucleusR = radius * useTuningStore.getState().nucleusRatioSvg
     const p = hashPhase(milestoneId)
     // On mobile: 4fps (saves 24 SVG filter re-evals/sec across 8 bubbles).
     // On desktop: uncapped (runs at display refresh rate).
@@ -124,7 +128,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       {(() => {
         const Icon = phaseIcons[phaseIndex]
         if (!Icon) return null
-        const size = Math.round(radius * 0.28)
+        const size = Math.round(radius * iconSizeRatio)
         return (
           <g transform={`translate(${-size / 2} ${-size / 2 - 12 - ICON_LABEL_GAP})`}>
             <Icon
@@ -142,7 +146,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       <text
         x={0} y={5}
         textAnchor="middle" dominantBaseline="central"
-        fontSize={11}
+        fontSize={phaseNameFontSize}
         fontFamily="'Space Grotesk', sans-serif"
         fontWeight={600}
         fill={palette.text}
@@ -155,7 +159,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       <text
         x={0} y={18}
         textAnchor="middle" dominantBaseline="central"
-        fontSize={8}
+        fontSize={phaseIndicatorFontSize}
         fontFamily="'JetBrains Mono', monospace"
         fontWeight={400}
         fill={palette.text}
