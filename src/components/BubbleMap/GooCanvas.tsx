@@ -390,12 +390,12 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
             tf.x, tf.y, tf.scale, width, height)) continue
 
         // Breathing radius
-        const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 3
+        const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 3.6
         const baseR = blob.radius + breathe
 
         // Organic blob shape: draw with sinusoidal radius variation
-        const deformA = Math.sin(time * 0.3 + blob.wobblePhase) * 3
-        const deformB = Math.cos(time * 0.25 + blob.wobblePhase * 1.3) * 2
+        const deformA = Math.sin(time * 0.3 + blob.wobblePhase) * 3.6
+        const deformB = Math.cos(time * 0.25 + blob.wobblePhase * 1.3) * 2.4
         const rotPhase = time * -0.15 + blob.phaseIndex * 0.5
 
         ctx.beginPath()
@@ -412,10 +412,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         ctx.closePath()
         ctx.fillStyle = blob.color
         ctx.fill()
-        // Organic border ring — follows membrane contour (visible through goo blend)
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'
-        ctx.lineWidth = 1.5
-        ctx.stroke()
       }
 
       // ── Draw nucleus shapes ──

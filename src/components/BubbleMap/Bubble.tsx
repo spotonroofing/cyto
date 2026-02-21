@@ -36,7 +36,6 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       role="button"
       tabIndex={0}
     >
-      {/* Border ring drawn in GooCanvas — follows organic membrane contour */}
       {/* Nucleus — dense core inside the membrane */}
       <circle cx={0} cy={0} r={radius * 0.57} fill={color} opacity={0.7} />
       {/* Hit target */}
