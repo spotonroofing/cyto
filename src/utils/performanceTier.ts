@@ -17,15 +17,11 @@ export const Q = IS_MOBILE ? {
   gooNucleusSteps: 64,
   gooNucleusHarmonics: 5,
   gooEdgeWobble: true as const,
-  gooTargetDt: 1000 / 45,     // match desktop
-  gooIdleDt: 1000 / 45,       // match desktop — no idle throttle
-  gooCacheInterval: 2,         // match desktop
-  gooCacheQuality: 1.0,
+  gooTargetDt: 1000 / 60,     // 60fps — ensures every frame draws on 60Hz displays
+  gooIdleDt: 1000 / 60,       // match active — consistent wobble when idle
 
-  // SVG goo filter blur — must scale linearly with zoom (no cap) to keep goo
-  // shape consistent across zoom levels. Capping breaks the feColorMatrix threshold.
+  // SVG goo filter blur (applied via CSS, browser handles DPR)
   baseBlurStdDev: 12,
-  maxBlurStdDev: 999,
 
   // Background particles
   particleCount: 15,           // (desktop: 105) — minimal on mobile
@@ -43,17 +39,17 @@ export const Q = IS_MOBILE ? {
   gooNucleusSteps: 64,
   gooNucleusHarmonics: 5,
   gooEdgeWobble: true as const,
-  gooTargetDt: 1000 / 45,
-  gooIdleDt: 1000 / 45,    // same as active — desktop has headroom, no idle throttle
-  gooCacheInterval: 2,      // update offscreen cache every 2 frames (~22fps wobble)
-  gooCacheQuality: 1.0,     // full resolution offscreen
+  gooTargetDt: 1000 / 60,   // 60fps — ensures every frame draws on 60Hz displays
+  gooIdleDt: 1000 / 60,     // match active — consistent wobble when idle
 
+  // SVG goo filter blur (applied via CSS, browser handles DPR)
   baseBlurStdDev: 12,
-  maxBlurStdDev: 999,          // effectively no cap on desktop
 
+  // Background particles
   particleCount: 105,
   particleTargetDt: 1000 / 30,
 
+  // Dot grid
   dotDpr: 2,
   dotSpacing: 35,
 }
