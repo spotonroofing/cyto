@@ -28,8 +28,9 @@ export function FpsCounter() {
       style={{
         color: fps < 20 ? '#ef4444' : fps < 40 ? '#f59e0b' : phaseColor(2),
         fontFamily: "'JetBrains Mono', monospace",
-        fontSize: '10px',
-        opacity: 0.45,
+        fontSize: '28px',
+        fontWeight: 700,
+        opacity: 0.5,
       }}
     >
       {fps} fps
