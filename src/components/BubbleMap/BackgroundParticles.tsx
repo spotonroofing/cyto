@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useTheme } from '@/themes'
 import { Q } from '@/utils/performanceTier'
+import { useDebugStore } from '@/stores/debugStore'
 
 interface Particle {
   x: number
@@ -25,6 +26,7 @@ export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
   const animFrameRef = useRef<number>(0)
   const transformRef = useRef(transform)
   const { palette } = useTheme()
+  const debugParticleCount = useDebugStore((s) => s.particleCount)
 
   // Keep transform ref in sync without re-running the main effect
   useEffect(() => { transformRef.current = transform }, [transform])
@@ -43,8 +45,8 @@ export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
     resize()
     window.addEventListener('resize', resize)
 
-    // Particle count from quality tier — fewer on mobile
-    const count = Q.particleCount
+    // Particle count from quality tier, scaled by debug multiplier
+    const count = Math.round(Q.particleCount * debugParticleCount)
 
     // particle base is "rgb(r,g,b)" — extract for rgba usage
     const particleBase = palette.particle
@@ -100,8 +102,11 @@ export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
     const TARGET_DT = Q.particleTargetDt
 
     const animate = (timestamp: number) => {
-      // Frame rate limiting
-      if (timestamp - lastFrameTime < TARGET_DT * 0.8) {
+      const dbg = useDebugStore.getState()
+
+      // Frame rate limiting — debug fpsCap overrides component default
+      const effectiveDT = dbg.fpsCap > 0 ? 1000 / dbg.fpsCap : TARGET_DT
+      if (timestamp - lastFrameTime < effectiveDT * 0.8) {
         animFrameRef.current = requestAnimationFrame(animate)
         return
       }
@@ -113,9 +118,19 @@ export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
       const tf = transformRef.current
 
       ctx.clearRect(0, 0, w, h)
+
+      // Skip all particle drawing when toggle is OFF
+      if (!dbg.particles) {
+        animFrameRef.current = requestAnimationFrame(animate)
+        return
+      }
+
       ctx.save()
       ctx.translate(tf.x, tf.y)
       ctx.scale(tf.scale, tf.scale)
+
+      // Apply debug opacity multiplier
+      if (dbg.particleOpacity < 1) ctx.globalAlpha = dbg.particleOpacity
 
       // Visible world rect for wrapping (with padding so particles don't pop in at edges)
       const wPad = 100
@@ -152,6 +167,7 @@ export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
         ctx.fill()
       }
 
+      if (dbg.particleOpacity < 1) ctx.globalAlpha = 1
       ctx.restore()
       animFrameRef.current = requestAnimationFrame(animate)
     }
@@ -162,7 +178,7 @@ export function BackgroundParticles({ transform }: BackgroundParticlesProps) {
       cancelAnimationFrame(animFrameRef.current)
       window.removeEventListener('resize', resize)
     }
-  }, [palette])
+  }, [palette, debugParticleCount])
 
   return (
     <canvas

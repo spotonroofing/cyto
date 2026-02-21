@@ -7,6 +7,7 @@ import { useChatStore } from '@/stores/chatStore'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { defaultHealthContext } from '@/data/healthContext'
 import { db } from '@/lib/db'
+import { PerformanceDebug } from './PerformanceDebug'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -26,6 +27,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [editingContext, setEditingContext] = useState(false)
   const [contextDraft, setContextDraft] = useState(healthContext ?? defaultHealthContext)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [showDebug, setShowDebug] = useState(false)
 
   // Export all data as JSON
   const handleExport = async () => {
@@ -321,6 +323,22 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     Cancel
                   </button>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Performance Debug */}
+          <div className="mt-6 pt-6" style={{ borderTop: `1px solid ${palette.border}` }}>
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className="w-full flex items-center justify-between text-xs font-medium opacity-50 hover:opacity-70 transition-opacity"
+            >
+              <span>Performance Debug</span>
+              <span className="text-[10px]">{showDebug ? '\u25B2' : '\u25BC'}</span>
+            </button>
+            {showDebug && (
+              <div className="mt-3">
+                <PerformanceDebug />
               </div>
             )}
           </div>

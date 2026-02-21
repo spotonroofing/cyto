@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useTheme } from '@/themes'
+import { useDebugStore } from '@/stores/debugStore'
 
 interface FloatingButtonProps {
   onClick: () => void
@@ -27,6 +28,7 @@ export function FloatingButton({
   phaseColor,
 }: FloatingButtonProps) {
   const { palette } = useTheme()
+  const navButtonWobble = useDebugStore((s) => s.navButtonWobble)
   const color = phaseColor ?? palette.accent
 
   return (
@@ -48,7 +50,7 @@ export function FloatingButton({
     >
       {/* Membrane layer */}
       <span
-        className="absolute inset-0 rounded-full membrane-breathe"
+        className={`absolute inset-0 rounded-full ${navButtonWobble ? 'membrane-breathe' : ''}`}
         style={{ backgroundColor: color, opacity: 0.3 }}
       />
       {/* Nucleus layer */}

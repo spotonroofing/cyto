@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { useTheme } from '@/themes'
 import { Q } from '@/utils/performanceTier'
+import { useDebugStore } from '@/stores/debugStore'
 
 interface DotGridProps {
   width: number
@@ -45,6 +46,16 @@ export function DotGrid({ width, height, transform }: DotGridProps) {
       rafId = requestAnimationFrame(draw)
 
       const tf = transformRef.current
+
+      // Skip drawing when grid toggle is OFF
+      if (!useDebugStore.getState().grid) {
+        if (lastTf.scale !== -1) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height)
+          lastTf = { x: NaN, y: NaN, scale: -1 }
+        }
+        return
+      }
+
       // Only redraw when transform actually changes
       if (tf.x === lastTf.x && tf.y === lastTf.y && tf.scale === lastTf.scale) return
       lastTf = { x: tf.x, y: tf.y, scale: tf.scale }

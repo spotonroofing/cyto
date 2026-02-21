@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { useTheme } from '@/themes'
 import { IS_MOBILE, Q } from '@/utils/performanceTier'
+import { useDebugStore } from '@/stores/debugStore'
 import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
 
 interface GooCanvasProps {
@@ -63,12 +64,13 @@ function sampleConnection(
   conn: ConnectionData,
   t: number, // 0..1 along path
   time: number,
+  wobbleI = 1,
 ): { x: number; y: number; width: number } {
   // Gentle organic curve bow
   const curveBow = Math.sin(t * Math.PI) * conn.dist * 0.008
   // Flow wave, damped at endpoints for clean junction merge
   const dampEnds = Math.sin(t * Math.PI)  // 0 at edges, 1 at center
-  const flowWave = Math.sin(time * conn.flowSpeed + t * 4 + conn.phaseOffset) * 4 * dampEnds
+  const flowWave = Math.sin(time * conn.flowSpeed + t * 4 + conn.phaseOffset) * 4 * dampEnds * wobbleI
 
   const x = conn.sx + conn.dx * t + conn.nx * (curveBow + flowWave)
   const y = conn.sy + conn.dy * t + conn.ny * (curveBow + flowWave)
@@ -144,6 +146,9 @@ function renderShapes(
   time: number,
   nucleusAlpha: number,
   cull: { tx: number; ty: number; scale: number; viewW: number; viewH: number } | null,
+  wobbleI = 1,
+  nucleusAnimate = true,
+  useGradients = true,
 ) {
   const SAMPLES_PER_100PX = Q.gooSamplesPerPx
   const MIN_SEGMENTS = Q.gooMinSegments
@@ -164,7 +169,7 @@ function renderShapes(
     const points: { x: number; y: number; width: number }[] = []
     for (let i = 0; i <= segments; i++) {
       const t = i / segments
-      points.push(sampleConnection(conn, t, time))
+      points.push(sampleConnection(conn, t, time, wobbleI))
     }
 
     // Compute upper and lower outlines
@@ -205,8 +210,8 @@ function renderShapes(
           Math.sin(time * 2.8 + edgeT * 5.5 + conn.phaseOffset + 2.1) * 2.5
           + Math.sin(time * 2.3 + edgeT * 3 + conn.phaseOffset * 1.3 + 1.0) * 1.5
         ) * wDamp
-        wU = p.width + wobbleUpper
-        wL = p.width + wobbleLower
+        wU = p.width + wobbleUpper * wobbleI
+        wL = p.width + wobbleLower * wobbleI
       } else {
         wU = p.width
         wL = p.width
@@ -243,18 +248,22 @@ function renderShapes(
 
     // Smooth gradient — edge-aligned so pure colors extend through cell radii
     // and the visible transition only occurs in the gap between cell edges
-    const grad = ctx.createLinearGradient(conn.sx, conn.sy, conn.tx, conn.ty)
-    const s = conn.sourceEdgeFrac
-    const e = conn.targetEdgeFrac
-    const range = e - s
-    grad.addColorStop(0, conn.sourceColor)
-    grad.addColorStop(s, conn.sourceColor)
-    grad.addColorStop(s + range * 0.25, conn.blendedColors[0]!)
-    grad.addColorStop(s + range * 0.5, conn.blendedColors[1]!)
-    grad.addColorStop(s + range * 0.75, conn.blendedColors[2]!)
-    grad.addColorStop(e, conn.targetColor)
-    grad.addColorStop(1, conn.targetColor)
-    ctx.fillStyle = grad
+    if (useGradients) {
+      const grad = ctx.createLinearGradient(conn.sx, conn.sy, conn.tx, conn.ty)
+      const s = conn.sourceEdgeFrac
+      const e = conn.targetEdgeFrac
+      const range = e - s
+      grad.addColorStop(0, conn.sourceColor)
+      grad.addColorStop(s, conn.sourceColor)
+      grad.addColorStop(s + range * 0.25, conn.blendedColors[0]!)
+      grad.addColorStop(s + range * 0.5, conn.blendedColors[1]!)
+      grad.addColorStop(s + range * 0.75, conn.blendedColors[2]!)
+      grad.addColorStop(e, conn.targetColor)
+      grad.addColorStop(1, conn.targetColor)
+      ctx.fillStyle = grad
+    } else {
+      ctx.fillStyle = conn.blendedColors[1]!
+    }
     ctx.fill()
   }
 
@@ -269,12 +278,12 @@ function renderShapes(
     }
 
     // Breathing radius
-    const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 3.6
+    const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 3.6 * wobbleI
     const baseR = blob.radius + breathe
 
     // Organic blob shape: draw with sinusoidal radius variation
-    const deformA = Math.sin(time * 0.3 + blob.wobblePhase) * 3.6
-    const deformB = Math.cos(time * 0.25 + blob.wobblePhase * 1.3) * 2.4
+    const deformA = Math.sin(time * 0.3 + blob.wobblePhase) * 3.6 * wobbleI
+    const deformB = Math.cos(time * 0.25 + blob.wobblePhase * 1.3) * 2.4 * wobbleI
     const rotPhase = time * -0.15 + blob.phaseIndex * 0.5
 
     ctx.beginPath()
@@ -303,30 +312,36 @@ function renderShapes(
     }
 
     const nucleusR = blob.radius * 0.68
-    const breathe = Math.sin(time * 0.7 + blob.nucleusBreathePhase) * 2.5
 
-    // Multi-harmonic organic shape
     ctx.beginPath()
-    for (let i = 0; i <= NUCLEUS_STEPS; i++) {
-      const angle = (i / NUCLEUS_STEPS) * Math.PI * 2
-      let r = nucleusR + breathe
+    if (nucleusAnimate) {
+      const breathe = Math.sin(time * 0.7 + blob.nucleusBreathePhase) * 2.5
 
-      // Sum harmonics (fewer on mobile)
-      const harmonicCount = Math.min(NUCLEUS_HARMONICS, blob.nucleusHarmonics.length)
-      for (let h = 0; h < harmonicCount; h++) {
-        const freq = h + 2  // frequencies 2, 3, 4, 5, 6
-        const amp = blob.nucleusHarmonics[h]!
-        const phase = blob.nucleusPhases[h]! + time * blob.nucleusRotSpeed * (h % 2 === 0 ? -1 : 0.7)
-        r += amp * Math.sin(freq * angle + phase)
+      // Multi-harmonic organic shape
+      for (let i = 0; i <= NUCLEUS_STEPS; i++) {
+        const angle = (i / NUCLEUS_STEPS) * Math.PI * 2
+        let r = nucleusR + breathe
+
+        // Sum harmonics (fewer on mobile)
+        const harmonicCount = Math.min(NUCLEUS_HARMONICS, blob.nucleusHarmonics.length)
+        for (let h = 0; h < harmonicCount; h++) {
+          const freq = h + 2  // frequencies 2, 3, 4, 5, 6
+          const amp = blob.nucleusHarmonics[h]!
+          const phase = blob.nucleusPhases[h]! + time * blob.nucleusRotSpeed * (h % 2 === 0 ? -1 : 0.7)
+          r += amp * Math.sin(freq * angle + phase)
+        }
+
+        // Clamp so it doesn't exceed membrane
+        r = Math.max(nucleusR * 0.6, Math.min(nucleusR * 1.25, r))
+
+        const px = blob.x + Math.cos(angle) * r
+        const py = blob.y + Math.sin(angle) * r
+        if (i === 0) ctx.moveTo(px, py)
+        else ctx.lineTo(px, py)
       }
-
-      // Clamp so it doesn't exceed membrane
-      r = Math.max(nucleusR * 0.6, Math.min(nucleusR * 1.25, r))
-
-      const px = blob.x + Math.cos(angle) * r
-      const py = blob.y + Math.sin(angle) * r
-      if (i === 0) ctx.moveTo(px, py)
-      else ctx.lineTo(px, py)
+    } else {
+      // Static circle when nucleus wobble is disabled
+      ctx.arc(blob.x, blob.y, nucleusR, 0, Math.PI * 2)
     }
     ctx.closePath()
 
@@ -533,8 +548,12 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     const IDLE_THRESHOLD = 2000 // ms of no transform change before entering idle
     let lastKnownTf = { x: 0, y: 0, scale: 0 }
     let lastTransformChangeTime = performance.now()
+    let lastGooFilter = true
+    let lastFallbackFilter = ''
 
     const draw = (timestamp: number) => {
+      const dbg = useDebugStore.getState()
+
       // Track transform changes for idle detection
       const tf = transformRef.current
       if (tf.x !== lastKnownTf.x || tf.y !== lastKnownTf.y || tf.scale !== lastKnownTf.scale) {
@@ -543,7 +562,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       }
 
       const isIdle = (timestamp - lastTransformChangeTime) > IDLE_THRESHOLD
-      const effectiveDT = isIdle ? IDLE_DT : TARGET_DT
+      // FPS cap override: when set, overrides component default
+      const effectiveDT = dbg.fpsCap > 0
+        ? 1000 / dbg.fpsCap
+        : (isIdle ? IDLE_DT : TARGET_DT)
 
       // Frame rate limiting (adaptive: slower when idle)
       if (timestamp - lastFrameTime < effectiveDT * 0.8) {
@@ -558,6 +580,13 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       const pal = paletteRef.current
       const connections = connectionsRef.current
       const blobs = blobsRef.current
+      const wobbleI = dbg.gooWobble ? dbg.gooWobbleIntensity : 0
+
+      // Force cache update when gooFilter toggle changes
+      if (dbg.gooFilter !== lastGooFilter) {
+        needsCacheUpdate = true
+        lastGooFilter = dbg.gooFilter
+      }
 
       if (useCache && shapeCtx && filteredCtx && shapeCanvas && filteredCanvas) {
         // ── Cached rendering path ──
@@ -576,7 +605,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
 
           // Update goo-cache filter stdDeviation for offscreen resolution
           if (cacheBlurRef.current) {
-            const stdDev = Q.baseBlurStdDev * CACHE_QUALITY
+            const stdDev = Q.baseBlurStdDev * CACHE_QUALITY * dbg.filterBlurRadius
             cacheBlurRef.current.setAttribute('stdDeviation', String(stdDev))
           }
 
@@ -585,14 +614,19 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           shapeCtx.save()
           shapeCtx.scale(CACHE_QUALITY, CACHE_QUALITY)
           shapeCtx.translate(-wMinX, -wMinY)
-          renderShapes(shapeCtx, connections, blobs, time, pal.nucleus, null)
+          renderShapes(shapeCtx, connections, blobs, time, pal.nucleus, null,
+            wobbleI, dbg.nucleusWobble, dbg.connectionGradients)
           shapeCtx.restore()
 
-          // 2. Apply goo filter to cache — CLEAR FIRST
+          // 2. Apply goo filter to cache (skip when gooFilter is OFF)
           filteredCtx.clearRect(0, 0, cacheW, cacheH)
-          filteredCtx.filter = 'url(#goo-cache)'
-          filteredCtx.drawImage(shapeCanvas, 0, 0)
-          filteredCtx.filter = 'none'
+          if (dbg.gooFilter) {
+            filteredCtx.filter = 'url(#goo-cache)'
+            filteredCtx.drawImage(shapeCanvas, 0, 0)
+            filteredCtx.filter = 'none'
+          } else {
+            filteredCtx.drawImage(shapeCanvas, 0, 0)
+          }
         }
 
         // 3. Composite cached result to main canvas — CLEAR FIRST
@@ -606,13 +640,23 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         ctx.restore()
       } else {
         // ── Fallback: direct draw with CSS filter on canvas element ──
+        // Update CSS filter dynamically based on gooFilter toggle
+        const desiredFilter = dbg.gooFilter
+          ? (IS_MOBILE ? 'url(#goo-filter-mobile)' : 'url(#goo-filter)')
+          : 'none'
+        if (desiredFilter !== lastFallbackFilter) {
+          canvas.style.filter = desiredFilter
+          lastFallbackFilter = desiredFilter
+        }
+
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         ctx.save()
         ctx.scale(dpr, dpr)
         ctx.translate(tf.x, tf.y)
         ctx.scale(tf.scale, tf.scale)
         renderShapes(ctx, connections, blobs, time, pal.nucleus,
-          { tx: tf.x, ty: tf.y, scale: tf.scale, viewW: width, viewH: height })
+          { tx: tf.x, ty: tf.y, scale: tf.scale, viewW: width, viewH: height },
+          wobbleI, dbg.nucleusWobble, dbg.connectionGradients)
         ctx.restore()
       }
 

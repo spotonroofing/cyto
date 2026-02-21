@@ -7,6 +7,7 @@ import { DotGrid } from './DotGrid'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
 import { Q } from '@/utils/performanceTier'
+import { useDebugStore } from '@/stores/debugStore'
 
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
@@ -97,6 +98,7 @@ export function BubbleMap() {
 
   const selectMilestone = useUIStore((s) => s.selectMilestone)
   const getCurrentMilestone = useRoadmapStore((s) => s.getCurrentMilestone)
+  const filterBlurRadius = useDebugStore((s) => s.filterBlurRadius)
 
   useEffect(() => {
     const measure = () => {
@@ -116,7 +118,7 @@ export function BubbleMap() {
   useEffect(() => { bubblesRef.current = bubbles }, [bubbles])
   useEffect(() => { dimensionsRef.current = dimensions }, [dimensions])
 
-  // Update goo filter stdDeviation when zoom changes
+  // Update goo filter stdDeviation when zoom or debug blur radius changes
   useEffect(() => {
     if (blurRef.current) {
       // Scale blur linearly with zoom — keeps goo shape identical at all zoom levels.
@@ -124,14 +126,14 @@ export function BubbleMap() {
       // stdDeviation must scale proportionally with zoom to maintain the same
       // relative blur radius (σ / feature_size = constant).
       // Capped by Q.maxBlurStdDev to prevent quadratic GPU cost at high zoom on mobile.
-      const stdDev = Math.min(Q.maxBlurStdDev, Q.baseBlurStdDev * transform.scale)
+      const stdDev = Math.min(Q.maxBlurStdDev, Q.baseBlurStdDev * transform.scale * filterBlurRadius)
       blurRef.current.setAttribute('stdDeviation', String(stdDev))
     }
     if (mobileBlurRef.current) {
-      const stdDev = Math.min(Q.maxBlurStdDev, Q.baseBlurStdDev * transform.scale)
+      const stdDev = Math.min(Q.maxBlurStdDev, Q.baseBlurStdDev * transform.scale * filterBlurRadius)
       mobileBlurRef.current.setAttribute('stdDeviation', String(stdDev))
     }
-  }, [transform.scale])
+  }, [transform.scale, filterBlurRadius])
 
   // Compute path bounding box when bubbles change
   useEffect(() => {

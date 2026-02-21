@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { milestones, phases } from '@/stores/roadmapStore'
 import { useTheme } from '@/themes'
 import { IS_MOBILE } from '@/utils/performanceTier'
+import { useDebugStore } from '@/stores/debugStore'
 import {
   Microscope, FileSearch, Pill, HeartPulse,
   Utensils, FlaskConical, Sparkles, ShieldCheck,
@@ -51,29 +52,42 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
     let lastFrame = 0
 
     const tick = (now: number) => {
-      if (targetDt > 0 && now - lastFrame < targetDt) {
+      const dbg = useDebugStore.getState()
+      const effectiveDt = dbg.fpsCap > 0 ? 1000 / dbg.fpsCap : targetDt
+      if (effectiveDt > 0 && now - lastFrame < effectiveDt) {
         rafId = requestAnimationFrame(tick)
         return
       }
       lastFrame = now
-      const t = now / 1000
+
       let d = ''
-      for (let i = 0; i <= NUCLEUS_WOBBLE_STEPS; i++) {
-        const angle = (i / NUCLEUS_WOBBLE_STEPS) * Math.PI * 2
-        let r = nucleusR
-        // Breathing — freq 0.8 (membrane uses 0.5)
-        r += Math.sin(t * 0.8 + p * 2) * nucleusR * 0.025
-        // 2-lobe deformation — freq 0.6 (membrane uses 0.3)
-        r += Math.sin(2 * angle + t * 0.6 + p) * nucleusR * 0.035
-        // 3-lobe deformation — freq 0.45 (membrane uses 0.25)
-        r += Math.sin(3 * angle + t * 0.45 + p * 1.3) * nucleusR * 0.025
-        // 5-lobe — skip on mobile for performance
-        if (!IS_MOBILE) {
-          r += Math.sin(5 * angle - t * 0.35 + p * 0.7) * nucleusR * 0.015
+      if (dbg.nucleusWobble) {
+        const t = now / 1000
+        for (let i = 0; i <= NUCLEUS_WOBBLE_STEPS; i++) {
+          const angle = (i / NUCLEUS_WOBBLE_STEPS) * Math.PI * 2
+          let r = nucleusR
+          // Breathing — freq 0.8 (membrane uses 0.5)
+          r += Math.sin(t * 0.8 + p * 2) * nucleusR * 0.025
+          // 2-lobe deformation — freq 0.6 (membrane uses 0.3)
+          r += Math.sin(2 * angle + t * 0.6 + p) * nucleusR * 0.035
+          // 3-lobe deformation — freq 0.45 (membrane uses 0.25)
+          r += Math.sin(3 * angle + t * 0.45 + p * 1.3) * nucleusR * 0.025
+          // 5-lobe — skip on mobile for performance
+          if (!IS_MOBILE) {
+            r += Math.sin(5 * angle - t * 0.35 + p * 0.7) * nucleusR * 0.015
+          }
+          const px = Math.cos(angle) * r
+          const py = Math.sin(angle) * r
+          d += `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`
         }
-        const px = Math.cos(angle) * r
-        const py = Math.sin(angle) * r
-        d += `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`
+      } else {
+        // Static circle when nucleus wobble is disabled
+        for (let i = 0; i <= NUCLEUS_WOBBLE_STEPS; i++) {
+          const angle = (i / NUCLEUS_WOBBLE_STEPS) * Math.PI * 2
+          const px = Math.cos(angle) * nucleusR
+          const py = Math.sin(angle) * nucleusR
+          d += `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`
+        }
       }
       el.setAttribute('d', d + 'Z')
       rafId = requestAnimationFrame(tick)
