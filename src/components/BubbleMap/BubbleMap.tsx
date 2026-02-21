@@ -86,13 +86,13 @@ export function BubbleMap() {
   // Update goo filter stdDeviation when zoom changes
   useEffect(() => {
     if (blurRef.current) {
-      // Scale blur with zoom so goo merging stays consistent
-      const scaledStd = Math.max(6, 12 * Math.sqrt(transform.scale))
+      // Scale blur with zoom so goo merging stays consistent (capped to limit GPU cost)
+      const scaledStd = Math.min(18, Math.max(6, 12 * Math.sqrt(transform.scale)))
       blurRef.current.setAttribute('stdDeviation', String(scaledStd))
     }
     if (mobileBlurRef.current) {
-      const scaledStd = Math.max(4, 7 * Math.sqrt(transform.scale))
-      mobileBlurRef.current.setAttribute('stdDeviation', String(scaledStd))
+      // Mobile: fixed stdDeviation — scaling with zoom is too expensive for mobile GPUs
+      mobileBlurRef.current.setAttribute('stdDeviation', '7')
     }
   }, [transform.scale])
 

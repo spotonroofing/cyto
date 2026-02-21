@@ -249,17 +249,30 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     let time = 0
     let lastFrameTime = 0
     const TARGET_DT = isMobile ? 1000 / 30 : 1000 / 45 // 30fps mobile, 45fps desktop
+    const IDLE_DT = 1000 / 10 // 10fps when idle — ambient animations are slow enough
+    const IDLE_THRESHOLD = 2000 // ms of no transform change before entering idle
+    let lastKnownTf = { x: 0, y: 0, scale: 0 }
+    let lastTransformChangeTime = performance.now()
 
     const draw = (timestamp: number) => {
-      // Frame rate limiting
-      if (timestamp - lastFrameTime < TARGET_DT * 0.8) {
+      // Track transform changes for idle detection
+      const tf = transformRef.current
+      if (tf.x !== lastKnownTf.x || tf.y !== lastKnownTf.y || tf.scale !== lastKnownTf.scale) {
+        lastKnownTf = { x: tf.x, y: tf.y, scale: tf.scale }
+        lastTransformChangeTime = timestamp
+      }
+
+      const isIdle = (timestamp - lastTransformChangeTime) > IDLE_THRESHOLD
+      const effectiveDT = isIdle ? IDLE_DT : TARGET_DT
+
+      // Frame rate limiting (adaptive: slower when idle)
+      if (timestamp - lastFrameTime < effectiveDT * 0.8) {
         animFrameRef.current = requestAnimationFrame(draw)
         return
       }
       lastFrameTime = timestamp
       time += 0.016
 
-      const tf = transformRef.current
       const pal = paletteRef.current
 
       ctx.clearRect(0, 0, canvas.width, canvas.height)

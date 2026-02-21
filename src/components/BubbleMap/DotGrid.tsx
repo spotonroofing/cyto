@@ -12,7 +12,11 @@ const DOT_RADIUS = 1.5
 
 export function DotGrid({ width, height, transform }: DotGridProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const transformRef = useRef(transform)
   const { isDark } = useTheme()
+
+  // Keep transform in sync via ref — avoids redraw on every React re-render
+  useEffect(() => { transformRef.current = transform }, [transform])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -27,51 +31,68 @@ export function DotGrid({ width, height, transform }: DotGridProps) {
     canvas.style.width = `${width}px`
     canvas.style.height = `${height}px`
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.save()
-    ctx.scale(dpr, dpr)
-
     // Dot color: light gray in light mode, medium gray in dark mode
-    ctx.fillStyle = isDark
+    const dotColor = isDark
       ? 'rgba(102, 102, 102, 0.20)'
       : 'rgba(180, 180, 180, 0.30)'
 
-    const { x: tx, y: ty, scale } = transform
-    const scaledSpacing = DOT_SPACING * scale
-    const scaledRadius = DOT_RADIUS * scale
-
-    // Skip drawing if dots would be invisibly small
-    if (scaledRadius < 0.3) {
-      ctx.restore()
-      return
-    }
-
-    // Compute world-space bounds of the visible viewport
-    const worldLeft = -tx / scale
-    const worldTop = -ty / scale
-    const worldRight = (width - tx) / scale
-    const worldBottom = (height - ty) / scale
-
-    // Snap to grid — find first/last grid indices in view
-    const startCol = Math.floor(worldLeft / DOT_SPACING)
-    const endCol = Math.ceil(worldRight / DOT_SPACING)
-    const startRow = Math.floor(worldTop / DOT_SPACING)
-    const endRow = Math.ceil(worldBottom / DOT_SPACING)
-
-    // Draw dots in screen space using the transform
+    let lastTf = { x: NaN, y: NaN, scale: NaN }
+    let rafId = 0
     const TAU = Math.PI * 2
-    for (let row = startRow; row <= endRow; row++) {
-      const screenY = row * scaledSpacing + ty
-      for (let col = startCol; col <= endCol; col++) {
-        const screenX = col * scaledSpacing + tx
-        ctx.beginPath()
-        ctx.arc(screenX, screenY, scaledRadius, 0, TAU)
-        ctx.fill()
+
+    const draw = () => {
+      rafId = requestAnimationFrame(draw)
+
+      const tf = transformRef.current
+      // Only redraw when transform actually changes
+      if (tf.x === lastTf.x && tf.y === lastTf.y && tf.scale === lastTf.scale) return
+      lastTf = { x: tf.x, y: tf.y, scale: tf.scale }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.save()
+      ctx.scale(dpr, dpr)
+
+      const scaledSpacing = DOT_SPACING * tf.scale
+      const scaledRadius = DOT_RADIUS * tf.scale
+
+      // Skip drawing if dots would be invisibly small
+      if (scaledRadius < 0.3) {
+        ctx.restore()
+        return
       }
+
+      ctx.fillStyle = dotColor
+
+      // Compute world-space bounds of the visible viewport
+      const worldLeft = -tf.x / tf.scale
+      const worldTop = -tf.y / tf.scale
+      const worldRight = (width - tf.x) / tf.scale
+      const worldBottom = (height - tf.y) / tf.scale
+
+      // Snap to grid — find first/last grid indices in view
+      const startCol = Math.floor(worldLeft / DOT_SPACING)
+      const endCol = Math.ceil(worldRight / DOT_SPACING)
+      const startRow = Math.floor(worldTop / DOT_SPACING)
+      const endRow = Math.ceil(worldBottom / DOT_SPACING)
+
+      // Batch all dots into a single path — one fill() call instead of hundreds
+      ctx.beginPath()
+      for (let row = startRow; row <= endRow; row++) {
+        const screenY = row * scaledSpacing + tf.y
+        for (let col = startCol; col <= endCol; col++) {
+          const screenX = col * scaledSpacing + tf.x
+          ctx.moveTo(screenX + scaledRadius, screenY)
+          ctx.arc(screenX, screenY, scaledRadius, 0, TAU)
+        }
+      }
+      ctx.fill()
+
+      ctx.restore()
     }
 
-    ctx.restore()
-  }, [width, height, transform, isDark])
+    rafId = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(rafId)
+  }, [width, height, isDark]) // transform removed from deps — read from ref
 
   return (
     <canvas
