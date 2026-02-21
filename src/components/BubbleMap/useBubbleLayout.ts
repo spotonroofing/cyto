@@ -65,7 +65,7 @@ export function useBubbleLayout(width: number, height: number) {
       const phaseIndex = phases.indexOf(phase!)
       const progress = getMilestoneProgress(ms.id)
       const itemCount = ms.actionItemIds.length
-      const radius = Math.max(53, Math.min(94, 35 + itemCount * 5))
+      const radius = Math.max(62, Math.min(110, 41 + itemCount * 6))
 
       const layout = milestoneLayout[ms.id]
       if (!layout) {
