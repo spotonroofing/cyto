@@ -119,8 +119,8 @@ export function BubbleMap() {
       if (b.y - b.radius < minY) minY = b.y - b.radius
       if (b.y + b.radius > maxY) maxY = b.y + b.radius
     }
-    const padX = (maxX - minX) * 0.3
-    const padY = (maxY - minY) * 0.3
+    const padX = (maxX - minX) * 0.12
+    const padY = (maxY - minY) * 0.12
     return { minX: minX - padX, maxX: maxX + padX, minY: minY - padY, maxY: maxY + padY }
   }, [bubbles])
 

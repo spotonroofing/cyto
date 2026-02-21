@@ -34,9 +34,9 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
   const { palette } = useTheme()
   const debugParticleCount = useDebugStore((s) => s.particleCount)
 
-  // Keep refs in sync without re-running the main effect
-  useEffect(() => { transformRef.current = transform }, [transform])
-  useEffect(() => { mapBoundsRef.current = mapBounds }, [mapBounds])
+  // Inline ref assignment eliminates 1-frame lag between particles and map during panning
+  transformRef.current = transform
+  mapBoundsRef.current = mapBounds
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -65,11 +65,10 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
       // No map bounds yet — clean up and wait for next run
       return () => { window.removeEventListener('resize', resize) }
     }
-    const pad = 200 // world-space padding beyond map edges
-    const worldLeft = bounds.minX - pad
-    const worldTop = bounds.minY - pad
-    const worldW = (bounds.maxX - bounds.minX) + pad * 2
-    const worldH = (bounds.maxY - bounds.minY) + pad * 2
+    const worldLeft = bounds.minX
+    const worldTop = bounds.minY
+    const worldW = bounds.maxX - bounds.minX
+    const worldH = bounds.maxY - bounds.minY
 
     particlesRef.current = Array.from({ length: count }, () => {
       const opacity = 0.11 + Math.random() * 0.12
@@ -145,11 +144,10 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
 
       // Map world rect for wrapping (particles stay within map bounds, not viewport)
       const mb = mapBoundsRef.current
-      const wPad = 100
-      const wLeft = mb ? mb.minX - wPad : -tf.x / tf.scale - wPad
-      const wTop = mb ? mb.minY - wPad : -tf.y / tf.scale - wPad
-      const wW = mb ? (mb.maxX - mb.minX) + wPad * 2 : w / tf.scale + wPad * 2
-      const wH = mb ? (mb.maxY - mb.minY) + wPad * 2 : h / tf.scale + wPad * 2
+      const wLeft = mb ? mb.minX : -tf.x / tf.scale
+      const wTop = mb ? mb.minY : -tf.y / tf.scale
+      const wW = mb ? (mb.maxX - mb.minX) : w / tf.scale
+      const wH = mb ? (mb.maxY - mb.minY) : h / tf.scale
 
       for (const p of particles) {
         // Update position (world-space drift)
