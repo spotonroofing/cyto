@@ -28,6 +28,13 @@ function computeReleaseVelocity(history: Array<{dx: number; dy: number; time: nu
   return { x: totalDx / dt * 16, y: totalDy / dt * 16 } // normalize to px/frame at 60fps
 }
 
+/** Progressive drag resistance past boundary — increases the further you pull. */
+function overdragResist(pos: number, min: number, max: number): number {
+  if (pos > max) return 1 / (1 + (pos - max) * 0.02)
+  if (pos < min) return 1 / (1 + (min - pos) * 0.02)
+  return 1.0
+}
+
 export function BubbleMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const blurRef = useRef<SVGFEGaussianBlurElement>(null)
@@ -169,9 +176,9 @@ export function BubbleMap() {
     const oy0 = cur.y > lim0.maxY ? cur.y - lim0.maxY : cur.y < lim0.minY ? cur.y - lim0.minY : 0
     if (Math.abs(vx) < 0.5 && Math.abs(vy) < 0.5 && Math.abs(ox0) < 0.5 && Math.abs(oy0) < 0.5) return
 
-    const FRICTION = 0.97     // free-space per-frame velocity retention (long coast)
-    const TENSION = 0.2       // spring force per px of overdrag
-    const SPRING_DAMP = 0.5   // velocity retention when spring is active (fast settle)
+    const FRICTION = 0.92     // free-space per-frame velocity retention
+    const TENSION = 0.15      // spring force per px of overdrag
+    const SPRING_DAMP = 0.7   // velocity retention when spring is active (smooth return)
 
     const animate = () => {
       const t = transformRef.current
@@ -246,16 +253,16 @@ export function BubbleMap() {
       // Track movement for release velocity computation
       const cur = transformRef.current
       const limits = getBoundaryLimits(cur.scale)
-      const resistX = (cur.x > limits.maxX || cur.x < limits.minX) ? 0.3 : 1.0
-      const resistY = (cur.y > limits.maxY || cur.y < limits.minY) ? 0.3 : 1.0
+      const resistX = overdragResist(cur.x, limits.minX, limits.maxX)
+      const resistY = overdragResist(cur.y, limits.minY, limits.maxY)
       const history = moveHistoryRef.current
       history.push({ dx: dx * resistX, dy: dy * resistY, time: performance.now() })
       if (history.length > 5) history.shift()
 
       batchTransform((t) => {
         const lim = getBoundaryLimits(t.scale)
-        const rx = (t.x > lim.maxX || t.x < lim.minX) ? 0.3 : 1.0
-        const ry = (t.y > lim.maxY || t.y < lim.minY) ? 0.3 : 1.0
+        const rx = overdragResist(t.x, lim.minX, lim.maxX)
+        const ry = overdragResist(t.y, lim.minY, lim.maxY)
         return { ...t, x: t.x + dx * rx, y: t.y + dy * ry }
       })
     }
@@ -263,7 +270,7 @@ export function BubbleMap() {
       if (!isPanningRef.current) return
       isPanningRef.current = false
       const vel = computeReleaseVelocity(moveHistoryRef.current)
-      startPhysics(vel.x, vel.y)
+      startPhysics(vel.x * 0.5, vel.y * 0.5)
     }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
@@ -334,16 +341,16 @@ export function BubbleMap() {
         // Track movement for release velocity computation
         const cur = transformRef.current
         const limits = getBoundaryLimits(cur.scale)
-        const resistX = (cur.x > limits.maxX || cur.x < limits.minX) ? 0.3 : 1.0
-        const resistY = (cur.y > limits.maxY || cur.y < limits.minY) ? 0.3 : 1.0
+        const resistX = overdragResist(cur.x, limits.minX, limits.maxX)
+        const resistY = overdragResist(cur.y, limits.minY, limits.maxY)
         const history = moveHistoryRef.current
         history.push({ dx: dx * resistX, dy: dy * resistY, time: performance.now() })
         if (history.length > 5) history.shift()
 
         batchTransform((tr) => {
           const lim = getBoundaryLimits(tr.scale)
-          const rx = (tr.x > lim.maxX || tr.x < lim.minX) ? 0.3 : 1.0
-          const ry = (tr.y > lim.maxY || tr.y < lim.minY) ? 0.3 : 1.0
+          const rx = overdragResist(tr.x, lim.minX, lim.maxX)
+          const ry = overdragResist(tr.y, lim.minY, lim.maxY)
           return { ...tr, x: tr.x + dx * rx, y: tr.y + dy * ry }
         })
       } else if (e.touches.length === 2) {
@@ -387,7 +394,7 @@ export function BubbleMap() {
       // Start momentum if user was panning, otherwise spring-back after pinch zoom
       if (wasPanning) {
         const vel = computeReleaseVelocity(moveHistoryRef.current)
-        startPhysics(vel.x, vel.y)
+        startPhysics(vel.x * 0.5, vel.y * 0.5)
       } else if (e.touches.length === 0) {
         startPhysics(0, 0)
       }
