@@ -19,13 +19,9 @@ export const Q = IS_MOBILE ? {
   gooEdgeWobble: true as const,
   gooTargetDt: 1000 / 60,     // 60fps — ensures every frame draws on 60Hz displays
   gooIdleDt: 1000 / 60,       // match active — consistent wobble when idle
-  gooCacheInterval: 1,         // update cache every frame for smooth wobble
-  gooCacheQuality: 1.0,
 
-  // SVG goo filter blur — must scale linearly with zoom (no cap) to keep goo
-  // shape consistent across zoom levels. Capping breaks the feColorMatrix threshold.
+  // SVG goo filter blur (applied via CSS, browser handles DPR)
   baseBlurStdDev: 12,
-  maxBlurStdDev: 999,
 
   // Background particles
   particleCount: 15,           // (desktop: 105) — minimal on mobile
@@ -45,15 +41,15 @@ export const Q = IS_MOBILE ? {
   gooEdgeWobble: true as const,
   gooTargetDt: 1000 / 60,   // 60fps — ensures every frame draws on 60Hz displays
   gooIdleDt: 1000 / 60,     // match active — consistent wobble when idle
-  gooCacheInterval: 1,       // update cache every frame for smooth wobble
-  gooCacheQuality: 1.0,      // full resolution offscreen
 
+  // SVG goo filter blur (applied via CSS, browser handles DPR)
   baseBlurStdDev: 12,
-  maxBlurStdDev: 999,          // effectively no cap on desktop
 
+  // Background particles
   particleCount: 105,
   particleTargetDt: 1000 / 30,
 
+  // Dot grid
   dotDpr: 2,
   dotSpacing: 35,
 }
