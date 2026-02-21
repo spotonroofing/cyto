@@ -8,8 +8,9 @@ export const IS_MOBILE = typeof window !== 'undefined' &&
 
 /** Quality settings — mobile tier trades visual fidelity for 30fps+ performance */
 export const Q = IS_MOBILE ? {
-  // Canvas device pixel ratio — 1 on mobile (goo filter blurs away the detail anyway)
-  canvasDpr: 1,
+  // Canvas device pixel ratio — 1.5 on mobile (must stay above 1 to avoid
+  // compositing/filter ghosting artifacts on high-DPR mobile browsers)
+  canvasDpr: 1.5,
 
   // GooCanvas connection rendering
   gooSamplesPerPx: 7,        // samples per 100px of connection (was 9)
@@ -21,9 +22,10 @@ export const Q = IS_MOBILE ? {
   gooTargetDt: 1000 / 24,     // 24fps target (was 30fps)
   gooIdleDt: 1000 / 8,        // 8fps idle (was 10fps)
 
-  // SVG goo filter blur — cap prevents quadratic cost explosion at high zoom
+  // SVG goo filter blur — must scale linearly with zoom (no cap) to keep goo
+  // shape consistent across zoom levels. Capping breaks the feColorMatrix threshold.
   baseBlurStdDev: 7,
-  maxBlurStdDev: 8,
+  maxBlurStdDev: 999,
 
   // Background particles
   particleCount: 25,           // (was 30)
