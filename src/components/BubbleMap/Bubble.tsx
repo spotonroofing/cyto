@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { milestones, phases } from '@/stores/roadmapStore'
 import { useTheme } from '@/themes'
+import { IS_MOBILE } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
 import {
   Microscope, FileSearch, Pill, HeartPulse,
@@ -20,7 +21,7 @@ function hashPhase(id: string): number {
   return h * 0.37
 }
 
-const NUCLEUS_WOBBLE_STEPS = 64
+const NUCLEUS_WOBBLE_STEPS = IS_MOBILE ? 48 : 64
 const ICON_LABEL_GAP = 5 // px of extra vertical spacing between phase icon and text label
 
 interface BubbleProps {

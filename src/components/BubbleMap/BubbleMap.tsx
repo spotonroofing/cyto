@@ -12,6 +12,7 @@ const TAP_TIME_THRESHOLD = 300
 const EDGE_PADDING = 40 // px from screen edge for auto-zoom fit
 const AUTO_ZOOM_EASE = 0.15 // per-frame lerp factor (~300ms to 95%)
 const MAX_SINGLE_SCALE = 1.2 // max zoom for single-column sections
+const MAX_MOTION_BLUR = 3 // px
 
 /** Compute release velocity from recent Y deltas (last 80ms window). */
 function computeReleaseVelocity(history: Array<{ dy: number; time: number }>): number {
@@ -36,6 +37,7 @@ function overdragResist(pos: number, min: number, max: number): number {
 
 export function BubbleMap() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const blurWrapRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 })
 
@@ -200,16 +202,11 @@ export function BubbleMap() {
     const visYStart = -scrollY / currentScale
     const visYEnd = (dims.height - scrollY) / currentScale
 
-    // Lookahead padding prevents jitter at fork boundaries: without this,
-    // bands at the viewport edge pop in/out causing the target scale to
-    // oscillate between fork-zoom and single-column zoom.
-    const pad = (visYEnd - visYStart) * 0.15
-
-    // Find widest content among visible row bands (with padding)
+    // Find widest content among visible row bands
     let maxContentWidth = 0
     let hasVisible = false
     for (const band of bands) {
-      if (band.yEnd >= visYStart - pad && band.yStart <= visYEnd + pad) {
+      if (band.yEnd >= visYStart && band.yStart <= visYEnd) {
         maxContentWidth = Math.max(maxContentWidth, band.contentWidth)
         hasVisible = true
       }
@@ -218,6 +215,16 @@ export function BubbleMap() {
     if (!hasVisible) return currentScale
     const fitScale = (dims.width - EDGE_PADDING * 2) / maxContentWidth
     return Math.min(fitScale, MAX_SINGLE_SCALE)
+  }, [])
+
+  /** Update the motion blur CSS directly on the wrapper div (no React re-render). */
+  const setBlur = useCallback((amount: number) => {
+    if (!blurWrapRef.current) return
+    if (amount > 0.1) {
+      blurWrapRef.current.style.filter = `blur(${amount.toFixed(1)}px)`
+    } else {
+      blurWrapRef.current.style.filter = 'none'
+    }
   }, [])
 
   const cancelAnimations = useCallback(() => {
@@ -261,7 +268,7 @@ export function BubbleMap() {
     [cancelAnimations],
   )
 
-  // --- Scroll physics (Y-only with auto-zoom) ---
+  // --- Scroll physics (Y-only with auto-zoom + motion blur) ---
   const startPhysics = useCallback(
     (vy0: number) => {
       cancelAnimationFrame(momentumRafRef.current)
@@ -278,12 +285,13 @@ export function BubbleMap() {
       const scaleTarget = getTargetScale(cur.y, cur.scale)
       const scaleOff = Math.abs(scaleTarget - cur.scale)
       if (Math.abs(vy) < 0.5 && Math.abs(oy0) < 0.5 && scaleOff < 0.001) {
+        setBlur(0)
         return
       }
 
       const FRICTION = 0.92
       const TENSION = 0.15
-      const SPRING_DAMP = 0.5
+      const SPRING_DAMP = 0.7
 
       const animate = () => {
         const t = transformRef.current
@@ -299,15 +307,18 @@ export function BubbleMap() {
         vy -= overY * TENSION
         vy *= overY !== 0 ? SPRING_DAMP : FRICTION
 
-        // Auto-zoom: ease scale toward target.
-        // Freeze zoom during bounce to prevent feedback between spring and auto-zoom.
-        const targetScale = overY === 0 ? getTargetScale(t.y + vy, t.scale) : t.scale
+        // Auto-zoom: ease scale toward target
+        const targetScale = getTargetScale(t.y + vy, t.scale)
         const newScale = t.scale + (targetScale - t.scale) * AUTO_ZOOM_EASE
         const newX = computeX(newScale)
+
+        // Motion blur proportional to velocity
+        setBlur(Math.min(Math.abs(vy) * 0.15, MAX_MOTION_BLUR))
 
         // Settle check
         const scaleSettled = Math.abs(targetScale - newScale) < 0.001
         if (Math.abs(vy) < 0.3 && Math.abs(overY) < 0.5 && scaleSettled) {
+          setBlur(0)
           if (overY !== 0) {
             setTransform((prev) => ({
               x: computeX(prev.scale),
@@ -324,7 +335,7 @@ export function BubbleMap() {
 
       momentumRafRef.current = requestAnimationFrame(animate)
     },
-    [getScrollBounds, getTargetScale, computeX],
+    [getScrollBounds, getTargetScale, computeX, setBlur],
   )
 
   // --- Initial view: zoom-to-fit before first paint ---
@@ -429,6 +440,8 @@ export function BubbleMap() {
       moveHistoryRef.current.push({ dy: dy * resistY, time: performance.now() })
       if (moveHistoryRef.current.length > 5) moveHistoryRef.current.shift()
 
+      setBlur(Math.min(Math.abs(dy) * 0.3, MAX_MOTION_BLUR))
+
       batchTransform((t) => {
         const lim = getScrollBounds(t.scale)
         const ry = overdragResist(t.y, lim.minY, lim.maxY)
@@ -455,6 +468,8 @@ export function BubbleMap() {
       const scrollDy = -e.deltaY
       moveHistoryRef.current.push({ dy: scrollDy, time: performance.now() })
       if (moveHistoryRef.current.length > 5) moveHistoryRef.current.shift()
+
+      setBlur(Math.min(Math.abs(e.deltaY) * 0.05, MAX_MOTION_BLUR))
 
       batchTransform((t) => {
         const lim = getScrollBounds(t.scale)
@@ -486,7 +501,7 @@ export function BubbleMap() {
       cancelAnimationFrame(cameraAnimRafRef.current)
       clearTimeout(wheelTimeoutRef.current)
     }
-  }, [batchTransform, cancelAnimations, getScrollBounds, getTargetScale, computeX, startPhysics])
+  }, [batchTransform, cancelAnimations, getScrollBounds, getTargetScale, computeX, startPhysics, setBlur])
 
   // --- Touch handlers: drag = vertical scroll, pinch = zoom ---
   useEffect(() => {
@@ -537,6 +552,8 @@ export function BubbleMap() {
         const resistY = overdragResist(cur.y, limits.minY, limits.maxY)
         moveHistoryRef.current.push({ dy: dy * resistY, time: performance.now() })
         if (moveHistoryRef.current.length > 5) moveHistoryRef.current.shift()
+
+        setBlur(Math.min(Math.abs(dy) * 0.3, MAX_MOTION_BLUR))
 
         batchTransform((tr) => {
           const lim = getScrollBounds(tr.scale)
@@ -620,6 +637,7 @@ export function BubbleMap() {
     getTargetScale,
     computeX,
     startPhysics,
+    setBlur,
   ])
 
   // --- Recenter handler ---
@@ -680,6 +698,8 @@ export function BubbleMap() {
       className="w-full h-dvh overflow-hidden relative"
       style={{ touchAction: 'none' }}
     >
+      {/* Motion blur wrapper — filter updated via ref for zero re-renders */}
+      <div ref={blurWrapRef} style={{ width: '100%', height: '100%' }}>
         <BackgroundParticles transform={transform} mapBounds={mapBounds} />
         <DotGrid width={dimensions.width} height={dimensions.height} transform={transform} />
 
@@ -731,6 +751,7 @@ export function BubbleMap() {
             ))}
           </g>
         </svg>
+      </div>
     </div>
   )
 }
