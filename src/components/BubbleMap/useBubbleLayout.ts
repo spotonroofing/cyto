@@ -63,7 +63,7 @@ export function useBubbleLayout(width: number, height: number) {
     const paddingY = ROW_SPACING * 0.5
     const centerX = width / 2
     const waveAmplitude = Math.min(width * 0.06, 40)
-    const branchOffset = Math.min(width * 0.22, 160)
+    const branchOffset = Math.min(width * 0.30, 160)
 
     // Build bubbles with deterministic positions
     const positionMap = new Map<string, { x: number; y: number; radius: number; phaseIndex: number }>()
