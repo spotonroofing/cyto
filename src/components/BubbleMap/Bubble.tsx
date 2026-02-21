@@ -41,24 +41,20 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       {/* Hit target */}
       <circle cx={0} cy={0} r={radius} fill="transparent" />
 
-      {/* Phase icon */}
+      {/* Phase icon — rendered as nested <svg> (foreignObject breaks on mobile) */}
       {(() => {
         const Icon = phaseIcons[phaseIndex]
         if (!Icon) return null
         const size = Math.round(radius * 0.28)
         return (
-          <foreignObject
+          <Icon
             x={-size / 2} y={-size / 2 - 12}
             width={size} height={size}
-            style={{ overflow: 'visible', pointerEvents: 'none' }}
-          >
-            <Icon
-              width={size} height={size}
-              color={palette.text}
-              opacity={0.7}
-              strokeWidth={2}
-            />
-          </foreignObject>
+            color={palette.text}
+            opacity={0.7}
+            strokeWidth={2}
+            style={{ pointerEvents: 'none' }}
+          />
         )
       })()}
 
