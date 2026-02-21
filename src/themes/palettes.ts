@@ -78,7 +78,7 @@ const cytoplasm: Theme = {
     phaseColors: [
       '#B86850', // 0 Deep Coral
       '#986070', // 1 Deep Rose
-      '#806080', // 2 Deep Mauve
+      '#705070', // 2 Deep Mauve (darkened for text contrast)
       '#A08050', // 3 Deep Clay
       '#907048', // 4 Deep Terracotta
       '#706878', // 5 Deep Taupe
@@ -273,7 +273,7 @@ const ember: Theme = {
     phaseColors: [
       '#F06020', // 0 Bright flame
       '#E04000', // 1 Hot orange
-      '#F0A840', // 2 Gold
+      '#C08030', // 2 Amber (darkened for text contrast)
       '#E02020', // 3 Red
       '#F08800', // 4 Vivid orange
       '#D05010', // 5 Deep orange
@@ -341,7 +341,7 @@ const aurora: Theme = {
       '#50A0F0', // 2 Sky
       '#40C8D8', // 3 Aqua
       '#68C880', // 4 Sage
-      '#F0C840', // 5 Gold
+      '#B89820', // 5 Gold (darkened for text contrast)
       '#E85050', // 6 Coral
       '#E860A0', // 7 Rose
     ],
@@ -406,7 +406,7 @@ const ocean: Theme = {
       '#20C0D0', // 2 Bright cyan
       '#20A090', // 3 Deep teal
       '#88C050', // 4 Seagrass
-      '#F0D840', // 5 Gold sand
+      '#B8A028', // 5 Gold sand (darkened for text contrast)
       '#A040B0', // 6 Deep anemone
       '#688898', // 7 Dark slate
     ],

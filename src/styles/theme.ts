@@ -14,7 +14,7 @@ export const phaseColors = {
   dark: {
     0: '#B86850', // Deep Coral
     1: '#986070', // Deep Rose
-    2: '#806080', // Deep Mauve
+    2: '#705070', // Deep Mauve (darkened for text contrast)
     3: '#A08050', // Deep Clay
     4: '#907048', // Deep Terracotta
     5: '#706878', // Deep Taupe
