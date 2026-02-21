@@ -17,9 +17,9 @@ export const Q = IS_MOBILE ? {
   gooNucleusSteps: 64,
   gooNucleusHarmonics: 5,
   gooEdgeWobble: true as const,
-  gooTargetDt: 1000 / 45,     // match desktop
-  gooIdleDt: 1000 / 45,       // match desktop — no idle throttle
-  gooCacheInterval: 2,         // match desktop
+  gooTargetDt: 1000 / 60,     // 60fps — ensures every frame draws on 60Hz displays
+  gooIdleDt: 1000 / 60,       // match active — consistent wobble when idle
+  gooCacheInterval: 1,         // update cache every frame for smooth wobble
   gooCacheQuality: 1.0,
 
   // SVG goo filter blur — must scale linearly with zoom (no cap) to keep goo
@@ -43,10 +43,10 @@ export const Q = IS_MOBILE ? {
   gooNucleusSteps: 64,
   gooNucleusHarmonics: 5,
   gooEdgeWobble: true as const,
-  gooTargetDt: 1000 / 45,
-  gooIdleDt: 1000 / 45,    // same as active — desktop has headroom, no idle throttle
-  gooCacheInterval: 2,      // update offscreen cache every 2 frames (~22fps wobble)
-  gooCacheQuality: 1.0,     // full resolution offscreen
+  gooTargetDt: 1000 / 60,   // 60fps — ensures every frame draws on 60Hz displays
+  gooIdleDt: 1000 / 60,     // match active — consistent wobble when idle
+  gooCacheInterval: 1,       // update cache every frame for smooth wobble
+  gooCacheQuality: 1.0,      // full resolution offscreen
 
   baseBlurStdDev: 12,
   maxBlurStdDev: 999,          // effectively no cap on desktop

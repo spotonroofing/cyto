@@ -698,7 +698,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         // Shapes drawn in world space so the CSS filter processes at world resolution
         // (identical to desktop offscreen cache). CSS transform handles camera.
         if (cacheBlurRef.current) {
-          const stdDev = Q.baseBlurStdDev * dbg.filterBlurRadius
+          const stdDev = Q.baseBlurStdDev * CACHE_QUALITY * dbg.filterBlurRadius
           cacheBlurRef.current.setAttribute('stdDeviation', String(stdDev))
         }
 
