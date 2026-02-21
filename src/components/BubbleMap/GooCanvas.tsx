@@ -109,8 +109,8 @@ function isInViewport(
   const screenMinY = minY * scale + ty
   const screenMaxX = maxX * scale + tx
   const screenMaxY = maxY * scale + ty
-  // Check overlap with viewport (with generous padding for goo filter bleed)
-  const pad = 60
+  // Padding scales with zoom to account for goo filter bleed (stdDev scales linearly)
+  const pad = Math.max(60, 40 * scale)
   return screenMaxX >= -pad && screenMinX <= viewW + pad &&
          screenMaxY >= -pad && screenMinY <= viewH + pad
 }

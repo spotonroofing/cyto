@@ -110,13 +110,15 @@ export function BubbleMap() {
   // Update goo filter stdDeviation when zoom changes
   useEffect(() => {
     if (blurRef.current) {
-      // Scale blur with zoom so goo merging stays consistent (capped to limit GPU cost)
-      const scaledStd = Math.min(18, Math.max(6, 12 * Math.sqrt(transform.scale)))
-      blurRef.current.setAttribute('stdDeviation', String(scaledStd))
+      // Scale blur linearly with zoom — keeps goo shape identical at all zoom levels.
+      // The filter operates in screen space on already-zoomed canvas content, so
+      // stdDeviation must scale proportionally with zoom to maintain the same
+      // relative blur radius (σ / feature_size = constant).
+      blurRef.current.setAttribute('stdDeviation', String(12 * transform.scale))
     }
     if (mobileBlurRef.current) {
-      // Mobile: fixed stdDeviation — scaling with zoom is too expensive for mobile GPUs
-      mobileBlurRef.current.setAttribute('stdDeviation', '7')
+      // Mobile: also scale linearly for consistent goo shape across zoom levels
+      mobileBlurRef.current.setAttribute('stdDeviation', String(7 * transform.scale))
     }
   }, [transform.scale])
 
