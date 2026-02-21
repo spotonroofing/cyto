@@ -57,6 +57,8 @@ export function BubbleMap() {
   const moveHistoryRef = useRef<Array<{dx: number; dy: number; time: number}>>([])
   const momentumRafRef = useRef(0)
   const springRafRef = useRef(0)
+  const cameraAnimRafRef = useRef(0)
+  const isAnimatingCameraRef = useRef(false)
   const pathBoundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; width: number; height: number } | null>(null)
   const dimensionsRef = useRef(dimensions)
 
@@ -164,7 +166,36 @@ export function BubbleMap() {
   const cancelAnimations = useCallback(() => {
     cancelAnimationFrame(momentumRafRef.current)
     cancelAnimationFrame(springRafRef.current)
+    cancelAnimationFrame(cameraAnimRafRef.current)
+    isAnimatingCameraRef.current = false
   }, [])
+
+  const animateCamera = useCallback((target: { x: number; y: number; scale: number }, duration = 600) => {
+    cancelAnimations()
+    const start = { ...transformRef.current }
+    // Skip if already at target
+    if (Math.abs(target.x - start.x) < 1 && Math.abs(target.y - start.y) < 1 && Math.abs(target.scale - start.scale) < 0.001) return
+
+    isAnimatingCameraRef.current = true
+    const startTime = performance.now()
+    const tick = (now: number) => {
+      const elapsed = now - startTime
+      const rawT = Math.min(elapsed / duration, 1)
+      // Ease-out cubic: fast start, gentle settle
+      const t = 1 - Math.pow(1 - rawT, 3)
+      setTransform({
+        x: start.x + (target.x - start.x) * t,
+        y: start.y + (target.y - start.y) * t,
+        scale: start.scale + (target.scale - start.scale) * t,
+      })
+      if (rawT < 1) {
+        cameraAnimRafRef.current = requestAnimationFrame(tick)
+      } else {
+        isAnimatingCameraRef.current = false
+      }
+    }
+    cameraAnimRafRef.current = requestAnimationFrame(tick)
+  }, [cancelAnimations])
 
   const startPhysics = useCallback((vx0: number, vy0: number) => {
     cancelAnimationFrame(momentumRafRef.current)
@@ -239,6 +270,7 @@ export function BubbleMap() {
     if (!el) return
     const onMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return
+      if (isAnimatingCameraRef.current) return
       isPanningRef.current = true
       lastPanRef.current = { x: e.clientX, y: e.clientY }
       moveHistoryRef.current = []
@@ -276,6 +308,7 @@ export function BubbleMap() {
     }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
+      if (isAnimatingCameraRef.current) return
       cancelAnimations()
       const rect = el.getBoundingClientRect()
       const cx = e.clientX - rect.left
@@ -298,6 +331,7 @@ export function BubbleMap() {
       el.removeEventListener('wheel', onWheel)
       cancelAnimationFrame(momentumRafRef.current)
       cancelAnimationFrame(springRafRef.current)
+      cancelAnimationFrame(cameraAnimRafRef.current)
     }
   }, [batchTransform, cancelAnimations, getBoundaryLimits, getMinScale, startPhysics])
 
@@ -306,6 +340,7 @@ export function BubbleMap() {
     const el = containerRef.current
     if (!el) return
     const onTouchStart = (e: TouchEvent) => {
+      if (isAnimatingCameraRef.current) return
       if (e.touches.length === 1) {
         const t = e.touches[0]!
         isPanningRef.current = true
@@ -410,18 +445,18 @@ export function BubbleMap() {
       el.removeEventListener('touchend', onTouchEnd)
       cancelAnimationFrame(momentumRafRef.current)
       cancelAnimationFrame(springRafRef.current)
+      cancelAnimationFrame(cameraAnimRafRef.current)
     }
   }, [selectMilestone, batchTransform, cancelAnimations, getBoundaryLimits, getMinScale, startPhysics])
 
   const handleRecenter = useCallback(() => {
-    cancelAnimations()
     if (recenterModeRef.current === 'focus') {
       // Focus on current milestone
       const current = getCurrentMilestone()
       if (!current) return
       const bubble = bubbles.find((b) => b.milestoneId === current.id)
       if (!bubble) return
-      setTransform({
+      animateCamera({
         x: dimensions.width / 2 - bubble.x * 1.2,
         y: dimensions.height / 2 - bubble.y * 1.2,
         scale: 1.2,
@@ -440,7 +475,7 @@ export function BubbleMap() {
       const scale = Math.max(getMinScale(), Math.min(dimensions.width / mapW, dimensions.height / mapH, 1))
       const cx = (minX + maxX) / 2
       const cy = (minY + maxY) / 2
-      setTransform({
+      animateCamera({
         x: dimensions.width / 2 - cx * scale,
         y: dimensions.height / 2 - cy * scale,
         scale,
@@ -448,7 +483,7 @@ export function BubbleMap() {
       recenterModeRef.current = 'focus'
       window.dispatchEvent(new CustomEvent('cyto-recenter-mode', { detail: 'focus' }))
     }
-  }, [bubbles, dimensions, getCurrentMilestone, cancelAnimations, getMinScale])
+  }, [bubbles, dimensions, getCurrentMilestone, animateCamera, getMinScale])
 
   useEffect(() => {
     const handler = () => handleRecenter()
