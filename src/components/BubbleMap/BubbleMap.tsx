@@ -184,8 +184,8 @@ export function BubbleMap() {
     const tick = (now: number) => {
       const elapsed = now - startTime
       const rawT = Math.min(elapsed / duration, 1)
-      // Ease-out cubic: fast start, gentle settle
-      const t = 1 - Math.pow(1 - rawT, 3)
+      // Ease-in-out cubic
+      const t = rawT < 0.5 ? 4 * rawT * rawT * rawT : 1 - Math.pow(-2 * rawT + 2, 3) / 2
       setTransform({
         x: start.x + (target.x - start.x) * t,
         y: start.y + (target.y - start.y) * t,
