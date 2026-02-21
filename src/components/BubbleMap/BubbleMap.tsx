@@ -593,7 +593,7 @@ export function BubbleMap() {
   return (
     <div
       ref={containerRef}
-      className="w-full h-screen overflow-hidden relative"
+      className="w-full h-dvh overflow-hidden relative"
       style={{ touchAction: 'none' }}
     >
       <BackgroundParticles transform={transform} />
