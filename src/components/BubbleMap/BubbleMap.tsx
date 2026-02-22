@@ -11,7 +11,6 @@ import { useTuningStore } from '@/stores/tuningStore'
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
 const EDGE_PADDING = 40 // px from screen edge for auto-zoom fit
-const AUTO_ZOOM_EASE = 0.15 // per-frame lerp factor (~300ms to 95%)
 const MAX_SINGLE_SCALE = 1.2 // max zoom for single-column sections
 
 /** Compute release velocity from recent Y deltas (last 80ms window). */
@@ -274,7 +273,7 @@ export function BubbleMap() {
     [cancelAnimations],
   )
 
-  // --- Scroll physics (Y-only with auto-zoom) ---
+  // --- Scroll physics (Y-only momentum + boundary spring) ---
   const startPhysics = useCallback(
     (vy0: number) => {
       cancelAnimationFrame(momentumRafRef.current)
@@ -288,9 +287,7 @@ export function BubbleMap() {
           : cur.y < lim0.minY
             ? cur.y - lim0.minY
             : 0
-      const scaleTarget = getTargetScale(cur.y, cur.scale)
-      const scaleOff = Math.abs(scaleTarget - cur.scale)
-      if (Math.abs(vy) < 0.5 && Math.abs(oy0) < 0.5 && scaleOff < 0.001) {
+      if (Math.abs(vy) < 0.5 && Math.abs(oy0) < 0.5) {
         return
       }
 
@@ -312,32 +309,8 @@ export function BubbleMap() {
         vy -= overY * TENSION
         vy *= overY !== 0 ? SPRING_DAMP : FRICTION
 
-        // Auto-zoom: ease scale toward target.
-        // Freeze zoom during bounce to prevent feedback between spring and auto-zoom.
-        const MAX_ZOOM = 3.0
-        const rawTarget = overY === 0 ? getTargetScale(t.y + vy, t.scale) : t.scale
-        // Only snap back if user exceeded max zoom (3.0x).
-        // Don't pull back in if user intentionally zoomed out below content-fit target.
-        const targetScale =
-          t.scale > MAX_ZOOM ? MAX_ZOOM : t.scale < rawTarget ? t.scale : rawTarget
-        const newScale = t.scale + (targetScale - t.scale) * AUTO_ZOOM_EASE
-        const newX = computeX(newScale)
-
-        // Compensate Y when auto-zoom changes scale to keep viewport center
-        // anchored at the same world-space point. Without this, scale changes
-        // shift the scroll bounds, pushing the position out of bounds and
-        // triggering a spring -> auto-zoom feedback loop (fork bounce bug).
-        let baseY = t.y
-        if (Math.abs(newScale - t.scale) > 0.0001) {
-          const dims = dimensionsRef.current
-          const viewH = Math.min(dims.height, window.innerHeight || dims.height)
-          const centerWorldY = (viewH / 2 - t.y) / t.scale
-          baseY = viewH / 2 - centerWorldY * newScale
-        }
-
         // Settle check
-        const scaleSettled = Math.abs(targetScale - newScale) < 0.001
-        if (Math.abs(vy) < 0.3 && Math.abs(overY) < 0.5 && scaleSettled) {
+        if (Math.abs(vy) < 0.3 && Math.abs(overY) < 0.5) {
           if (overY !== 0) {
             setTransform((prev) => ({
               x: computeX(prev.scale),
@@ -348,13 +321,13 @@ export function BubbleMap() {
           return
         }
 
-        setTransform({ x: newX, y: baseY + vy, scale: newScale })
+        setTransform({ x: computeX(t.scale), y: t.y + vy, scale: t.scale })
         momentumRafRef.current = requestAnimationFrame(animate)
       }
 
       momentumRafRef.current = requestAnimationFrame(animate)
     },
-    [getScrollBounds, getTargetScale, computeX],
+    [getScrollBounds, computeX],
   )
 
   // --- Initial view: zoom-to-fit before first paint ---
@@ -433,7 +406,7 @@ export function BubbleMap() {
     }
   }, [settled, bubbles, dimensions, getCurrentMilestone, getTargetScale, computeX])
 
-  // --- Mouse handlers: drag = vertical scroll, wheel = vertical scroll ---
+  // --- Mouse handlers: drag = Y pan, wheel = Y pan ---
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -463,9 +436,7 @@ export function BubbleMap() {
         const lim = getScrollBounds(t.scale)
         const ry = overdragResist(t.y, lim.minY, lim.maxY)
         const newY = t.y + dy * ry
-        const targetScale = getTargetScale(newY, t.scale)
-        const newScale = t.scale + (targetScale - t.scale) * AUTO_ZOOM_EASE
-        return { x: computeX(newScale), y: newY, scale: newScale }
+        return { x: computeX(t.scale), y: newY, scale: t.scale }
       })
     }
 
@@ -490,9 +461,7 @@ export function BubbleMap() {
         const lim = getScrollBounds(t.scale)
         const ry = overdragResist(t.y, lim.minY, lim.maxY)
         const newY = t.y + scrollDy * ry
-        const targetScale = getTargetScale(newY, t.scale)
-        const newScale = t.scale + (targetScale - t.scale) * AUTO_ZOOM_EASE
-        return { x: computeX(newScale), y: newY, scale: newScale }
+        return { x: computeX(t.scale), y: newY, scale: t.scale }
       })
 
       // Debounce: start momentum after wheel events stop
@@ -516,7 +485,7 @@ export function BubbleMap() {
       cancelAnimationFrame(cameraAnimRafRef.current)
       clearTimeout(wheelTimeoutRef.current)
     }
-  }, [batchTransform, cancelAnimations, getScrollBounds, getTargetScale, computeX, startPhysics])
+  }, [batchTransform, cancelAnimations, getScrollBounds, computeX, startPhysics])
 
   // --- Touch handlers: drag = vertical scroll, pinch = zoom ---
   useEffect(() => {
@@ -572,9 +541,7 @@ export function BubbleMap() {
           const lim = getScrollBounds(tr.scale)
           const ry = overdragResist(tr.y, lim.minY, lim.maxY)
           const newY = tr.y + dy * ry
-          const targetScale = getTargetScale(newY, tr.scale)
-          const newScale = tr.scale + (targetScale - tr.scale) * AUTO_ZOOM_EASE
-          return { x: computeX(newScale), y: newY, scale: newScale }
+          return { x: computeX(tr.scale), y: newY, scale: tr.scale }
         })
       } else if (e.touches.length === 2) {
         e.preventDefault()
@@ -647,7 +614,6 @@ export function BubbleMap() {
     batchTransform,
     cancelAnimations,
     getScrollBounds,
-    getTargetScale,
     computeX,
     startPhysics,
   ])
