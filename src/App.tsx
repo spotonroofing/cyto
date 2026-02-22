@@ -8,7 +8,8 @@ import { useChatStore } from '@/stores/chatStore'
 import { useUIStore } from '@/stores/uiStore'
 import { BubbleMap } from '@/components/BubbleMap/BubbleMap'
 import { FloatingButton } from '@/components/UI/FloatingButton'
-import { GooTuningPanel } from '@/components/UI/GooTuningPanel'
+// TUNING PANEL DISABLED — preserved on goo-svg-filter-baseline branch
+// import { GooTuningPanel } from '@/components/UI/GooTuningPanel'
 import { TypewriterTerminal } from '@/components/UI/TypewriterTerminal'
 import { useTheme } from '@/themes'
 
@@ -84,8 +85,8 @@ export function App() {
         {/* Bubble Map (always rendered) */}
         <BubbleMap />
 
-        {/* Goo tuning panel — desktop only */}
-        <GooTuningPanel />
+        {/* TUNING PANEL DISABLED — preserved on goo-svg-filter-baseline branch */}
+        {/* <GooTuningPanel /> */}
 
         {/* Typewriter terminal — map view only */}
         {showMapOnlyButtons && (
