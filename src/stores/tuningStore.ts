@@ -12,6 +12,39 @@ export const TUNING_DEFAULTS = {
   phaseIndicatorFontSize: 8,
   particleCount: Q.particleCount,
   particleSpreadX: 1.0,
+
+  // Goo filter
+  gooContrast: 20,
+  gooThreshold: -8,
+
+  // Nucleus filter
+  nucleusBlur: 3,
+  nucleusContrast: 18,
+  nucleusThreshold: -7,
+
+  // Edge wobble (multipliers on hardcoded constants)
+  edgeWobbleSpeed: 1.0,
+  edgeWobbleAmp: 1.0,
+
+  // SVG nucleus animation
+  svgNucleusBreatheSpeed: 0.8,
+  svgNucleusBreatheAmp: 0.025,
+  svgNucleus2LobeSpeed: 0.6,
+  svgNucleus2LobeAmp: 0.035,
+  svgNucleus3LobeSpeed: 0.45,
+  svgNucleus3LobeAmp: 0.025,
+  svgNucleus5LobeSpeed: 0.35,
+  svgNucleus5LobeAmp: 0.015,
+  nucleusOpacity: 0.7,
+
+  // Membrane breathing
+  membraneBreatheSpeed: 0.5,
+  membraneBreatheAmp: 3.6,
+  membraneDeformASpeed: 0.3,
+  membraneDeformAAmp: 3.6,
+  membraneDeformBSpeed: 0.25,
+  membraneDeformBAmp: 2.4,
+  membraneRotSpeed: -0.15,
 } as const
 
 export type TuningKey = keyof typeof TUNING_DEFAULTS
@@ -36,6 +69,39 @@ export interface TuningState {
   // Particles
   particleCount: number          // base count before debug multiplier
   particleSpreadX: number        // multiplier on horizontal range (default 1.0)
+
+  // Goo filter
+  gooContrast: number            // feColorMatrix alpha multiplier (default 20)
+  gooThreshold: number           // feColorMatrix alpha offset (default -8)
+
+  // Nucleus filter
+  nucleusBlur: number            // nucleus feGaussianBlur stdDeviation (default 3)
+  nucleusContrast: number        // nucleus feColorMatrix alpha multiplier (default 18)
+  nucleusThreshold: number       // nucleus feColorMatrix alpha offset (default -7)
+
+  // Edge wobble
+  edgeWobbleSpeed: number        // master speed multiplier on edge wobble (default 1.0)
+  edgeWobbleAmp: number          // master amplitude multiplier on edge wobble (default 1.0)
+
+  // SVG nucleus animation
+  svgNucleusBreatheSpeed: number // breathing speed (default 0.8)
+  svgNucleusBreatheAmp: number   // breathing amplitude ratio (default 0.025)
+  svgNucleus2LobeSpeed: number   // 2-lobe deform speed (default 0.6)
+  svgNucleus2LobeAmp: number     // 2-lobe deform amplitude ratio (default 0.035)
+  svgNucleus3LobeSpeed: number   // 3-lobe deform speed (default 0.45)
+  svgNucleus3LobeAmp: number     // 3-lobe deform amplitude ratio (default 0.025)
+  svgNucleus5LobeSpeed: number   // 5-lobe deform speed (default 0.35)
+  svgNucleus5LobeAmp: number     // 5-lobe deform amplitude ratio (default 0.015)
+  nucleusOpacity: number         // nucleus fill opacity (default 0.7)
+
+  // Membrane breathing
+  membraneBreatheSpeed: number   // breathing sine speed (default 0.5)
+  membraneBreatheAmp: number     // breathing amplitude (default 3.6)
+  membraneDeformASpeed: number   // deform A speed (default 0.3)
+  membraneDeformAAmp: number     // deform A amplitude (default 3.6)
+  membraneDeformBSpeed: number   // deform B speed (default 0.25)
+  membraneDeformBAmp: number     // deform B amplitude (default 2.4)
+  membraneRotSpeed: number       // rotation speed (default -0.15)
 
   set: <K extends TuningKey>(key: K, value: number) => void
   reset: () => void

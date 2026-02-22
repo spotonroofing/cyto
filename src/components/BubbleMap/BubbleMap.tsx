@@ -114,6 +114,9 @@ export function BubbleMap() {
 
   const { bubbles, links, settled, rowBands } = useBubbleLayout(dimensions.width, dimensions.height)
   const particleSpreadX = useTuningStore((s) => s.particleSpreadX)
+  const nucleusBlur = useTuningStore((s) => s.nucleusBlur)
+  const nucleusContrast = useTuningStore((s) => s.nucleusContrast)
+  const nucleusThreshold = useTuningStore((s) => s.nucleusThreshold)
 
   // World center X for horizontal centering
   const worldCenterX = useMemo(() => {
@@ -709,11 +712,11 @@ export function BubbleMap() {
         <svg width="0" height="0" style={{ position: 'absolute' }}>
           <defs>
             <filter id="nucleus-goo" colorInterpolationFilters="sRGB">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+              <feGaussianBlur in="SourceGraphic" stdDeviation={String(nucleusBlur)} result="blur" />
               <feColorMatrix
                 in="blur"
                 type="matrix"
-                values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7"
+                values={`1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 ${nucleusContrast} ${nucleusThreshold}`}
                 result="goo"
               />
               <feBlend in="SourceGraphic" in2="goo" />

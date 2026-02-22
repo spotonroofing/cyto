@@ -35,6 +35,49 @@ const sections: Section[] = [
     ],
   },
   {
+    title: 'Goo Filter',
+    sliders: [
+      { key: 'gooContrast',      label: 'Goo Contrast',  min: 1,   max: 40, step: 1   },
+      { key: 'gooThreshold',     label: 'Goo Threshold', min: -20, max: 0,  step: 0.5 },
+      { key: 'nucleusBlur',      label: 'Nuc Blur',      min: 0,   max: 15, step: 0.5 },
+      { key: 'nucleusContrast',  label: 'Nuc Contrast',  min: 1,   max: 40, step: 1   },
+      { key: 'nucleusThreshold', label: 'Nuc Threshold', min: -20, max: 0,  step: 0.5 },
+    ],
+  },
+  {
+    title: 'Edge Wobble',
+    sliders: [
+      { key: 'edgeWobbleSpeed', label: 'Wobble Spd', min: 0, max: 3, step: 0.05 },
+      { key: 'edgeWobbleAmp',   label: 'Wobble Amp', min: 0, max: 3, step: 0.05 },
+    ],
+  },
+  {
+    title: 'Nucleus SVG',
+    sliders: [
+      { key: 'svgNucleusBreatheSpeed', label: 'Breathe Spd',  min: 0, max: 3,   step: 0.05  },
+      { key: 'svgNucleusBreatheAmp',   label: 'Breathe Amp',  min: 0, max: 0.1, step: 0.005 },
+      { key: 'svgNucleus2LobeSpeed',   label: '2-Lobe Spd',   min: 0, max: 3,   step: 0.05  },
+      { key: 'svgNucleus2LobeAmp',     label: '2-Lobe Amp',   min: 0, max: 0.1, step: 0.005 },
+      { key: 'svgNucleus3LobeSpeed',   label: '3-Lobe Spd',   min: 0, max: 3,   step: 0.05  },
+      { key: 'svgNucleus3LobeAmp',     label: '3-Lobe Amp',   min: 0, max: 0.1, step: 0.005 },
+      { key: 'svgNucleus5LobeSpeed',   label: '5-Lobe Spd',   min: 0, max: 3,   step: 0.05  },
+      { key: 'svgNucleus5LobeAmp',     label: '5-Lobe Amp',   min: 0, max: 0.1, step: 0.005 },
+      { key: 'nucleusOpacity',         label: 'Opacity',       min: 0, max: 1,   step: 0.05  },
+    ],
+  },
+  {
+    title: 'Membrane',
+    sliders: [
+      { key: 'membraneBreatheSpeed', label: 'Breathe Spd',  min: 0,  max: 3,  step: 0.05 },
+      { key: 'membraneBreatheAmp',   label: 'Breathe Amp',  min: 0,  max: 10, step: 0.2  },
+      { key: 'membraneDeformASpeed', label: 'Deform A Spd', min: 0,  max: 2,  step: 0.05 },
+      { key: 'membraneDeformAAmp',   label: 'Deform A Amp', min: 0,  max: 10, step: 0.2  },
+      { key: 'membraneDeformBSpeed', label: 'Deform B Spd', min: 0,  max: 2,  step: 0.05 },
+      { key: 'membraneDeformBAmp',   label: 'Deform B Amp', min: 0,  max: 10, step: 0.2  },
+      { key: 'membraneRotSpeed',     label: 'Rot Speed',    min: -1, max: 1,  step: 0.05 },
+    ],
+  },
+  {
     title: 'Particles',
     sliders: [
       { key: 'particleCount',   label: 'Particles', min: 0,   max: 300, step: 5   },

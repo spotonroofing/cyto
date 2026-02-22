@@ -40,6 +40,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
   const iconSizeRatio = useTuningStore((s) => s.iconSizeRatio)
   const phaseNameFontSize = useTuningStore((s) => s.phaseNameFontSize)
   const phaseIndicatorFontSize = useTuningStore((s) => s.phaseIndicatorFontSize)
+  const nucleusOpacity = useTuningStore((s) => s.nucleusOpacity)
 
   const milestone = milestones.find((m) => m.id === milestoneId)
   const phase = phases.find((p) => p.id === milestone?.phaseId)
@@ -75,7 +76,8 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       lastFrame = now
 
       // Read per-frame so tuning slider changes take effect immediately
-      const nucleusR = radius * useTuningStore.getState().nucleusRatioSvg
+      const tn = useTuningStore.getState()
+      const nucleusR = radius * tn.nucleusRatioSvg
 
       let d = ''
       if (dbg.nucleusWobble) {
@@ -83,13 +85,13 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
         for (let i = 0; i <= NUCLEUS_WOBBLE_STEPS; i++) {
           const angle = (i / NUCLEUS_WOBBLE_STEPS) * Math.PI * 2
           let r = nucleusR
-          // Breathing — freq 0.8 (membrane uses 0.5)
-          r += Math.sin(t * 0.8 + p * 2) * nucleusR * 0.025
-          // 2-lobe deformation — freq 0.6 (membrane uses 0.3)
-          r += Math.sin(2 * angle + t * 0.6 + p) * nucleusR * 0.035
-          // 3-lobe deformation — freq 0.45 (membrane uses 0.25)
-          r += Math.sin(3 * angle + t * 0.45 + p * 1.3) * nucleusR * 0.025
-          r += Math.sin(5 * angle - t * 0.35 + p * 0.7) * nucleusR * 0.015
+          // Breathing
+          r += Math.sin(t * tn.svgNucleusBreatheSpeed + p * 2) * nucleusR * tn.svgNucleusBreatheAmp
+          // 2-lobe deformation
+          r += Math.sin(2 * angle + t * tn.svgNucleus2LobeSpeed + p) * nucleusR * tn.svgNucleus2LobeAmp
+          // 3-lobe deformation
+          r += Math.sin(3 * angle + t * tn.svgNucleus3LobeSpeed + p * 1.3) * nucleusR * tn.svgNucleus3LobeAmp
+          r += Math.sin(5 * angle - t * tn.svgNucleus5LobeSpeed + p * 0.7) * nucleusR * tn.svgNucleus5LobeAmp
           const px = Math.cos(angle) * r
           const py = Math.sin(angle) * r
           d += `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`
@@ -120,7 +122,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
     >
       {/* Nucleus — organic wobbling core with goo filter */}
       <g filter="url(#nucleus-goo)">
-        <path ref={nucleusRef} fill={color} opacity={0.7} />
+        <path ref={nucleusRef} fill={color} opacity={nucleusOpacity} />
       </g>
       {/* Hit target */}
       <circle cx={0} cy={0} r={radius} fill="transparent" />

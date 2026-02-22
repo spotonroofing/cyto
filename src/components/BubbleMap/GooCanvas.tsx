@@ -183,6 +183,15 @@ function renderShapes(
   const NUCLEUS_STEPS = Q.gooNucleusSteps
   const NUCLEUS_HARMONICS = Q.gooNucleusHarmonics
 
+  // Tuning params (read once per frame)
+  const {
+    edgeWobbleSpeed: ewSpd, edgeWobbleAmp: ewAmp,
+    membraneBreatheSpeed, membraneBreatheAmp,
+    membraneDeformASpeed, membraneDeformAAmp,
+    membraneDeformBSpeed, membraneDeformBAmp,
+    membraneRotSpeed,
+  } = useTuningStore.getState()
+
   // ── Draw connections as thick tapered filled paths ──
 
   for (const conn of connections) {
@@ -229,12 +238,12 @@ function renderShapes(
         const edgeT = i / segments
         const wDamp = Math.sin(edgeT * Math.PI)
         const wobbleUpper = (
-          Math.sin(time * 3.2 + edgeT * 6 + conn.phaseOffset) * 2.5
-          + Math.sin(time * 2.1 + edgeT * 3.5 + conn.phaseOffset * 1.7) * 1.5
+          Math.sin(time * 3.2 * ewSpd + edgeT * 6 + conn.phaseOffset) * 2.5 * ewAmp
+          + Math.sin(time * 2.1 * ewSpd + edgeT * 3.5 + conn.phaseOffset * 1.7) * 1.5 * ewAmp
         ) * wDamp
         const wobbleLower = (
-          Math.sin(time * 2.8 + edgeT * 5.5 + conn.phaseOffset + 2.1) * 2.5
-          + Math.sin(time * 2.3 + edgeT * 3 + conn.phaseOffset * 1.3 + 1.0) * 1.5
+          Math.sin(time * 2.8 * ewSpd + edgeT * 5.5 + conn.phaseOffset + 2.1) * 2.5 * ewAmp
+          + Math.sin(time * 2.3 * ewSpd + edgeT * 3 + conn.phaseOffset * 1.3 + 1.0) * 1.5 * ewAmp
         ) * wDamp
         wU = p.width + wobbleUpper * wobbleI
         wL = p.width + wobbleLower * wobbleI
@@ -304,13 +313,13 @@ function renderShapes(
     }
 
     // Breathing radius
-    const breathe = Math.sin(time * 0.5 + blob.breathePhase) * 3.6 * wobbleI
+    const breathe = Math.sin(time * membraneBreatheSpeed + blob.breathePhase) * membraneBreatheAmp * wobbleI
     const baseR = blob.radius + breathe
 
     // Organic blob shape: draw with sinusoidal radius variation
-    const deformA = Math.sin(time * 0.3 + blob.wobblePhase) * 3.6 * wobbleI
-    const deformB = Math.cos(time * 0.25 + blob.wobblePhase * 1.3) * 2.4 * wobbleI
-    const rotPhase = time * -0.15 + blob.phaseIndex * 0.5
+    const deformA = Math.sin(time * membraneDeformASpeed + blob.wobblePhase) * membraneDeformAAmp * wobbleI
+    const deformB = Math.cos(time * membraneDeformBSpeed + blob.wobblePhase * 1.3) * membraneDeformBAmp * wobbleI
+    const rotPhase = time * membraneRotSpeed + blob.phaseIndex * 0.5
 
     ctx.beginPath()
     for (let i = 0; i <= BLOB_STEPS; i++) {
@@ -391,8 +400,9 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   const { phaseColor, palette } = useTheme()
   const paletteRef = useRef(palette)
 
-  // Ref for the SVG filter's blur element (used to sync stdDeviation with debug controls)
+  // Refs for the SVG filter elements (synced from rAF loop to avoid React re-renders)
   const gooBlurRef = useRef<SVGFEGaussianBlurElement>(null)
+  const gooCmRef = useRef<SVGFEColorMatrixElement>(null)
 
   // Keep refs in sync without restarting animation loop.
   // Transform uses inline assignment (not useEffect) to eliminate 1-frame lag
@@ -517,6 +527,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     // Cache last-written style values to avoid redundant DOM writes every frame
     let lastFilterStr = ''
     let lastStdDevStr = ''
+    let lastCmStr = ''
 
     const draw = (timestamp: number) => {
       const dbg = useDebugStore.getState()
@@ -583,6 +594,15 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         }
       }
 
+      // Sync goo feColorMatrix with tuning (cached)
+      if (gooCmRef.current) {
+        const cmStr = `1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 ${tuning.gooContrast} ${tuning.gooThreshold}`
+        if (cmStr !== lastCmStr) {
+          gooCmRef.current.setAttribute('values', cmStr)
+          lastCmStr = cmStr
+        }
+      }
+
       // Draw shapes directly to visible canvas with DPR + camera transform
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.save()
@@ -608,9 +628,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   }, [width, height, bubbles, palette])
   // NOTE: transform removed from deps — read from ref instead
 
-  // Unified color matrix — same goo strength on all devices
-  const cmValues = '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8'
-
   return (
     <>
       {/* SVG goo filter applied via CSS on the canvas element.
@@ -626,9 +643,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
               result="blur"
             />
             <feColorMatrix
+              ref={gooCmRef}
               in="blur"
               type="matrix"
-              values={cmValues}
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8"
               result="goo"
             />
             <feBlend in="SourceGraphic" in2="goo" />
