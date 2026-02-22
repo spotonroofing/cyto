@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useTuningStore, type TuningKey } from '@/stores/tuningStore'
+import { useTuningStore, TUNING_DEFAULTS, type TuningKey } from '@/stores/tuningStore'
 import { IS_MOBILE } from '@/utils/performanceTier'
 
 interface SliderDef {
@@ -136,19 +136,47 @@ export function GooTuningPanel() {
                   </button>
 
                   {!isCollapsed &&
-                    section.sliders.map((s) => (
+                    section.sliders.map((s) => {
+                      const current = store[s.key] as number
+                      const dflt = TUNING_DEFAULTS[s.key]
+                      const isDefault = current === dflt
+                      return (
                       <div key={s.key} style={{ marginBottom: 8 }}>
                         <div
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
+                            alignItems: 'center',
                             marginBottom: 2,
                             opacity: 0.6,
                           }}
                         >
                           <span>{s.label}</span>
-                          <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                            {formatValue(store[s.key] as number)}
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {formatValue(current)}
+                            </span>
+                            {!isDefault && (
+                              <button
+                                onClick={() => store.set(s.key, dflt)}
+                                title={`Reset to ${formatValue(dflt)}`}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  padding: 0,
+                                  margin: 0,
+                                  cursor: 'pointer',
+                                  fontSize: 14,
+                                  lineHeight: 1,
+                                  color: '#888',
+                                  transition: 'color 150ms',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b6b')}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = '#888')}
+                              >
+                                ↺
+                              </button>
+                            )}
                           </span>
                         </div>
                         <input
@@ -166,7 +194,8 @@ export function GooTuningPanel() {
                           }}
                         />
                       </div>
-                    ))}
+                      )
+                    })}
                 </div>
               )
             })}
