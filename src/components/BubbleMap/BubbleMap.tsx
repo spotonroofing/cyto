@@ -287,17 +287,29 @@ export function BubbleMap() {
           : cur.y < lim0.minY
             ? cur.y - lim0.minY
             : 0
-      if (Math.abs(vy) < 0.5 && Math.abs(oy0) < 0.5) {
+      const target0 = getTargetScale(cur.y, cur.scale)
+      const needsScaleEase = cur.scale > target0 + 0.005
+      if (Math.abs(vy) < 0.5 && Math.abs(oy0) < 0.5 && !needsScaleEase) {
         return
       }
 
       const FRICTION = 0.92
       const TENSION = 0.15
       const SPRING_DAMP = 0.5
+      const SCALE_EASE = 0.1
 
       const animate = () => {
         const t = transformRef.current
-        const limits = getScrollBounds(t.scale)
+
+        // Scale easing: only pull back when zoomed IN past target (never zoom back in)
+        let newScale = t.scale
+        const targetScale = getTargetScale(t.y, t.scale)
+        if (t.scale > targetScale + 0.003) {
+          newScale = t.scale + (targetScale - t.scale) * SCALE_EASE
+          if (Math.abs(newScale - targetScale) < 0.003) newScale = targetScale
+        }
+
+        const limits = getScrollBounds(newScale)
 
         const overY =
           t.y > limits.maxY
@@ -309,25 +321,35 @@ export function BubbleMap() {
         vy -= overY * TENSION
         vy *= overY !== 0 ? SPRING_DAMP : FRICTION
 
+        const scaleSettled = Math.abs(newScale - t.scale) < 0.001
+
         // Settle check
-        if (Math.abs(vy) < 0.3 && Math.abs(overY) < 0.5) {
+        if (Math.abs(vy) < 0.3 && Math.abs(overY) < 0.5 && scaleSettled) {
           if (overY !== 0) {
-            setTransform((prev) => ({
-              x: computeX(prev.scale),
-              y: Math.max(limits.minY, Math.min(limits.maxY, prev.y)),
-              scale: prev.scale,
-            }))
+            setTransform({
+              x: computeX(newScale),
+              y: Math.max(limits.minY, Math.min(limits.maxY, t.y)),
+              scale: newScale,
+            })
           }
           return
         }
 
-        setTransform({ x: computeX(t.scale), y: t.y + vy, scale: t.scale })
+        // Adjust Y for scale change (zoom around viewport center)
+        let newY = t.y + vy
+        if (newScale !== t.scale) {
+          const viewH = Math.min(dimensionsRef.current.height, window.innerHeight || dimensionsRef.current.height)
+          const ratio = newScale / t.scale
+          newY = viewH / 2 - (viewH / 2 - newY) * ratio
+        }
+
+        setTransform({ x: computeX(newScale), y: newY, scale: newScale })
         momentumRafRef.current = requestAnimationFrame(animate)
       }
 
       momentumRafRef.current = requestAnimationFrame(animate)
     },
-    [getScrollBounds, computeX],
+    [getScrollBounds, computeX, getTargetScale],
   )
 
   // --- Initial view: zoom-to-fit before first paint ---
@@ -460,8 +482,19 @@ export function BubbleMap() {
       batchTransform((t) => {
         const lim = getScrollBounds(t.scale)
         const ry = overdragResist(t.y, lim.minY, lim.maxY)
-        const newY = t.y + scrollDy * ry
-        return { x: computeX(t.scale), y: newY, scale: t.scale }
+        let newY = t.y + scrollDy * ry
+        let newScale = t.scale
+
+        // Auto-zoom back out if zoomed in past target (never zoom back in)
+        const target = getTargetScale(newY, t.scale)
+        if (t.scale > target + 0.003) {
+          newScale = t.scale + (target - t.scale) * 0.04
+          const viewH = Math.min(dimensionsRef.current.height, window.innerHeight || dimensionsRef.current.height)
+          const ratio = newScale / t.scale
+          newY = viewH / 2 - (viewH / 2 - newY) * ratio
+        }
+
+        return { x: computeX(newScale), y: newY, scale: newScale }
       })
 
       // Debounce: start momentum after wheel events stop
@@ -485,7 +518,7 @@ export function BubbleMap() {
       cancelAnimationFrame(cameraAnimRafRef.current)
       clearTimeout(wheelTimeoutRef.current)
     }
-  }, [batchTransform, cancelAnimations, getScrollBounds, computeX, startPhysics])
+  }, [batchTransform, cancelAnimations, getScrollBounds, computeX, startPhysics, getTargetScale])
 
   // --- Touch handlers: drag = vertical scroll, pinch = zoom ---
   useEffect(() => {
@@ -540,8 +573,19 @@ export function BubbleMap() {
         batchTransform((tr) => {
           const lim = getScrollBounds(tr.scale)
           const ry = overdragResist(tr.y, lim.minY, lim.maxY)
-          const newY = tr.y + dy * ry
-          return { x: computeX(tr.scale), y: newY, scale: tr.scale }
+          let newY = tr.y + dy * ry
+          let newScale = tr.scale
+
+          // Auto-zoom back out if zoomed in past target (never zoom back in)
+          const target = getTargetScale(newY, tr.scale)
+          if (tr.scale > target + 0.003) {
+            newScale = tr.scale + (target - tr.scale) * 0.03
+            const viewH = Math.min(dimensionsRef.current.height, window.innerHeight || dimensionsRef.current.height)
+            const ratio = newScale / tr.scale
+            newY = viewH / 2 - (viewH / 2 - newY) * ratio
+          }
+
+          return { x: computeX(newScale), y: newY, scale: newScale }
         })
       } else if (e.touches.length === 2) {
         e.preventDefault()
@@ -616,6 +660,7 @@ export function BubbleMap() {
     getScrollBounds,
     computeX,
     startPhysics,
+    getTargetScale,
   ])
 
   // --- Recenter handler ---
