@@ -19,6 +19,17 @@
 - **Result:** IN PROGRESS / Promising
 - **Why:** Separating goo (canvas) from cell body (SVG) solved color fringe. Filled paths solved "dotted line" issue.
 
+### Attempt 4: WebGL2 2-Pass Metaball Renderer (Mobile Only)
+- **What:** Replaces Canvas 2D + CSS SVG filter pipeline with a WebGL2 2-pass metaball renderer, gated behind `IS_MOBILE`. Desktop keeps the existing Attempt 3 pipeline unchanged.
+  - **Pass 1 — Density Field:** Each milestone blob and connection bridge blob is an instanced quad rendered to a half-resolution RGBA16F framebuffer with additive blending (`gl.ONE, gl.ONE`). The fragment shader outputs a quartic radial falloff (`f = (1 - dist²)²`) with color-weighted accumulation (`vec4(color * falloff, falloff)`).
+  - **Pass 2 — Threshold:** A full-screen quad samples the density texture. Color is recovered via `RGB / A` (weighted average). A `smoothstep` threshold with antialiased edges produces the goo shape. The threshold/smoothness values map directly from the existing SVG filter's `gooContrast` and `gooThreshold` tuning params.
+  - **Bridge Blobs:** Connections are sampled at 12 points using the same `sampleConnection()` math (curveBow, flowWave, fillet width profile). Each sample becomes a blob in the density field with radius = `width * 1.8` for overlap. This creates continuous goo bridges through density accumulation.
+  - **Camera:** Transform `{x, y, scale}` is a `vec3` uniform in the vertex shader — pan/zoom is just a uniform update, no redraw of geometry.
+  - **Fallback:** If WebGL2 context creation fails, the component calls `onFallback()` and BubbleMap switches to the Canvas 2D pipeline.
+- **Result:** IN PROGRESS
+- **Why:** The CSS SVG filter (feGaussianBlur + feColorMatrix + feBlend = 3 GPU shader passes on ~780×1688 pixels) was the #1 mobile performance bottleneck. The WebGL approach renders density at 0.5× resolution (~195×422) and threshold at 1× DPR (~390×844), with only 2 draw calls per frame using instanced rendering. Expected 3-5× GPU cost reduction. Camera transform is free (uniform vs full redraw + filter re-evaluation).
+- **File:** `src/components/BubbleMap/GooCanvasGL.tsx`
+
 ## Challenge: Organic Cell Shape
 
 ### Attempt 1: feTurbulence Filter

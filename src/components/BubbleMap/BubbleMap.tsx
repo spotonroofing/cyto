@@ -2,11 +2,13 @@ import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo } fr
 import { useBubbleLayout } from './useBubbleLayout'
 import { Bubble } from './Bubble'
 import { GooCanvas } from './GooCanvas'
+import { GooCanvasGL } from './GooCanvasGL'
 import { BackgroundParticles } from './BackgroundParticles'
 import { DotGrid } from './DotGrid'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useTuningStore } from '@/stores/tuningStore'
+import { IS_MOBILE } from '@/utils/performanceTier'
 
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
@@ -38,6 +40,8 @@ export function BubbleMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 })
+  const [useWebGL, setUseWebGL] = useState(IS_MOBILE)
+  const handleWebGLFallback = useCallback(() => setUseWebGL(false), [])
 
   const isPanningRef = useRef(false)
   const lastPanYRef = useRef(0)
@@ -740,14 +744,25 @@ export function BubbleMap() {
           </defs>
         </svg>
 
-        {/* Goo canvas — milestone blobs + animated tapered connections with goo filter */}
-        <GooCanvas
-          width={dimensions.width}
-          height={dimensions.height}
-          bubbles={bubbles}
-          links={links}
-          transform={transform}
-        />
+        {/* Goo canvas — milestone blobs + animated tapered connections */}
+        {useWebGL ? (
+          <GooCanvasGL
+            width={dimensions.width}
+            height={dimensions.height}
+            bubbles={bubbles}
+            links={links}
+            transform={transform}
+            onFallback={handleWebGLFallback}
+          />
+        ) : (
+          <GooCanvas
+            width={dimensions.width}
+            height={dimensions.height}
+            bubbles={bubbles}
+            links={links}
+            transform={transform}
+          />
+        )}
 
         {/* SVG overlay — labels and click targets (no filter) */}
         <svg
