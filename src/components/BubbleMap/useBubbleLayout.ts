@@ -62,8 +62,11 @@ export function useBubbleLayout(width: number, height: number) {
 
     const paddingY = ROW_SPACING * 0.5
     const centerX = width / 2
-    const waveAmplitude = Math.min(width * 0.06, 40)
-    const branchOffset = Math.min(width * 0.22, 160)
+    // Use fixed world-space values so mobile gets the same proportional layout
+    // as desktop. Auto-zoom (fitScale / getTargetScale) handles fitting to the
+    // actual viewport — scaling everything down uniformly on smaller screens.
+    const waveAmplitude = 40
+    const branchOffset = 160
 
     // Build bubbles with deterministic positions
     const positionMap = new Map<string, { x: number; y: number; radius: number; phaseIndex: number }>()

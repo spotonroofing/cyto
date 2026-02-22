@@ -583,10 +583,12 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         lastFilterStr = filterStr
       }
 
-      // Sync SVG filter blur radius with tuning + debug slider (cached)
+      // Sync SVG filter blur radius with tuning + debug slider (cached).
+      // Scale by zoom so blur-to-shape ratio stays constant at all zoom levels —
+      // without this, zooming out makes the fixed-pixel blur overwhelm the shapes.
       const tuning = useTuningStore.getState()
       if (gooBlurRef.current) {
-        const stdDev = tuning.blurStdDev * dbg.filterBlurRadius
+        const stdDev = tuning.blurStdDev * dbg.filterBlurRadius * tf.scale
         const stdDevStr = String(stdDev)
         if (stdDevStr !== lastStdDevStr) {
           gooBlurRef.current.setAttribute('stdDeviation', stdDevStr)

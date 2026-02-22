@@ -582,7 +582,7 @@ export function BubbleMap() {
           const f = nd / lastPinchDist
           const my = (t0.clientY + t1.clientY) / 2 - el.getBoundingClientRect().top
           batchTransform((t) => {
-            const ns = Math.max(0.5, Math.min(3, t.scale * f))
+            const ns = Math.max(0.25, Math.min(3, t.scale * f))
             const r = ns / t.scale
             return { x: computeX(ns), y: my - (my - t.y) * r, scale: ns }
           })
