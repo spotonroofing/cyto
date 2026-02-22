@@ -26,9 +26,23 @@
   - **Bridge Blobs:** Connections are sampled at 12 points using the same `sampleConnection()` math (curveBow, flowWave, fillet width profile). Each sample becomes a blob in the density field with radius = `width * 1.8` for overlap. This creates continuous goo bridges through density accumulation.
   - **Camera:** Transform `{x, y, scale}` is a `vec3` uniform in the vertex shader — pan/zoom is just a uniform update, no redraw of geometry.
   - **Fallback:** If WebGL2 context creation fails, the component calls `onFallback()` and BubbleMap switches to the Canvas 2D pipeline.
+- **Result:** REVERTED (commit cf6263e)
+- **Why:** Mobile-only scope was too narrow — didn't replace the per-bubble nucleus SVG filter (24 GPU filter passes/frame). Reverted in favor of a unified approach (Attempt 5).
+- **File:** `src/components/BubbleMap/GooCanvasGL.tsx` (deleted)
+
+### Attempt 5: Unified WebGL2 2-Pass Metaball Renderer (All Platforms)
+- **What:** Replaces BOTH the goo Canvas 2D + CSS SVG filter AND the per-bubble nucleus SVG filter with a single WebGL2 canvas using 3 draw calls per frame on ALL platforms (desktop + mobile).
+  - **Pass 1 — Goo Density:** 8 membrane blobs + ~225 bridge blobs rendered as instanced quads to a half-res RGBA16F FBO with additive blending. Quartic radial falloff `(1 - dist²)²` with color-weighted accumulation.
+  - **Pass 2 — Nucleus Density:** 8 nuclei rendered to a separate half-res RGBA16F FBO with additive blending. Fragment shader computes angle-dependent radius from 4-harmonic wobble (breathe + 2/3/5-lobe harmonics) for organic cell shapes.
+  - **Pass 3 — Composite:** Full-screen quad samples both density textures, applies independent smoothstep thresholds, composites nucleus over goo with alpha-over blending.
+  - **Two FBOs:** The goo pass merges all shapes into one liquid mass. The nucleus pass gives each nucleus an independent soft edge WITHOUT merging them with each other or the goo layer. Two separate density fields with independent thresholds reproduce the original dual-filter behavior.
+  - **Camera:** Transform `{x, y, scale}` as a `vec3` uniform — pan/zoom is just a uniform update.
+  - **Bubble.tsx simplified:** Removed SVG nucleus `<path>`, rAF animation loop, and `filter="url(#nucleus-goo)"` wrapper. Only hit-target circle, phase icon, and text labels remain.
+  - **SVG filter defs removed:** Both `#nucleus-goo` and `#goo-css` filter definitions removed from DOM.
+  - **Shared math:** `sampleConnection()`, `blendHex()`, `hexToVec3()` extracted to `gooMath.ts`.
 - **Result:** IN PROGRESS
-- **Why:** The CSS SVG filter (feGaussianBlur + feColorMatrix + feBlend = 3 GPU shader passes on ~780×1688 pixels) was the #1 mobile performance bottleneck. The WebGL approach renders density at 0.5× resolution (~195×422) and threshold at 1× DPR (~390×844), with only 2 draw calls per frame using instanced rendering. Expected 3-5× GPU cost reduction. Camera transform is free (uniform vs full redraw + filter re-evaluation).
-- **File:** `src/components/BubbleMap/GooCanvasGL.tsx`
+- **Why:** Eliminates all SVG filter overhead. Previous approach had 27 GPU filter passes/frame (3 for goo + 24 for 8 nuclei × 3 passes each). New approach: 3 draw calls total with instanced rendering at half resolution. Nucleus wobble animation moves from JS rAF + SVG path recalculation to GPU fragment shader. Camera transform is a uniform update instead of full redraw + filter re-evaluation.
+- **Files:** `src/components/BubbleMap/GooCanvas.tsx` (rewritten), `src/components/BubbleMap/gooMath.ts` (new), `src/components/BubbleMap/Bubble.tsx` (simplified), `src/components/BubbleMap/BubbleMap.tsx` (filter defs removed)
 
 ## Challenge: Organic Cell Shape
 

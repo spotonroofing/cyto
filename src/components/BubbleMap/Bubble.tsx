@@ -1,9 +1,6 @@
-import { useRef, useEffect } from 'react'
 import { milestones, phases } from '@/stores/roadmapStore'
 import { useTheme } from '@/themes'
-import { useDebugStore } from '@/stores/debugStore'
 import { useTuningStore } from '@/stores/tuningStore'
-import { Q, IS_MOBILE, mobileIdle } from '@/utils/performanceTier'
 import {
   Microscope, FileSearch, Pill, HeartPulse,
   Utensils, FlaskConical, Sparkles, ShieldCheck,
@@ -15,15 +12,7 @@ const phaseIcons: Record<number, LucideIcon> = {
   4: Utensils, 5: FlaskConical, 6: Sparkles, 7: ShieldCheck,
 }
 
-/** Derive a stable phase offset from milestoneId for independent animation timing */
-function hashPhase(id: string): number {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h += id.charCodeAt(i)
-  return h * 0.37
-}
-
-const NUCLEUS_WOBBLE_STEPS = 64
-const ICON_LABEL_GAP = 5 // px of extra vertical spacing between phase icon and text label
+const ICON_LABEL_GAP = 5
 
 interface BubbleProps {
   milestoneId: string
@@ -35,82 +24,14 @@ interface BubbleProps {
 }
 
 export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
-  const { palette, phaseColor } = useTheme()
-  const nucleusRef = useRef<SVGPathElement>(null)
+  const { palette } = useTheme()
   const iconSizeRatio = useTuningStore((s) => s.iconSizeRatio)
   const phaseNameFontSize = useTuningStore((s) => s.phaseNameFontSize)
   const phaseIndicatorFontSize = useTuningStore((s) => s.phaseIndicatorFontSize)
-  const nucleusOpacity = useTuningStore((s) => s.nucleusOpacity)
 
   const milestone = milestones.find((m) => m.id === milestoneId)
   const phase = phases.find((p) => p.id === milestone?.phaseId)
   const phaseIndex = phase ? phases.indexOf(phase) : 0
-  const color = phaseColor(phaseIndex)
-
-  // Animate nucleus wobble via direct DOM manipulation (no React re-renders)
-  useEffect(() => {
-    const el = nucleusRef.current
-    if (!el) return
-    const p = hashPhase(milestoneId)
-    // On mobile: 4fps (saves 24 SVG filter re-evals/sec across 8 bubbles).
-    // On desktop: uncapped (runs at display refresh rate).
-    const targetDt = Q.bubbleTargetDt
-    let rafId = 0
-    let lastFrame = 0
-
-    const tick = (now: number) => {
-      // On mobile idle: skip path update → SVG filter (#nucleus-goo) not re-evaluated.
-      // Each of the 8 Bubble instances has its own filter (3 GPU shader passes each),
-      // so pausing all 8 saves 24 GPU passes per frame.
-      if (IS_MOBILE && mobileIdle.active) {
-        rafId = requestAnimationFrame(tick)
-        return
-      }
-
-      const dbg = useDebugStore.getState()
-      const effectiveDt = dbg.fpsCap > 0 ? 1000 / dbg.fpsCap : targetDt
-      if (effectiveDt > 0 && now - lastFrame < effectiveDt) {
-        rafId = requestAnimationFrame(tick)
-        return
-      }
-      lastFrame = now
-
-      // Read per-frame so tuning slider changes take effect immediately
-      const tn = useTuningStore.getState()
-      const nucleusR = radius * tn.nucleusRatioSvg
-
-      let d = ''
-      if (dbg.nucleusWobble) {
-        const t = now / 1000
-        for (let i = 0; i <= NUCLEUS_WOBBLE_STEPS; i++) {
-          const angle = (i / NUCLEUS_WOBBLE_STEPS) * Math.PI * 2
-          let r = nucleusR
-          // Breathing
-          r += Math.sin(t * tn.svgNucleusBreatheSpeed + p * 2) * nucleusR * tn.svgNucleusBreatheAmp
-          // 2-lobe deformation
-          r += Math.sin(2 * angle + t * tn.svgNucleus2LobeSpeed + p) * nucleusR * tn.svgNucleus2LobeAmp
-          // 3-lobe deformation
-          r += Math.sin(3 * angle + t * tn.svgNucleus3LobeSpeed + p * 1.3) * nucleusR * tn.svgNucleus3LobeAmp
-          r += Math.sin(5 * angle - t * tn.svgNucleus5LobeSpeed + p * 0.7) * nucleusR * tn.svgNucleus5LobeAmp
-          const px = Math.cos(angle) * r
-          const py = Math.sin(angle) * r
-          d += `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`
-        }
-      } else {
-        // Static circle when nucleus wobble is disabled
-        for (let i = 0; i <= NUCLEUS_WOBBLE_STEPS; i++) {
-          const angle = (i / NUCLEUS_WOBBLE_STEPS) * Math.PI * 2
-          const px = Math.cos(angle) * nucleusR
-          const py = Math.sin(angle) * nucleusR
-          d += `${i === 0 ? 'M' : 'L'}${px.toFixed(1)},${py.toFixed(1)}`
-        }
-      }
-      el.setAttribute('d', d + 'Z')
-      rafId = requestAnimationFrame(tick)
-    }
-    rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
-  }, [milestoneId, radius])
 
   return (
     <g
@@ -120,15 +41,10 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       role="button"
       tabIndex={0}
     >
-      {/* Nucleus — organic wobbling core with goo filter */}
-      <g filter="url(#nucleus-goo)">
-        <path ref={nucleusRef} fill={color} opacity={nucleusOpacity} />
-      </g>
       {/* Hit target */}
       <circle cx={0} cy={0} r={radius} fill="transparent" />
 
-      {/* Phase icon — wrapped in <g> for reliable mobile positioning
-          (nested <svg> x/y attributes are unreliable on mobile Safari) */}
+      {/* Phase icon */}
       {(() => {
         const Icon = phaseIcons[phaseIndex]
         if (!Icon) return null
@@ -146,7 +62,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
         )
       })()}
 
-      {/* Phase name — primary label */}
+      {/* Phase name */}
       <text
         x={0} y={5}
         textAnchor="middle" dominantBaseline="central"
@@ -159,7 +75,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
         {getShortPhaseName(phaseIndex)}
       </text>
 
-      {/* Phase number — secondary, smaller */}
+      {/* Phase number */}
       <text
         x={0} y={18}
         textAnchor="middle" dominantBaseline="central"

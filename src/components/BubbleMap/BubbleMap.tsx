@@ -113,9 +113,6 @@ export function BubbleMap() {
 
   const { bubbles, links, settled, rowBands } = useBubbleLayout(dimensions.width, dimensions.height)
   const particleSpreadX = useTuningStore((s) => s.particleSpreadX)
-  const nucleusBlur = useTuningStore((s) => s.nucleusBlur)
-  const nucleusContrast = useTuningStore((s) => s.nucleusContrast)
-  const nucleusThreshold = useTuningStore((s) => s.nucleusThreshold)
 
   // World center X for horizontal centering
   const worldCenterX = useMemo(() => {
@@ -724,23 +721,7 @@ export function BubbleMap() {
         <BackgroundParticles transform={transform} mapBounds={mapBounds} />
         <DotGrid width={dimensions.width} height={dimensions.height} transform={transform} />
 
-        {/* Hidden SVG for nucleus goo filter */}
-        <svg width="0" height="0" style={{ position: 'absolute' }}>
-          <defs>
-            <filter id="nucleus-goo" colorInterpolationFilters="sRGB">
-              <feGaussianBlur in="SourceGraphic" stdDeviation={String(nucleusBlur)} result="blur" />
-              <feColorMatrix
-                in="blur"
-                type="matrix"
-                values={`1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 ${nucleusContrast} ${nucleusThreshold}`}
-                result="goo"
-              />
-              <feBlend in="SourceGraphic" in2="goo" />
-            </filter>
-          </defs>
-        </svg>
-
-        {/* Goo canvas — milestone blobs + animated tapered connections */}
+{/* Goo canvas — milestone blobs + animated tapered connections */}
         <GooCanvas
           width={dimensions.width}
           height={dimensions.height}
