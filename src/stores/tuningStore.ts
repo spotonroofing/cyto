@@ -1,50 +1,49 @@
 import { create } from 'zustand'
-import { Q } from '@/utils/performanceTier'
 
 export const TUNING_DEFAULTS = {
-  tubeWidthRatio: 0.24,
-  filletWidthRatio: 1.4,
+  tubeWidthRatio: 0.200,
+  filletWidthRatio: 1.40,
   blurStdDev: 12,
   nucleusRatioCanvas: 0.782,
-  nucleusRatioSvg: 0.655,
-  iconSizeRatio: 0.28,
-  phaseNameFontSize: 11,
-  phaseIndicatorFontSize: 8,
-  particleCount: Q.particleCount,
-  particleSpreadX: 1.0,
+  nucleusRatioSvg: 0.700,
+  iconSizeRatio: 0.280,
+  phaseNameFontSize: 16,
+  phaseIndicatorFontSize: 12,
+  particleCount: 300,
+  particleSpreadX: 2.20,
 
   // Goo filter
-  gooContrast: 20,
+  gooContrast: 22,
   gooThreshold: -8,
 
   // Nucleus filter
-  nucleusBlur: 3,
+  nucleusBlur: 15,
   nucleusContrast: 18,
   nucleusThreshold: -7,
 
   // Edge wobble (multipliers on hardcoded constants)
-  edgeWobbleSpeed: 1.0,
-  edgeWobbleAmp: 1.0,
+  edgeWobbleSpeed: 1.45,
+  edgeWobbleAmp: 1.10,
 
   // SVG nucleus animation
-  svgNucleusBreatheSpeed: 0.8,
-  svgNucleusBreatheAmp: 0.025,
-  svgNucleus2LobeSpeed: 0.6,
-  svgNucleus2LobeAmp: 0.035,
-  svgNucleus3LobeSpeed: 0.45,
+  svgNucleusBreatheSpeed: 0.650,
+  svgNucleusBreatheAmp: 0.080,
+  svgNucleus2LobeSpeed: 2.30,
+  svgNucleus2LobeAmp: 0.030,
+  svgNucleus3LobeSpeed: 0.450,
   svgNucleus3LobeAmp: 0.025,
-  svgNucleus5LobeSpeed: 0.35,
+  svgNucleus5LobeSpeed: 0.350,
   svgNucleus5LobeAmp: 0.015,
-  nucleusOpacity: 0.7,
+  nucleusOpacity: 0.650,
 
   // Membrane breathing
-  membraneBreatheSpeed: 0.5,
-  membraneBreatheAmp: 3.6,
-  membraneDeformASpeed: 0.3,
-  membraneDeformAAmp: 3.6,
-  membraneDeformBSpeed: 0.25,
-  membraneDeformBAmp: 2.4,
-  membraneRotSpeed: -0.15,
+  membraneBreatheSpeed: 2.15,
+  membraneBreatheAmp: 4.60,
+  membraneDeformASpeed: 0.300,
+  membraneDeformAAmp: 3.60,
+  membraneDeformBSpeed: 0.250,
+  membraneDeformBAmp: 2.40,
+  membraneRotSpeed: -0.150,
 } as const
 
 export type TuningKey = keyof typeof TUNING_DEFAULTS
