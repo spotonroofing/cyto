@@ -50,7 +50,6 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
   useEffect(() => {
     const el = nucleusRef.current
     if (!el) return
-    const nucleusR = radius * useTuningStore.getState().nucleusRatioSvg
     const p = hashPhase(milestoneId)
     // On mobile: 4fps (saves 24 SVG filter re-evals/sec across 8 bubbles).
     // On desktop: uncapped (runs at display refresh rate).
@@ -74,6 +73,9 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
         return
       }
       lastFrame = now
+
+      // Read per-frame so tuning slider changes take effect immediately
+      const nucleusR = radius * useTuningStore.getState().nucleusRatioSvg
 
       let d = ''
       if (dbg.nucleusWobble) {
