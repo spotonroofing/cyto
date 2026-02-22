@@ -40,3 +40,11 @@
 
 ### Attempt 3: Native DOM Listeners + Plain g (Current)
 - **Result:** SUCCESS — Bypasses React synthetic events and Framer interpolation.
+
+## Challenge: Mobile Goo Filter Performance
+
+**Goal:** Reduce choppiness caused by the CSS SVG filter (feGaussianBlur + feColorMatrix) being re-evaluated every animation frame on mobile.
+
+### Attempt: Mobile goo frame throttle (20fps goo, 60fps scroll)
+- **What:** Added a frame counter (`MOBILE_FRAME_SKIP = 3`) in GooCanvas.tsx's rAF loop. On mobile, only every 3rd frame does a full canvas redraw (triggering filter re-evaluation). On the 2 skipped frames, the cached filter output is repositioned via a CSS `transform` (translate + scale) computed from the delta between the current camera transform and the last-drawn transform. CSS transforms are applied at the composite stage (after filter), so the browser reuses the cached filter bitmap — no GPU shader passes. Canvas element gets `will-change: transform` and `transform-origin: 0 0` on mobile to ensure cheap GPU compositing. Desktop path is completely unchanged.
+- **Result:** NEEDS VISUAL TESTING — compiles clean, logic is sound, but requires on-device verification for smoothness and correctness during pan/zoom.

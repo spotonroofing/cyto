@@ -5,6 +5,11 @@ import { useDebugStore } from '@/stores/debugStore'
 import { useTuningStore } from '@/stores/tuningStore'
 import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
 
+/** On mobile, only do a full canvas redraw every Nth frame (~20fps at 60Hz).
+ *  Intermediate frames apply a cheap CSS transform to track scroll/zoom
+ *  without triggering the expensive SVG filter re-evaluation. */
+const MOBILE_FRAME_SKIP = 3
+
 interface GooCanvasProps {
   width: number
   height: number
@@ -528,6 +533,9 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     let lastFilterStr = ''
     let lastStdDevStr = ''
     let lastCmStr = ''
+    // Mobile frame throttle: track which frame we're on and the transform at last full draw
+    let frameCount = 0
+    let lastDrawTf = { x: 0, y: 0, scale: 1 }
 
     const draw = (timestamp: number) => {
       const dbg = useDebugStore.getState()
@@ -554,6 +562,24 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       }
       if (IS_MOBILE) {
         mobileIdle.active = false
+      }
+
+      // ── Mobile frame throttle: skip expensive redraws on non-render frames ──
+      // The CSS SVG filter is re-evaluated every time canvas pixels change.
+      // On skip frames, we apply a CSS transform to reposition the cached bitmap
+      // instead — CSS transforms happen at the composite stage (after filter),
+      // so the browser reuses the cached filter output. ~3x less GPU filter work.
+      if (IS_MOBILE) {
+        frameCount++
+        if (frameCount % MOBILE_FRAME_SKIP !== 0) {
+          const cur = transformRef.current
+          const s = cur.scale / lastDrawTf.scale
+          const e = cur.x - s * lastDrawTf.x
+          const f = cur.y - s * lastDrawTf.y
+          canvas.style.transform = `translate(${e}px, ${f}px) scale(${s})`
+          animFrameRef.current = requestAnimationFrame(draw)
+          return
+        }
       }
 
       // FPS cap override: when set, overrides component default
@@ -606,6 +632,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       }
 
       // Draw shapes directly to visible canvas with DPR + camera transform
+      if (IS_MOBILE) canvas.style.transform = 'none'
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.save()
       ctx.scale(dpr, dpr)
@@ -621,6 +648,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         tuning.tubeWidthRatio, tuning.filletWidthRatio, tuning.nucleusRatioCanvas)
 
       ctx.restore()
+      if (IS_MOBILE) lastDrawTf = { x: tf.x, y: tf.y, scale: tf.scale }
 
       animFrameRef.current = requestAnimationFrame(draw)
     }
@@ -664,9 +692,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           opacity: palette.goo,
           // CSS filter for goo — browser handles DPR automatically
           filter: 'url(#goo-css)',
-          // On mobile, omit willChange so the browser can cache the filter result
-          // when canvas content is frozen during idle. On desktop, hint for smooth updates.
-          willChange: IS_MOBILE ? 'auto' : 'filter',
+          // On mobile, hint transform for cheap CSS repositioning on throttled frames.
+          // On desktop, hint filter for smooth goo updates.
+          willChange: IS_MOBILE ? 'transform' : 'filter',
+          transformOrigin: '0 0',
         }}
       />
     </>
