@@ -13,13 +13,6 @@ export const IS_MOBILE = typeof window !== 'undefined' &&
  */
 export const mobileIdle = { active: false }
 
-/**
- * Shared mobile scroll state — set by BubbleMap (owns touch handlers),
- * read by GooCanvas to freeze drawing during active scroll/pinch.
- * Plain object for zero-cost reads in rAF hot paths.
- */
-export const mobileScrolling = { active: false, debounceId: 0 }
-
 /** Quality settings — mobile matches desktop for goo rendering (visual correctness first) */
 export const Q = IS_MOBILE ? {
   canvasDpr: 2,

@@ -1,17 +1,9 @@
 import { useRef, useEffect } from 'react'
 import { useTheme } from '@/themes'
-import { Q, IS_MOBILE, mobileIdle, mobileScrolling } from '@/utils/performanceTier'
+import { Q, IS_MOBILE, mobileIdle } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
 import { useTuningStore } from '@/stores/tuningStore'
 import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
-
-/** On mobile, only do a full canvas redraw every Nth frame (~20fps at 60Hz).
- *  Intermediate frames apply a cheap CSS transform to track scroll/zoom
- *  without triggering the expensive SVG filter re-evaluation. */
-const MOBILE_FRAME_SKIP = 3
-
-/** ms over which wobble/animation gradually wakes up after scroll freeze ends. */
-const SCROLL_RESUME_RAMP_MS = 200
 
 interface GooCanvasProps {
   width: number
@@ -536,12 +528,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     let lastFilterStr = ''
     let lastStdDevStr = ''
     let lastCmStr = ''
-    // Mobile frame throttle: track which frame we're on and the transform at last full draw
-    let frameCount = 0
-    let lastDrawTf = { x: 0, y: 0, scale: 1 }
-    // Mobile scroll freeze: track frozen state for wake-up ramp
-    let wasScrollFrozen = false
-    let resumeTimestamp = 0
 
     const draw = (timestamp: number) => {
       const dbg = useDebugStore.getState()
@@ -570,48 +556,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         mobileIdle.active = false
       }
 
-      // ── Mobile scroll freeze: during active scroll, skip all canvas drawing
-      // and only apply CSS transforms. Canvas pixels don't change → browser
-      // caches the SVG filter output → CSS transform repositions at composite
-      // stage for zero filter cost. ──
-      if (IS_MOBILE && mobileScrolling.active) {
-        wasScrollFrozen = true
-        // Track wall-clock time so resume doesn't see a huge dt jump
-        lastFrameTime = timestamp
-        // DON'T advance animation `time` — goo shapes stay frozen
-        const cur = transformRef.current
-        const s = cur.scale / lastDrawTf.scale
-        const e = cur.x - s * lastDrawTf.x
-        const f = cur.y - s * lastDrawTf.y
-        canvas.style.transform = `translate(${e}px, ${f}px) scale(${s})`
-        animFrameRef.current = requestAnimationFrame(draw)
-        return
-      }
-
-      // Detect scroll freeze → live transition for wake-up ramp
-      if (wasScrollFrozen) {
-        wasScrollFrozen = false
-        resumeTimestamp = timestamp
-      }
-
-      // ── Mobile frame throttle: skip expensive redraws on non-render frames ──
-      // The CSS SVG filter is re-evaluated every time canvas pixels change.
-      // On skip frames, we apply a CSS transform to reposition the cached bitmap
-      // instead — CSS transforms happen at the composite stage (after filter),
-      // so the browser reuses the cached filter output. ~3x less GPU filter work.
-      if (IS_MOBILE) {
-        frameCount++
-        if (frameCount % MOBILE_FRAME_SKIP !== 0) {
-          const cur = transformRef.current
-          const s = cur.scale / lastDrawTf.scale
-          const e = cur.x - s * lastDrawTf.x
-          const f = cur.y - s * lastDrawTf.y
-          canvas.style.transform = `translate(${e}px, ${f}px) scale(${s})`
-          animFrameRef.current = requestAnimationFrame(draw)
-          return
-        }
-      }
-
       // FPS cap override: when set, overrides component default
       const effectiveDT = dbg.fpsCap > 0
         ? 1000 / dbg.fpsCap
@@ -624,23 +568,13 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       }
       const prevFrame = lastFrameTime
       lastFrameTime = timestamp
-      // Wake-up ramp: after scroll freeze ends, gradually bring animation back
-      // so the transition from frozen → live is seamless (no visual pop).
-      let rampT = 1
-      if (resumeTimestamp > 0) {
-        rampT = Math.min(1, (timestamp - resumeTimestamp) / SCROLL_RESUME_RAMP_MS)
-        if (rampT >= 1) resumeTimestamp = 0
-      }
-
-      // Use real elapsed time so wobble speed is independent of frame rate.
-      // During ramp, scale the time delta so animation gradually wakes up.
-      const dt = prevFrame > 0 ? Math.min((timestamp - prevFrame) / 1000, 0.1) : 0.016
-      time += dt * rampT
+      // Use real elapsed time so wobble speed is independent of frame rate
+      time += prevFrame > 0 ? Math.min((timestamp - prevFrame) / 1000, 0.1) : 0.016
 
       const pal = paletteRef.current
       const connections = connectionsRef.current
       const blobs = blobsRef.current
-      const wobbleI = (dbg.gooWobble ? dbg.gooWobbleIntensity : 0) * rampT
+      const wobbleI = dbg.gooWobble ? dbg.gooWobbleIntensity : 0
 
       // Sync CSS filter with debug toggle (cached to avoid redundant style writes)
       const filterStr = dbg.gooFilter ? 'url(#goo-css)' : 'none'
@@ -672,7 +606,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       }
 
       // Draw shapes directly to visible canvas with DPR + camera transform
-      if (IS_MOBILE) canvas.style.transform = 'none'
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.save()
       ctx.scale(dpr, dpr)
@@ -688,7 +621,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         tuning.tubeWidthRatio, tuning.filletWidthRatio, tuning.nucleusRatioCanvas)
 
       ctx.restore()
-      if (IS_MOBILE) lastDrawTf = { x: tf.x, y: tf.y, scale: tf.scale }
 
       animFrameRef.current = requestAnimationFrame(draw)
     }
@@ -703,7 +635,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       {/* SVG goo filter applied via CSS on the canvas element.
           Using CSS filter (not Canvas 2D filter API) ensures the browser
           handles DPR natively — identical visual result on all devices. */}
-      <svg width="0" height="0" style={{ position: 'absolute', ...(IS_MOBILE && { willChange: 'contents' }) }}>
+      <svg width="0" height="0" style={{ position: 'absolute' }}>
         <defs>
           <filter id="goo-css" colorInterpolationFilters="sRGB">
             <feGaussianBlur
@@ -732,10 +664,9 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
           opacity: palette.goo,
           // CSS filter for goo — browser handles DPR automatically
           filter: 'url(#goo-css)',
-          // On mobile, hint transform for cheap CSS repositioning on throttled frames.
-          // On desktop, hint filter for smooth goo updates.
-          willChange: IS_MOBILE ? 'transform' : 'filter',
-          transformOrigin: '0 0',
+          // On mobile, omit willChange so the browser can cache the filter result
+          // when canvas content is frozen during idle. On desktop, hint for smooth updates.
+          willChange: IS_MOBILE ? 'auto' : 'filter',
         }}
       />
     </>

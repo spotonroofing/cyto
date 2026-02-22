@@ -7,15 +7,11 @@ import { DotGrid } from './DotGrid'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useTuningStore } from '@/stores/tuningStore'
-import { IS_MOBILE, mobileScrolling } from '@/utils/performanceTier'
 
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
 const EDGE_PADDING = 40 // px from screen edge for auto-zoom fit
 const MAX_SINGLE_SCALE = 1.2 // max zoom for single-column sections
-
-/** ms after touchend before telling GooCanvas to resume live drawing (mobile only). */
-const SCROLL_FREEZE_DEBOUNCE_MS = 150
 
 /** Compute release velocity from recent Y deltas (last 80ms window). */
 function computeReleaseVelocity(history: Array<{ dy: number; time: number }>): number {
@@ -532,11 +528,6 @@ export function BubbleMap() {
 
     const onTouchStart = (e: TouchEvent) => {
       if (isAnimatingCameraRef.current) return
-      // Freeze goo drawing during touch interaction (mobile scroll-freeze optimization)
-      if (IS_MOBILE) {
-        clearTimeout(mobileScrolling.debounceId)
-        mobileScrolling.active = true
-      }
       if (e.touches.length === 1) {
         const t = e.touches[0]!
         isPanningRef.current = true
@@ -650,13 +641,6 @@ export function BubbleMap() {
       } else if (e.touches.length === 0) {
         startPhysics(0)
       }
-
-      // Debounced resume of goo drawing after touch ends
-      if (IS_MOBILE && e.touches.length === 0) {
-        mobileScrolling.debounceId = window.setTimeout(() => {
-          mobileScrolling.active = false
-        }, SCROLL_FREEZE_DEBOUNCE_MS)
-      }
     }
 
     el.addEventListener('touchstart', onTouchStart, { passive: false })
@@ -668,8 +652,6 @@ export function BubbleMap() {
       el.removeEventListener('touchend', onTouchEnd)
       cancelAnimationFrame(momentumRafRef.current)
       cancelAnimationFrame(cameraAnimRafRef.current)
-      clearTimeout(mobileScrolling.debounceId)
-      mobileScrolling.active = false
     }
   }, [
     selectMilestone,
@@ -737,13 +719,13 @@ export function BubbleMap() {
     <div
       ref={containerRef}
       className="w-full h-dvh overflow-hidden relative"
-      style={{ touchAction: 'none', ...(IS_MOBILE && { willChange: 'transform' }) }}
+      style={{ touchAction: 'none' }}
     >
         <BackgroundParticles transform={transform} mapBounds={mapBounds} />
         <DotGrid width={dimensions.width} height={dimensions.height} transform={transform} />
 
         {/* Hidden SVG for nucleus goo filter */}
-        <svg width="0" height="0" style={{ position: 'absolute', ...(IS_MOBILE && { willChange: 'contents' }) }}>
+        <svg width="0" height="0" style={{ position: 'absolute' }}>
           <defs>
             <filter id="nucleus-goo" colorInterpolationFilters="sRGB">
               <feGaussianBlur in="SourceGraphic" stdDeviation={String(nucleusBlur)} result="blur" />
