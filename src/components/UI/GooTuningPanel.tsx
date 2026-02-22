@@ -132,7 +132,6 @@ export function GooTuningPanel() {
             fontSize: 11,
             pointerEvents: 'auto',
             maxHeight: '80vh',
-            overflowY: 'auto',
             borderRight: '1px solid rgba(255,255,255,0.06)',
             borderTop: '1px solid rgba(255,255,255,0.06)',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -141,7 +140,7 @@ export function GooTuningPanel() {
           }}
         >
           {/* Sections */}
-          <div style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
             {sections.map((section) => {
               const isCollapsed = !!collapsed[section.title]
               return (
