@@ -663,7 +663,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       {/* SVG goo filter applied via CSS on the canvas element.
           Using CSS filter (not Canvas 2D filter API) ensures the browser
           handles DPR natively — identical visual result on all devices. */}
-      <svg width="0" height="0" style={{ position: 'absolute' }}>
+      <svg width="0" height="0" style={{ position: 'absolute', ...(IS_MOBILE && { willChange: 'contents' }) }}>
         <defs>
           <filter id="goo-css" colorInterpolationFilters="sRGB">
             <feGaussianBlur

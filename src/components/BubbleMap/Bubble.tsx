@@ -115,7 +115,15 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
   return (
     <g
       transform={`translate(${x}, ${y})`}
-      style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+      style={{
+        cursor: 'pointer',
+        pointerEvents: 'auto',
+        ...(IS_MOBILE && {
+          contain: 'layout style paint',
+          contentVisibility: 'auto',
+          containIntrinsicSize: `${radius * 2}px ${radius * 2}px`,
+        }),
+      }}
       onClick={() => onTap(milestoneId)}
       role="button"
       tabIndex={0}

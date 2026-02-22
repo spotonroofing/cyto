@@ -7,6 +7,7 @@ import { DotGrid } from './DotGrid'
 import { useRoadmapStore } from '@/stores/roadmapStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useTuningStore } from '@/stores/tuningStore'
+import { IS_MOBILE } from '@/utils/performanceTier'
 
 const TAP_DISTANCE_THRESHOLD = 10
 const TAP_TIME_THRESHOLD = 300
@@ -719,13 +720,13 @@ export function BubbleMap() {
     <div
       ref={containerRef}
       className="w-full h-dvh overflow-hidden relative"
-      style={{ touchAction: 'none' }}
+      style={{ touchAction: 'none', ...(IS_MOBILE && { willChange: 'transform' }) }}
     >
         <BackgroundParticles transform={transform} mapBounds={mapBounds} />
         <DotGrid width={dimensions.width} height={dimensions.height} transform={transform} />
 
         {/* Hidden SVG for nucleus goo filter */}
-        <svg width="0" height="0" style={{ position: 'absolute' }}>
+        <svg width="0" height="0" style={{ position: 'absolute', ...(IS_MOBILE && { willChange: 'contents' }) }}>
           <defs>
             <filter id="nucleus-goo" colorInterpolationFilters="sRGB">
               <feGaussianBlur in="SourceGraphic" stdDeviation={String(nucleusBlur)} result="blur" />
