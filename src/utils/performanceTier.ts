@@ -13,21 +13,22 @@ export const IS_MOBILE = typeof window !== 'undefined' &&
  */
 export const mobileIdle = { active: false }
 
-/** Quality settings — mobile matches desktop for goo rendering (visual correctness first) */
+/** Quality settings — mobile uses reduced resolution to cut SVG filter cost ~8x */
 export const Q = IS_MOBILE ? {
-  canvasDpr: 2,
+  canvasDpr: 1,               // (was 2) — 4x fewer pixels for SVG filter to process
 
-  // GooCanvas — identical to desktop for visual parity
-  gooSamplesPerPx: 10,
-  gooMinSegments: 28,
-  gooBlobSteps: 48,
-  gooNucleusSteps: 64,
-  gooNucleusHarmonics: 5,
+  // GooCanvas — reduced complexity (shapes are fewer pixels at low DPR anyway)
+  gooSamplesPerPx: 6,         // (was 10) — fewer path segments per connection
+  gooMinSegments: 20,         // (was 28)
+  gooBlobSteps: 32,           // (was 48) — fewer vertices per blob circle
+  gooNucleusSteps: 32,        // (was 64) — fewer vertices per nucleus
+  gooNucleusHarmonics: 3,     // (was 5) — fewer harmonic calculations
   gooEdgeWobble: true as const,
   gooTargetDt: 1000 / 60,     // 60fps — ensures every frame draws on 60Hz displays
   gooIdleDt: 1000 / 60,       // match active — consistent wobble when idle
 
   // SVG goo filter blur (applied via CSS, browser handles DPR)
+  // Runtime stdDev is scaled by (dpr / 2) in GooCanvas to compensate for lower DPR
   baseBlurStdDev: 12,
 
   // Background particles

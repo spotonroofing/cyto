@@ -521,7 +521,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     let lastFrameTime = 0
     const TARGET_DT = Q.gooTargetDt
     const IDLE_DT = Q.gooIdleDt
-    const IDLE_THRESHOLD = 2000 // ms of no transform change before entering idle
+    const IDLE_THRESHOLD = IS_MOBILE ? 1000 : 2000 // ms of no transform change before entering idle
     let lastKnownTf = { x: 0, y: 0, scale: 0 }
     let lastTransformChangeTime = performance.now()
     // Cache last-written style values to avoid redundant DOM writes every frame
@@ -588,7 +588,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       // without this, zooming out makes the fixed-pixel blur overwhelm the shapes.
       const tuning = useTuningStore.getState()
       if (gooBlurRef.current) {
-        const stdDev = tuning.blurStdDev * dbg.filterBlurRadius * tf.scale
+        // Scale stdDev by (dpr / 2) on mobile so the visual blur radius stays
+        // constant despite the lower canvas backing-store resolution.
+        // At DPR 1 this halves stdDev — same visual size, 2x smaller kernel.
+        const stdDev = tuning.blurStdDev * dbg.filterBlurRadius * tf.scale * (dpr / 2)
         const stdDevStr = String(stdDev)
         if (stdDevStr !== lastStdDevStr) {
           gooBlurRef.current.setAttribute('stdDeviation', stdDevStr)
@@ -617,7 +620,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         viewW: width, viewH: height,
       }
       renderShapes(ctx, connections, blobs, time, pal.nucleus, cull,
-        wobbleI, dbg.nucleusWobble, dbg.connectionGradients,
+        wobbleI, dbg.nucleusWobble,
+        IS_MOBILE ? false : dbg.connectionGradients, // flat colors on mobile — skip gradient allocation
         tuning.tubeWidthRatio, tuning.filletWidthRatio, tuning.nucleusRatioCanvas)
 
       ctx.restore()
