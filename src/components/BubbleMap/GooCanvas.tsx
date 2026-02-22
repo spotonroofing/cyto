@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useTheme } from '@/themes'
-import { Q, IS_MOBILE, mobileIdle } from '@/utils/performanceTier'
+import { Q, IS_MOBILE, mobileIdle, mobileScrolling } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
 import { useTuningStore } from '@/stores/tuningStore'
 import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
@@ -9,6 +9,9 @@ import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
  *  Intermediate frames apply a cheap CSS transform to track scroll/zoom
  *  without triggering the expensive SVG filter re-evaluation. */
 const MOBILE_FRAME_SKIP = 3
+
+/** ms over which wobble/animation gradually wakes up after scroll freeze ends. */
+const SCROLL_RESUME_RAMP_MS = 200
 
 interface GooCanvasProps {
   width: number
@@ -536,6 +539,9 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     // Mobile frame throttle: track which frame we're on and the transform at last full draw
     let frameCount = 0
     let lastDrawTf = { x: 0, y: 0, scale: 1 }
+    // Mobile scroll freeze: track frozen state for wake-up ramp
+    let wasScrollFrozen = false
+    let resumeTimestamp = 0
 
     const draw = (timestamp: number) => {
       const dbg = useDebugStore.getState()
@@ -562,6 +568,30 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       }
       if (IS_MOBILE) {
         mobileIdle.active = false
+      }
+
+      // ── Mobile scroll freeze: during active scroll, skip all canvas drawing
+      // and only apply CSS transforms. Canvas pixels don't change → browser
+      // caches the SVG filter output → CSS transform repositions at composite
+      // stage for zero filter cost. ──
+      if (IS_MOBILE && mobileScrolling.active) {
+        wasScrollFrozen = true
+        // Track wall-clock time so resume doesn't see a huge dt jump
+        lastFrameTime = timestamp
+        // DON'T advance animation `time` — goo shapes stay frozen
+        const cur = transformRef.current
+        const s = cur.scale / lastDrawTf.scale
+        const e = cur.x - s * lastDrawTf.x
+        const f = cur.y - s * lastDrawTf.y
+        canvas.style.transform = `translate(${e}px, ${f}px) scale(${s})`
+        animFrameRef.current = requestAnimationFrame(draw)
+        return
+      }
+
+      // Detect scroll freeze → live transition for wake-up ramp
+      if (wasScrollFrozen) {
+        wasScrollFrozen = false
+        resumeTimestamp = timestamp
       }
 
       // ── Mobile frame throttle: skip expensive redraws on non-render frames ──
@@ -594,13 +624,23 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       }
       const prevFrame = lastFrameTime
       lastFrameTime = timestamp
-      // Use real elapsed time so wobble speed is independent of frame rate
-      time += prevFrame > 0 ? Math.min((timestamp - prevFrame) / 1000, 0.1) : 0.016
+      // Wake-up ramp: after scroll freeze ends, gradually bring animation back
+      // so the transition from frozen → live is seamless (no visual pop).
+      let rampT = 1
+      if (resumeTimestamp > 0) {
+        rampT = Math.min(1, (timestamp - resumeTimestamp) / SCROLL_RESUME_RAMP_MS)
+        if (rampT >= 1) resumeTimestamp = 0
+      }
+
+      // Use real elapsed time so wobble speed is independent of frame rate.
+      // During ramp, scale the time delta so animation gradually wakes up.
+      const dt = prevFrame > 0 ? Math.min((timestamp - prevFrame) / 1000, 0.1) : 0.016
+      time += dt * rampT
 
       const pal = paletteRef.current
       const connections = connectionsRef.current
       const blobs = blobsRef.current
-      const wobbleI = dbg.gooWobble ? dbg.gooWobbleIntensity : 0
+      const wobbleI = (dbg.gooWobble ? dbg.gooWobbleIntensity : 0) * rampT
 
       // Sync CSS filter with debug toggle (cached to avoid redundant style writes)
       const filterStr = dbg.gooFilter ? 'url(#goo-css)' : 'none'
