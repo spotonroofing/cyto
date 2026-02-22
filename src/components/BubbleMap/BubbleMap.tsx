@@ -314,7 +314,12 @@ export function BubbleMap() {
 
         // Auto-zoom: ease scale toward target.
         // Freeze zoom during bounce to prevent feedback between spring and auto-zoom.
-        const targetScale = overY === 0 ? getTargetScale(t.y + vy, t.scale) : t.scale
+        const MAX_ZOOM = 3.0
+        const rawTarget = overY === 0 ? getTargetScale(t.y + vy, t.scale) : t.scale
+        // Only snap back if user exceeded max zoom (3.0x).
+        // Don't pull back in if user intentionally zoomed out below content-fit target.
+        const targetScale =
+          t.scale > MAX_ZOOM ? MAX_ZOOM : t.scale < rawTarget ? t.scale : rawTarget
         const newScale = t.scale + (targetScale - t.scale) * AUTO_ZOOM_EASE
         const newX = computeX(newScale)
 
