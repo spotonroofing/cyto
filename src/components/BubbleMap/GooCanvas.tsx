@@ -308,7 +308,13 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
   // WebGL setup + animation loop
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || width === 0 || height === 0 || failedRef.current) return
+    if (!canvas || failedRef.current) return
+
+    // Read actual rendered dimensions (from CSS inset-0 stretching to fill container)
+    // — this avoids mismatches when the prop values differ from the true layout size
+    const cssW = canvas.clientWidth
+    const cssH = canvas.clientHeight
+    if (cssW === 0 || cssH === 0) return
 
     // ── Context ──
     const gl = canvas.getContext('webgl2', {
@@ -326,8 +332,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     }
 
     const dpr = Math.min(window.devicePixelRatio || 1, Q.canvasDpr)
-    const pxW = Math.round(width * dpr)
-    const pxH = Math.round(height * dpr)
+    const pxW = Math.round(cssW * dpr)
+    const pxH = Math.round(cssH * dpr)
     canvas.width = pxW
     canvas.height = pxH
 
@@ -500,7 +506,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       gl.bindVertexArray(vao)
 
       // Global uniforms
-      gl.uniform2f(loc.resolution, width, height)
+      gl.uniform2f(loc.resolution, cssW, cssH)
       gl.uniform1f(loc.dpr, dpr)
       gl.uniform3f(loc.camera, tf.x, tf.y, tf.scale)
       gl.uniform1f(loc.time, time)
@@ -557,8 +563,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       ref={canvasRef}
       className="absolute inset-0"
       style={{
-        width: width + 'px',
-        height: height + 'px',
         zIndex: 1,
         pointerEvents: 'none',
       }}
