@@ -23,7 +23,7 @@ export const Q = IS_MOBILE ? {
 
   // Background particles
   particleCount: 15,           // (desktop: 105) — minimal on mobile
-  particleTargetDt: 1000 / 12, // ~12fps — half goo rate, non-critical layer
+  particleTargetDt: 1000 / 60, // 60fps — match goo rate for smooth parallax scrolling
 
   // Bubble nucleus (SVG layer)
   bubbleTargetDt: 1000 / 4,   // 4fps nucleus animation on mobile (was uncapped)
@@ -40,7 +40,7 @@ export const Q = IS_MOBILE ? {
 
   // Background particles
   particleCount: 105,
-  particleTargetDt: 1000 / 30,
+  particleTargetDt: 1000 / 60, // 60fps — match goo rate for smooth parallax scrolling
 
   // Bubble nucleus (SVG layer)
   bubbleTargetDt: 0,           // uncapped on desktop

@@ -718,7 +718,7 @@ export function BubbleMap() {
       className="w-full h-dvh overflow-hidden relative"
       style={{ touchAction: 'none' }}
     >
-        <BackgroundParticles transform={transform} mapBounds={mapBounds} />
+        <BackgroundParticles width={dimensions.width} height={dimensions.height} transform={transform} mapBounds={mapBounds} />
         <DotGrid width={dimensions.width} height={dimensions.height} transform={transform} />
 
 {/* Goo canvas — milestone blobs + animated tapered connections */}

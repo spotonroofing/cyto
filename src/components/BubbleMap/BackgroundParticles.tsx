@@ -22,11 +22,13 @@ interface MapBounds {
 }
 
 interface BackgroundParticlesProps {
+  width: number
+  height: number
   transform: { x: number; y: number; scale: number }
   mapBounds: MapBounds | null
 }
 
-export function BackgroundParticles({ transform, mapBounds }: BackgroundParticlesProps) {
+export function BackgroundParticles({ width, height, transform, mapBounds }: BackgroundParticlesProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const particlesRef = useRef<Particle[]>([])
   const animFrameRef = useRef<number>(0)
@@ -47,14 +49,9 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    let dpr = Math.min(window.devicePixelRatio || 1, Q.canvasDpr)
-    const resize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, Q.canvasDpr)
-      canvas.width = Math.round(window.innerWidth * dpr)
-      canvas.height = Math.round(window.innerHeight * dpr)
-    }
-    resize()
-    window.addEventListener('resize', resize)
+    const dpr = Math.min(window.devicePixelRatio || 1, Q.canvasDpr)
+    canvas.width = Math.round(width * dpr)
+    canvas.height = Math.round(height * dpr)
 
     // Particle count from tuning store, scaled by debug multiplier
     const count = Math.round(tuningParticleCount * debugParticleCount)
@@ -66,8 +63,8 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
     // Initialize particles across the full map bounding box (world space)
     const bounds = mapBoundsRef.current
     if (!bounds) {
-      // No map bounds yet — clean up and wait for next run
-      return () => { window.removeEventListener('resize', resize) }
+      // No map bounds yet — wait for next run
+      return
     }
     const worldLeft = bounds.minX
     const worldTop = bounds.minY
@@ -108,9 +105,7 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
         ctx.fill()
       }
       ctx.restore()
-      return () => {
-        window.removeEventListener('resize', resize)
-      }
+      return
     }
 
     let lastFrameTime = 0
@@ -206,15 +201,18 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
     return () => {
       cancelAnimationFrame(animFrameRef.current)
       clearTimeout(idlePollTimeout)
-      window.removeEventListener('resize', resize)
     }
-  }, [palette, debugParticleCount, tuningParticleCount, mapBounds])
+  }, [width, height, palette, debugParticleCount, tuningParticleCount, mapBounds])
 
   return (
     <canvas
       ref={canvasRef}
       className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 0 }}
+      style={{
+        width: width + 'px',
+        height: height + 'px',
+        zIndex: 0,
+      }}
     />
   )
 }
