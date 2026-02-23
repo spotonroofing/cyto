@@ -97,49 +97,28 @@ export function sampleConnection(
   const tubeWidth = smallerR * tubeWidthRatio
   const tSE = conn.sr / conn.dist
   const tTE = 1 - conn.tr / conn.dist
-  // Meniscus peak width where tube meets cell edge — filletRatio controls how
-  // pronounced the flare is (higher = wider meniscus at the junction)
-  const peakWidth = tubeWidth * (1 + filletRatio)
+  const filletWidth = tubeWidth * filletRatio
   const nearFan = t < 0.5 ? (conn.sourceFanOut || 1) : (conn.targetFanOut || 1)
   const fanScale = nearFan > 2 ? 0.78 : 1.0
 
   let width: number
   if (tSE >= tTE) {
-    // Cells very close or overlapping — simple sine profile
-    width = peakWidth * Math.sin(t * Math.PI) * fanScale
+    width = filletWidth * Math.sin(t * Math.PI) * fanScale
   } else if (t <= tSE) {
-    // Inside source cell — smoothstep ramp for metaball blending
     const u = tSE > 0.001 ? t / tSE : 1
-    width = peakWidth * u * u * (3 - 2 * u) * fanScale
+    width = filletWidth * u * u * (3 - 2 * u) * fanScale
   } else if (t >= tTE) {
-    // Inside target cell — mirror
     const span = 1 - tTE
     const u = span > 0.001 ? (1 - t) / span : 1
-    width = peakWidth * u * u * (3 - 2 * u) * fanScale
+    width = filletWidth * u * u * (3 - 2 * u) * fanScale
   } else {
-    // Middle section: constant tubeWidth with concave meniscus near cell edges.
-    // The tube stays thin, then flares outward right at the cell boundary —
-    // like how liquid curves when it touches a sphere (surface tension meniscus).
-    const distFromSE = t - tSE
-    const distFromTE = tTE - t
     const gap = tTE - tSE
-
-    // Meniscus zones extend from each cell edge into the tube.
-    // Depth proportional to cell radius fraction, scaled by filletRatio.
-    const mzS = Math.min(tSE * filletRatio, gap * 0.4)
-    const mzT = Math.min((1 - tTE) * filletRatio, gap * 0.4)
-
-    if (distFromSE < mzS) {
-      const u = distFromSE / mzS                    // 0 at cell edge, 1 at meniscus end
-      const concave = (1 - u) * (1 - u)             // quadratic: stays thin, flares at edge
-      width = (tubeWidth + (peakWidth - tubeWidth) * concave) * fanScale
-    } else if (distFromTE < mzT) {
-      const u = distFromTE / mzT
-      const concave = (1 - u) * (1 - u)
-      width = (tubeWidth + (peakWidth - tubeWidth) * concave) * fanScale
-    } else {
-      width = tubeWidth * fanScale                   // constant tube width in the middle
-    }
+    const g = (t - tSE) / gap
+    const edgeDist = Math.min(g, 1 - g)
+    const transZone = 0.3
+    const fade = Math.min(edgeDist / transZone, 1)
+    const eased = 0.5 * (1 - Math.cos(Math.PI * fade))
+    width = (filletWidth + (tubeWidth - filletWidth) * eased) * fanScale
   }
 
   return { x, y, width }
