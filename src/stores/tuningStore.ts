@@ -1,11 +1,11 @@
 import { create } from 'zustand'
 
 export const TUNING_DEFAULTS = {
-  tubeWidthRatio: 0.140,
-  filletWidthRatio: 1.20,
-  blurStdDev: 12,
+  tubeWidthRatio: 0.240,
+  filletWidthRatio: 2.20,
+  blurStdDev: 16,
   nucleusRatioCanvas: 1,
-  nucleusRatioSvg: 0.700,
+  nucleusRatioSvg: 0.880,
   iconSizeRatio: 0.280,
   phaseNameFontSize: 16,
   phaseIndicatorFontSize: 12,
@@ -13,17 +13,17 @@ export const TUNING_DEFAULTS = {
   particleSpreadX: 1.60,
 
   // Goo filter
-  gooContrast: 16,
+  gooContrast: 14,
   gooThreshold: -4.0,
 
   // Nucleus filter
-  nucleusBlur: 15,
+  nucleusBlur: 20,
   nucleusContrast: 18,
   nucleusThreshold: -7,
 
   // Edge wobble (multipliers on hardcoded constants)
   edgeWobbleSpeed: 2.65,
-  edgeWobbleAmp: 3,
+  edgeWobbleAmp: 5.5,
 
   // SVG nucleus animation
   svgNucleusBreatheSpeed: 0.650,
@@ -34,17 +34,17 @@ export const TUNING_DEFAULTS = {
   svgNucleus3LobeAmp: 0.025,
   svgNucleus5LobeSpeed: 0.350,
   svgNucleus5LobeAmp: 0.015,
-  nucleusOpacity: 0.650,
+  nucleusOpacity: 0.780,
 
   // Membrane breathing
   membraneBreatheSpeed: 2,
-  membraneBreatheAmp: 2.40,
+  membraneBreatheAmp: 4.50,
   membraneDeformASpeed: 0.300,
-  membraneDeformAAmp: 2.40,
+  membraneDeformAAmp: 4.80,
   membraneDeformBSpeed: 0.250,
-  membraneDeformBAmp: 1.60,
+  membraneDeformBAmp: 3.20,
   membraneRotSpeed: -0.150,
-  membraneRadiusScale: 1.07,
+  membraneRadiusScale: 1.18,
 } as const
 
 export type TuningKey = keyof typeof TUNING_DEFAULTS
