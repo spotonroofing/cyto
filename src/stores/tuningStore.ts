@@ -13,8 +13,8 @@ export const TUNING_DEFAULTS = {
   particleSpreadX: 1.60,
 
   // Goo filter
-  gooContrast: 22,
-  gooThreshold: -5.5,
+  gooContrast: 16,
+  gooThreshold: -4.0,
 
   // Nucleus filter
   nucleusBlur: 15,
