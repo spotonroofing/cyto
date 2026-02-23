@@ -12,7 +12,7 @@ const phaseIcons: Record<number, LucideIcon> = {
   4: Utensils, 5: FlaskConical, 6: Sparkles, 7: ShieldCheck,
 }
 
-const ICON_LABEL_GAP = 8
+const ICON_LABEL_GAP = 5
 
 // Utensils icon visually fills more of its viewBox than other icons
 const iconScaleOverrides: Partial<Record<number, number>> = { 4: 0.85 }
