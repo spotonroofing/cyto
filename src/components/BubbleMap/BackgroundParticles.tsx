@@ -47,9 +47,11 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    let dpr = Math.min(window.devicePixelRatio || 1, Q.canvasDpr)
     const resize = () => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
+      dpr = Math.min(window.devicePixelRatio || 1, Q.canvasDpr)
+      canvas.width = Math.round(window.innerWidth * dpr)
+      canvas.height = Math.round(window.innerHeight * dpr)
     }
     resize()
     window.addEventListener('resize', resize)
@@ -96,6 +98,7 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
       const tf = transformRef.current
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.save()
+      ctx.scale(dpr, dpr)
       ctx.translate(tf.x, tf.y)
       ctx.scale(tf.scale, tf.scale)
       for (const p of particlesRef.current) {
@@ -137,6 +140,8 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
 
       const w = canvas.width
       const h = canvas.height
+      const cssW = w / dpr
+      const cssH = h / dpr
       const particles = particlesRef.current
       const tf = transformRef.current
 
@@ -149,6 +154,7 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
       }
 
       ctx.save()
+      ctx.scale(dpr, dpr)
       ctx.translate(tf.x, tf.y)
       ctx.scale(tf.scale, tf.scale)
 
@@ -159,8 +165,8 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
       const mb = mapBoundsRef.current
       const wLeft = mb ? mb.minX : -tf.x / tf.scale
       const wTop = mb ? mb.minY : -tf.y / tf.scale
-      const wW = mb ? (mb.maxX - mb.minX) : w / tf.scale
-      const wH = mb ? (mb.maxY - mb.minY) : h / tf.scale
+      const wW = mb ? (mb.maxX - mb.minX) : cssW / tf.scale
+      const wH = mb ? (mb.maxY - mb.minY) : cssH / tf.scale
 
       for (const p of particles) {
         // Update position (world-space drift)
@@ -174,10 +180,10 @@ export function BackgroundParticles({ transform, mapBounds }: BackgroundParticle
         if (p.y < wTop) p.y += wH
         else if (p.y > wTop + wH) p.y -= wH
 
-        // Viewport culling — skip particles outside visible screen
+        // Viewport culling — skip particles outside visible screen (CSS pixel space)
         const screenX = p.x * tf.scale + tf.x
         const screenY = p.y * tf.scale + tf.y
-        if (screenX < -20 || screenX > w + 20 || screenY < -20 || screenY > h + 20) continue
+        if (screenX < -20 || screenX > cssW + 20 || screenY < -20 || screenY > cssH + 20) continue
 
         // Draw organic ellipse — radius is in world units, camera transform handles scaling
         const wobble = Math.sin(p.wobblePhase) * 0.15
