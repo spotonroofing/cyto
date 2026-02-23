@@ -12,7 +12,10 @@ const phaseIcons: Record<number, LucideIcon> = {
   4: Utensils, 5: FlaskConical, 6: Sparkles, 7: ShieldCheck,
 }
 
-const ICON_LABEL_GAP = 7
+const ICON_LABEL_GAP = 8
+
+// Utensils icon visually fills more of its viewBox than other icons
+const iconScaleOverrides: Partial<Record<number, number>> = { 4: 0.85 }
 
 interface BubbleProps {
   milestoneId: string
@@ -48,7 +51,8 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
       {(() => {
         const Icon = phaseIcons[phaseIndex]
         if (!Icon) return null
-        const size = Math.round(radius * iconSizeRatio)
+        const baseSize = Math.round(radius * iconSizeRatio)
+        const size = Math.round(baseSize * (iconScaleOverrides[phaseIndex] ?? 1))
         return (
           <g transform={`translate(${-size / 2} ${-size / 2 - 12 - ICON_LABEL_GAP})`}>
             <Icon
@@ -77,7 +81,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
 
       {/* Phase number */}
       <text
-        x={0} y={21}
+        x={0} y={23}
         textAnchor="middle" dominantBaseline="central"
         fontSize={phaseIndicatorFontSize}
         fontFamily="'JetBrains Mono', monospace"
