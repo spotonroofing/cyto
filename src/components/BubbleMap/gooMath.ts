@@ -101,6 +101,9 @@ export function sampleConnection(
   const nearFan = t < 0.5 ? (conn.sourceFanOut || 1) : (conn.targetFanOut || 1)
   const fanScale = nearFan > 2 ? 0.78 : 1.0
 
+  // Fillet zone length in t-space (world distance = filletRatio * tubeWidth)
+  const filletLen = (filletRatio * tubeWidth) / conn.dist
+
   let width: number
   if (tSE >= tTE) {
     width = filletWidth * Math.sin(t * Math.PI) * fanScale
@@ -112,13 +115,13 @@ export function sampleConnection(
     const u = span > 0.001 ? (1 - t) / span : 1
     width = filletWidth * u * u * (3 - 2 * u) * fanScale
   } else {
-    const gap = tTE - tSE
-    const g = (t - tSE) / gap
-    const edgeDist = Math.min(g, 1 - g)
-    const transZone = 0.3
-    const fade = Math.min(edgeDist / transZone, 1)
-    const eased = 0.5 * (1 - Math.cos(Math.PI * fade))
-    width = (filletWidth + (tubeWidth - filletWidth) * eased) * fanScale
+    // Between cell edges: concave fillet near each cell, constant tubeWidth in middle
+    const distFromNearEdge = Math.min(t - tSE, tTE - t)
+    const u = Math.min(distFromNearEdge / filletLen, 1) // 0 at cell edge, 1 past fillet zone
+    // Concave meniscus: width stays at filletWidth near cell, drops to tubeWidth.
+    // sin rises fast then decelerates, so (1 - sin) drops quickly then levels off —
+    // producing a concave curve that hugs tubeWidth for most of the zone.
+    width = (tubeWidth + (filletWidth - tubeWidth) * (1 - Math.sin(u * Math.PI / 2))) * fanScale
   }
 
   return { x, y, width }
