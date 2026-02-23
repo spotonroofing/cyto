@@ -22,6 +22,7 @@ void main() {
 
 const SDF_FRAG = `#version 300 es
 precision highp float;
+precision highp int;
 
 #define MAX_CELLS 12
 #define MAX_CONNS 16
@@ -179,7 +180,7 @@ void main() {
   }
 
   memColor /= max(memWeightSum, 0.001);
-  float memAlpha = smoothstep(aaW, -aaW, memDist) * u_gooOpacity;
+  float memAlpha = smoothstep(-aaW, aaW, -memDist) * u_gooOpacity;
 
   // ── Nucleus layer (sharp circles, no smin) ──
   float nucDist = 9999.0;
@@ -211,7 +212,7 @@ void main() {
     }
   }
 
-  float nucAlpha = smoothstep(aaW, -aaW, nucDist) * u_nucleusOpacity;
+  float nucAlpha = smoothstep(-aaW, aaW, -nucDist) * u_nucleusOpacity;
 
   // ── Alpha-over composite ──
   float outA = nucAlpha + memAlpha * (1.0 - nucAlpha);
