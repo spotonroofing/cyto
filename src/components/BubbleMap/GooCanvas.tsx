@@ -272,8 +272,11 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     gl.getExtension('EXT_color_buffer_half_float')
     gl.getExtension('EXT_color_buffer_float')
 
-    canvas.width = width
-    canvas.height = height
+    const dpr = Math.min(window.devicePixelRatio || 1, Q.canvasDpr)
+    const pxW = Math.round(width * dpr)
+    const pxH = Math.round(height * dpr)
+    canvas.width = pxW
+    canvas.height = pxH
 
     // ── Programs ──
     const gooProg = createProgram(gl, GOO_DENSITY_VERT, GOO_DENSITY_FRAG)
@@ -286,8 +289,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     }
 
     // ── FBOs ──
-    const fboW = Math.ceil(width * FBO_SCALE)
-    const fboH = Math.ceil(height * FBO_SCALE)
+    const fboW = Math.ceil(pxW * FBO_SCALE)
+    const fboH = Math.ceil(pxH * FBO_SCALE)
     const gooFBO = createFBO(gl, fboW, fboH)
     const nucFBO = createFBO(gl, fboW, fboH)
     if (!gooFBO || !nucFBO) {
@@ -534,10 +537,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       const gooRadiusScale = 1.0 + (tuning.blurStdDev * dbg.filterBlurRadius) / 40.0
       const nucRadiusScale = 1.0 + tuning.nucleusBlur / 30.0
 
-      // Camera uniform scaled to FBO resolution
-      const camX = tf.x * FBO_SCALE
-      const camY = tf.y * FBO_SCALE
-      const camScale = tf.scale * FBO_SCALE
+      // Camera uniform scaled to FBO resolution (tf is CSS pixels → multiply by dpr)
+      const camX = tf.x * dpr * FBO_SCALE
+      const camY = tf.y * dpr * FBO_SCALE
+      const camScale = tf.scale * dpr * FBO_SCALE
 
       // ── PASS 1: Goo density ──
       gl.bindFramebuffer(gl.FRAMEBUFFER, gooFBO.fbo)
@@ -566,7 +569,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
 
       // ── PASS 3: Composite to screen ──
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
-      gl.viewport(0, 0, width, height)
+      gl.viewport(0, 0, pxW, pxH)
       gl.clearColor(0, 0, 0, 0)
       gl.clear(gl.COLOR_BUFFER_BIT)
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
@@ -591,7 +594,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       // First-frame log
       if (!hasLogged) {
         hasLogged = true
-        console.log(`[GooGL] FBO: ${fboW}x${fboH}, goo blobs: ${gooCount}, nuclei: ${nucCount}, draw calls: 3`)
+        console.log(`[GooGL] DPR: ${dpr}, canvas: ${pxW}x${pxH}, FBO: ${fboW}x${fboH}, goo: ${gooCount}, nuclei: ${nucCount}`)
       }
 
       animFrameRef.current = requestAnimationFrame(draw)
