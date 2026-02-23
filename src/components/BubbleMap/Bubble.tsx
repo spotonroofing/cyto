@@ -12,7 +12,7 @@ const phaseIcons: Record<number, LucideIcon> = {
   4: Utensils, 5: FlaskConical, 6: Sparkles, 7: ShieldCheck,
 }
 
-const ICON_LABEL_GAP = 5
+const ICON_LABEL_GAP = 7
 
 interface BubbleProps {
   milestoneId: string
@@ -56,7 +56,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
               color={palette.text}
               opacity={0.7}
               strokeWidth={2}
-              style={{ pointerEvents: 'none' }}
+              style={{ pointerEvents: 'none', width: size, height: size, overflow: 'hidden' }}
             />
           </g>
         )
@@ -77,7 +77,7 @@ export function Bubble({ milestoneId, x, y, radius, onTap }: BubbleProps) {
 
       {/* Phase number */}
       <text
-        x={0} y={18}
+        x={0} y={21}
         textAnchor="middle" dominantBaseline="central"
         fontSize={phaseIndicatorFontSize}
         fontFamily="'JetBrains Mono', monospace"

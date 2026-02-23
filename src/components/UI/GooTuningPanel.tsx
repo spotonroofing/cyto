@@ -84,8 +84,8 @@ const sections: Section[] = [
   },
 ]
 
-// Flat list for copy-parameters
-const allSliders = sections.flatMap((s) => s.sliders)
+// All tuning keys for copy-parameters
+const allTuningKeys = Object.keys(TUNING_DEFAULTS) as TuningKey[]
 
 function formatValue(v: number): string {
   if (Number.isInteger(v)) return String(v)
@@ -244,12 +244,19 @@ export function GooTuningPanel() {
           {/* Action buttons — always visible */}
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexShrink: 0 }}>
             <button
-              onClick={() => {
-                const params: Record<string, number> = {}
-                for (const s of allSliders) params[s.key] = store[s.key] as number
-                navigator.clipboard.writeText(JSON.stringify(params, null, 2))
-                setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
+              onClick={async () => {
+                try {
+                  const params: Record<string, number> = {}
+                  for (const k of allTuningKeys) params[k] = store[k] as number
+                  await navigator.clipboard.writeText(JSON.stringify(params, null, 2))
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                } catch {
+                  // Fallback: prompt user with text
+                  const params: Record<string, number> = {}
+                  for (const k of allTuningKeys) params[k] = store[k] as number
+                  window.prompt('Copy parameters:', JSON.stringify(params))
+                }
               }}
               style={{
                 flex: 1,
