@@ -310,10 +310,11 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     const canvas = canvasRef.current
     if (!canvas || failedRef.current) return
 
-    // Read actual rendered dimensions (from CSS inset-0 stretching to fill container)
-    // — this avoids mismatches when the prop values differ from the true layout size
-    const cssW = canvas.clientWidth
-    const cssH = canvas.clientHeight
+    // Use prop values directly — they match the SVG's width/height attributes.
+    // canvas.clientWidth/clientHeight is unreliable (depends on layout timing,
+    // can return viewport size instead of content size on mobile).
+    const cssW = width
+    const cssH = height
     if (cssW === 0 || cssH === 0) return
 
     // ── Context ──
@@ -563,6 +564,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       ref={canvasRef}
       className="absolute inset-0"
       style={{
+        width: width + 'px',
+        height: height + 'px',
         zIndex: 1,
         pointerEvents: 'none',
       }}
