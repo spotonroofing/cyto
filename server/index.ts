@@ -378,6 +378,65 @@ app.get('/api/health/debug/tables', async (c) => {
   })
 })
 
+// --- GET /api/health/sleep/range?start=YYYY-MM-DD&end=YYYY-MM-DD ---
+app.get('/api/health/sleep/range', async (c) => {
+  const end = c.req.query('end') ?? new Date().toISOString().substring(0, 10)
+  const start = c.req.query('start') ?? new Date(Date.now() - 14 * 86_400_000).toISOString().substring(0, 10)
+  const rows = await sql`
+    SELECT * FROM sleep_sessions
+    WHERE sleep_start::date >= ${start} AND sleep_start::date <= ${end}
+    ORDER BY sleep_start DESC
+  `
+  return c.json({ start, end, count: rows.length, data: rows })
+})
+
+// --- GET /api/health/weight/range?start=YYYY-MM-DD&end=YYYY-MM-DD ---
+app.get('/api/health/weight/range', async (c) => {
+  const end = c.req.query('end') ?? new Date().toISOString().substring(0, 10)
+  const start = c.req.query('start') ?? new Date(Date.now() - 30 * 86_400_000).toISOString().substring(0, 10)
+  const rows = await sql`
+    SELECT * FROM weight_entries
+    WHERE date::date >= ${start} AND date::date <= ${end}
+    ORDER BY date DESC
+  `
+  return c.json({ start, end, count: rows.length, data: rows })
+})
+
+// --- GET /api/health/nutrition/range?start=YYYY-MM-DD&end=YYYY-MM-DD ---
+app.get('/api/health/nutrition/range', async (c) => {
+  const end = c.req.query('end') ?? new Date().toISOString().substring(0, 10)
+  const start = c.req.query('start') ?? new Date(Date.now() - 14 * 86_400_000).toISOString().substring(0, 10)
+  const rows = await sql`
+    SELECT * FROM nutrition_daily
+    WHERE date >= ${start} AND date <= ${end}
+    ORDER BY date DESC
+  `
+  return c.json({ start, end, count: rows.length, data: rows })
+})
+
+// --- GET /api/health/summary/:date ---
+app.get('/api/health/summary/:date', async (c) => {
+  const date = c.req.param('date')
+
+  const [sleepRows, nutritionRows, weightRows] = await Promise.all([
+    sql`SELECT sleep_start, sleep_end, duration_hours, total_sleep, deep, rem, core
+        FROM sleep_sessions
+        WHERE sleep_end::date = ${date}
+        ORDER BY sleep_end DESC LIMIT 1`,
+    sql`SELECT calories, protein_g, carbs_g, fat_g, sugar_g, micronutrients, last_entry_time
+        FROM nutrition_daily WHERE date = ${date} LIMIT 1`,
+    sql`SELECT weight_lbs FROM weight_entries
+        WHERE date::date = ${date} ORDER BY date DESC LIMIT 1`,
+  ])
+
+  return c.json({
+    date,
+    sleep: sleepRows[0] ?? null,
+    nutrition: nutritionRows[0] ?? null,
+    weight_lbs: weightRows[0]?.weight_lbs ?? null,
+  })
+})
+
 // Serve static files from Vite build output
 app.use('/*', serveStatic({ root: './dist' }))
 
