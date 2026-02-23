@@ -38,12 +38,13 @@ export const TUNING_DEFAULTS = {
 
   // Membrane breathing
   membraneBreatheSpeed: 2,
-  membraneBreatheAmp: 3.60,
+  membraneBreatheAmp: 2.40,
   membraneDeformASpeed: 0.300,
-  membraneDeformAAmp: 3.60,
+  membraneDeformAAmp: 2.40,
   membraneDeformBSpeed: 0.250,
-  membraneDeformBAmp: 2.40,
+  membraneDeformBAmp: 1.60,
   membraneRotSpeed: -0.150,
+  membraneRadiusScale: 1.07,
 } as const
 
 export type TuningKey = keyof typeof TUNING_DEFAULTS
@@ -101,6 +102,7 @@ export interface TuningState {
   membraneDeformBSpeed: number   // deform B speed (default 0.25)
   membraneDeformBAmp: number     // deform B amplitude (default 2.4)
   membraneRotSpeed: number       // rotation speed (default -0.15)
+  membraneRadiusScale: number    // membrane radius multiplier (default 1.07)
 
   set: <K extends TuningKey>(key: K, value: number) => void
   reset: () => void

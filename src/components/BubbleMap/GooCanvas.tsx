@@ -448,7 +448,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         const breathe = Math.sin(time * tuning.membraneBreatheSpeed + blob.breathePhase) * tuning.membraneBreatheAmp
         const deformA = Math.sin(time * tuning.membraneDeformASpeed + blob.wobblePhase) * tuning.membraneDeformAAmp
         const deformB = Math.sin(time * tuning.membraneDeformBSpeed + blob.deformFreq) * tuning.membraneDeformBAmp
-        const r = blob.radius + (breathe + deformA + deformB) * wobbleI
+        const r = blob.radius * tuning.membraneRadiusScale + (breathe + deformA + deformB) * wobbleI
         const [cr, cg, cb] = hexToVec3(blob.color)
         const off = gooCount * GOO_FLOATS_PER
         gooInstanceData[off] = blob.x
