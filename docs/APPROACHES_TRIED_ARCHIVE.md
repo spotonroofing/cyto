@@ -65,3 +65,12 @@
 
 ### Attempt 3: Native DOM Listeners + Plain g (Current)
 - **Result:** SUCCESS — Bypasses React synthetic events and Framer interpolation.
+
+## Challenge: Goo Connections — Final Solution
+
+### Attempt 6: SDF Smooth-Union Fragment Shader (Production)
+- **What:** Replaced the 2-pass FBO metaball density pipeline with a single fullscreen fragment shader evaluating signed distance fields per pixel. Cells are SDF circles, connections are SDF capsules with tapered radius profiles. Shapes merge via `smin` (cubic polynomial smooth minimum) producing organic membrane blending. Nucleus layer uses independent SDF circles with harmonic wobble (2/3/5-lobe deformation). No FBOs, no instanced geometry, no density textures — just one draw call rendering a fullscreen triangle.
+- **Result:** SUCCESS — This is now the production renderer.
+- **Why:** Dramatically simpler architecture (1 draw call vs 3), no FBO allocation or half-res sampling artifacts, inherently DPR-correct via uniform, distance-weighted color blending produces natural gradients, premultiplied alpha output composites cleanly. Early bounding-box discard keeps GPU cost low for off-screen regions.
+- **Files:** `src/components/BubbleMap/GooCanvas.tsx` (rewritten), `src/components/BubbleMap/gooMath.ts`, `src/stores/tuningStore.ts`
+- **Backup:** `docs/goo-backups/sdf-smooth-union-v1/`
