@@ -25,7 +25,7 @@ export const Q = IS_MOBILE ? {
   gooNucleusHarmonics: 5,
   gooEdgeWobble: true as const,
   gooTargetDt: 1000 / 60,     // 60fps — ensures every frame draws on 60Hz displays
-  gooIdleDt: 1000 / 60,       // match active — consistent wobble when idle
+  gooIdleDt: 1000 / 15,       // 15fps when idle — keeps breathing alive, saves battery
 
   // SVG goo filter blur (applied via CSS, browser handles DPR)
   baseBlurStdDev: 12,

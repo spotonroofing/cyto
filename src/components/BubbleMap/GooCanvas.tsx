@@ -416,13 +416,9 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       }
       const isIdle = (timestamp - lastTransformChangeTime) > IDLE_THRESHOLD
 
-      // Mobile idle freeze
-      if (IS_MOBILE && isIdle) {
-        mobileIdle.active = true
-        animFrameRef.current = requestAnimationFrame(draw)
-        return
-      }
-      if (IS_MOBILE) mobileIdle.active = false
+      // Mobile idle: signal other layers to pause, but keep goo rendering
+      // at a reduced framerate so breathing/wobble stay alive
+      if (IS_MOBILE) mobileIdle.active = isIdle
 
       // FPS cap
       const effectiveDT = dbg.fpsCap > 0 ? 1000 / dbg.fpsCap : (isIdle ? IDLE_DT : TARGET_DT)
