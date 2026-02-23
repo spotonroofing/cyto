@@ -260,7 +260,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     // ── Context ──
     const gl = canvas.getContext('webgl2', {
       alpha: true,
-      premultipliedAlpha: false,
+      premultipliedAlpha: true,
       antialias: false,
       depth: false,
       stencil: false,
