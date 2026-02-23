@@ -629,8 +629,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       ref={canvasRef}
       className="absolute inset-0"
       style={{
-        width: '100%',
-        height: '100%',
+        width: width + 'px',
+        height: height + 'px',
         zIndex: 1,
         pointerEvents: 'none',
       }}
