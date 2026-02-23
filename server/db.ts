@@ -48,6 +48,10 @@ export async function initDb() {
     )
   `
 
+  // Add columns for HAE nutrient routing (idempotent)
+  await sql`ALTER TABLE nutrition_daily ADD COLUMN IF NOT EXISTS sugar_g NUMERIC`
+  await sql`ALTER TABLE nutrition_daily ADD COLUMN IF NOT EXISTS micronutrients JSONB DEFAULT '{}'`
+
   await sql`
     CREATE TABLE IF NOT EXISTS weight_entries (
       id SERIAL PRIMARY KEY,
