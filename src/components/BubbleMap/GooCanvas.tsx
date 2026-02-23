@@ -537,10 +537,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       const gooRadiusScale = 1.0 + (tuning.blurStdDev * dbg.filterBlurRadius) / 40.0
       const nucRadiusScale = 1.0 + tuning.nucleusBlur / 30.0
 
-      // Camera uniform scaled to FBO resolution (tf is CSS pixels → multiply by dpr)
-      const camX = tf.x * dpr * FBO_SCALE
-      const camY = tf.y * dpr * FBO_SCALE
-      const camScale = tf.scale * dpr * FBO_SCALE
+      // Camera uniform in CSS pixel coordinates (gl.viewport handles buffer scaling)
+      const camX = tf.x
+      const camY = tf.y
+      const camScale = tf.scale
 
       // ── PASS 1: Goo density ──
       gl.bindFramebuffer(gl.FRAMEBUFFER, gooFBO.fbo)
@@ -550,7 +550,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       gl.enable(gl.BLEND)
       gl.blendFunc(gl.ONE, gl.ONE)
       gl.useProgram(gooProg)
-      gl.uniform2f(gooUniforms.resolution, fboW, fboH)
+      gl.uniform2f(gooUniforms.resolution, width, height)
       gl.uniform3f(gooUniforms.camera, camX, camY, camScale)
       gl.uniform1f(gooUniforms.radiusScale, gooRadiusScale)
       gl.bindVertexArray(gooVAO)
@@ -561,7 +561,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       gl.viewport(0, 0, fboW, fboH)
       gl.clear(gl.COLOR_BUFFER_BIT)
       gl.useProgram(nucProg)
-      gl.uniform2f(nucUniforms.resolution, fboW, fboH)
+      gl.uniform2f(nucUniforms.resolution, width, height)
       gl.uniform3f(nucUniforms.camera, camX, camY, camScale)
       gl.uniform1f(nucUniforms.radiusScale, nucRadiusScale)
       gl.bindVertexArray(nucVAO)
