@@ -48,14 +48,3 @@ export const phaseNames: Record<number, string> = {
   6: 'Optimization',
   7: 'Maintenance',
 }
-
-export function getPhaseColor(phaseIndex: number, isDark: boolean): string {
-  const colors = isDark ? phaseColors.dark : phaseColors.light
-  return colors[phaseIndex as keyof typeof colors] ?? colors[0]
-}
-
-export function getPhaseColorOpacity(_phaseIndex: number, isDark: boolean, status: string): number {
-  if (status === 'blocked' || status === 'not_started') return isDark ? 0.18 : 0.22
-  if (status === 'completed') return isDark ? 0.45 : 0.5
-  return isDark ? 0.35 : 0.4
-}

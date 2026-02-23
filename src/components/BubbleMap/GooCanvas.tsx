@@ -400,9 +400,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       nucOpacity: gl.getUniformLocation(compProg, 'u_nucOpacity'),
     }
 
-    // ── First-frame logging flag ──
-    let hasLogged = false
-
     // ── Animation state ──
     let time = 0
     let lastFrameTime = 0
@@ -594,12 +591,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
       gl.bindVertexArray(null)
-
-      // First-frame log
-      if (!hasLogged) {
-        hasLogged = true
-        console.log(`[GooGL] DPR: ${dpr}, canvas: ${pxW}x${pxH}, FBO: ${fboW}x${fboH}, goo: ${gooCount}, nuclei: ${nucCount}`)
-      }
 
       animFrameRef.current = requestAnimationFrame(draw)
     }

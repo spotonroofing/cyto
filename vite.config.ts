@@ -23,7 +23,6 @@ export default defineConfig({
         manualChunks: {
           'vendor-motion': ['framer-motion'],
           'vendor-charts': ['recharts'],
-          'vendor-d3': ['d3'],
         },
       },
     },

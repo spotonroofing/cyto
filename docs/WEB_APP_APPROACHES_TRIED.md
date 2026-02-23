@@ -40,7 +40,7 @@
   - **Bubble.tsx simplified:** Removed SVG nucleus `<path>`, rAF animation loop, and `filter="url(#nucleus-goo)"` wrapper. Only hit-target circle, phase icon, and text labels remain.
   - **SVG filter defs removed:** Both `#nucleus-goo` and `#goo-css` filter definitions removed from DOM.
   - **Shared math:** `sampleConnection()`, `blendHex()`, `hexToVec3()` extracted to `gooMath.ts`.
-- **Result:** IN PROGRESS
+- **Result:** COMPLETED
 - **Why:** Eliminates all SVG filter overhead. Previous approach had 27 GPU filter passes/frame (3 for goo + 24 for 8 nuclei × 3 passes each). New approach: 3 draw calls total with instanced rendering at half resolution. Nucleus wobble animation moves from JS rAF + SVG path recalculation to GPU fragment shader. Camera transform is a uniform update instead of full redraw + filter re-evaluation.
 - **Files:** `src/components/BubbleMap/GooCanvas.tsx` (rewritten), `src/components/BubbleMap/gooMath.ts` (new), `src/components/BubbleMap/Bubble.tsx` (simplified), `src/components/BubbleMap/BubbleMap.tsx` (filter defs removed)
 

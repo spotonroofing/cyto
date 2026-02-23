@@ -345,39 +345,6 @@ app.get('/api/health/nutrition/today', async (c) => {
   return c.json(rows[0] ?? null)
 })
 
-// --- Debug endpoints ---
-app.get('/api/health/debug/recent', async (c) => {
-  const rows = await sql`
-    SELECT * FROM health_metrics ORDER BY date DESC LIMIT 50
-  `
-  return c.json(rows)
-})
-
-app.get('/api/health/debug/metrics', async (c) => {
-  const rows = await sql`
-    SELECT DISTINCT metric_name, COUNT(*)::int AS count
-    FROM health_metrics
-    GROUP BY metric_name
-    ORDER BY count DESC
-  `
-  return c.json(rows)
-})
-
-app.get('/api/health/debug/tables', async (c) => {
-  const [hm, ss, nd, we] = await Promise.all([
-    sql`SELECT COUNT(*)::int AS count FROM health_metrics`,
-    sql`SELECT COUNT(*)::int AS count FROM sleep_sessions`,
-    sql`SELECT COUNT(*)::int AS count FROM nutrition_daily`,
-    sql`SELECT COUNT(*)::int AS count FROM weight_entries`,
-  ])
-  return c.json({
-    health_metrics: hm[0].count,
-    sleep_sessions: ss[0].count,
-    nutrition_daily: nd[0].count,
-    weight_entries: we[0].count,
-  })
-})
-
 // --- GET /api/health/sleep/range?start=YYYY-MM-DD&end=YYYY-MM-DD ---
 app.get('/api/health/sleep/range', async (c) => {
   const end = c.req.query('end') ?? new Date().toISOString().substring(0, 10)
