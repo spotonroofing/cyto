@@ -1,20 +1,20 @@
 import { create } from 'zustand'
 
 export const TUNING_DEFAULTS = {
-  tubeWidthRatio: 0.200,
-  filletWidthRatio: 1.40,
+  tubeWidthRatio: 0.140,
+  filletWidthRatio: 1.20,
   blurStdDev: 12,
-  nucleusRatioCanvas: 0.782,
+  nucleusRatioCanvas: 1,
   nucleusRatioSvg: 0.700,
   iconSizeRatio: 0.280,
   phaseNameFontSize: 16,
   phaseIndicatorFontSize: 12,
   particleCount: 300,
-  particleSpreadX: 2.20,
+  particleSpreadX: 1.60,
 
   // Goo filter
   gooContrast: 22,
-  gooThreshold: -8,
+  gooThreshold: -5.5,
 
   // Nucleus filter
   nucleusBlur: 15,
@@ -22,8 +22,8 @@ export const TUNING_DEFAULTS = {
   nucleusThreshold: -7,
 
   // Edge wobble (multipliers on hardcoded constants)
-  edgeWobbleSpeed: 1.45,
-  edgeWobbleAmp: 1.10,
+  edgeWobbleSpeed: 2.65,
+  edgeWobbleAmp: 3,
 
   // SVG nucleus animation
   svgNucleusBreatheSpeed: 0.650,
@@ -37,8 +37,8 @@ export const TUNING_DEFAULTS = {
   nucleusOpacity: 0.650,
 
   // Membrane breathing
-  membraneBreatheSpeed: 2.15,
-  membraneBreatheAmp: 4.60,
+  membraneBreatheSpeed: 2,
+  membraneBreatheAmp: 3.60,
   membraneDeformASpeed: 0.300,
   membraneDeformAAmp: 3.60,
   membraneDeformBSpeed: 0.250,
