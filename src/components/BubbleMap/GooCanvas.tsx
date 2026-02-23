@@ -128,11 +128,15 @@ out vec4 fragColor;
 void main() {
   vec4 goo = texture(u_gooDensity, v_uv);
   vec3 gooColor = goo.a > 0.001 ? goo.rgb / goo.a : vec3(0.0);
-  float gooAlpha = smoothstep(u_gooThreshold - u_gooSmooth, u_gooThreshold + u_gooSmooth, goo.a) * u_gooOpacity;
+  float gooGrad = fwidth(goo.a);
+  float gooSm = max(u_gooSmooth, gooGrad * 1.5);
+  float gooAlpha = smoothstep(u_gooThreshold - gooSm, u_gooThreshold + gooSm, goo.a) * u_gooOpacity;
 
   vec4 nuc = texture(u_nucDensity, v_uv);
   vec3 nucColor = nuc.a > 0.001 ? nuc.rgb / nuc.a : vec3(0.0);
-  float nucAlpha = smoothstep(u_nucThreshold - u_nucSmooth, u_nucThreshold + u_nucSmooth, nuc.a) * u_nucOpacity;
+  float nucGrad = fwidth(nuc.a);
+  float nucSm = max(u_nucSmooth, nucGrad * 1.5);
+  float nucAlpha = smoothstep(u_nucThreshold - nucSm, u_nucThreshold + nucSm, nuc.a) * u_nucOpacity;
 
   float outA = nucAlpha + gooAlpha * (1.0 - nucAlpha);
   vec3 outC = outA > 0.001
