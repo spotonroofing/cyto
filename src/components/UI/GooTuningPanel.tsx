@@ -22,8 +22,7 @@ const sections: Section[] = [
       { key: 'tubeWidthRatio',     label: 'Bridge Width',   min: 0.05, max: 0.60, step: 0.01 },
       { key: 'filletWidthRatio',   label: 'Fillet Ratio',   min: 0.5,  max: 3.0,  step: 0.1  },
       { key: 'blurStdDev',         label: 'Goo Halo',       min: 0,    max: 30,   step: 1    },
-      { key: 'nucleusRatioCanvas', label: 'Nucleus Canvas', min: 0.3,  max: 1.0,  step: 0.01 },
-      { key: 'nucleusRatioSvg',    label: 'Nucleus SVG',    min: 0.3,  max: 1.0,  step: 0.01 },
+      { key: 'nucleusRatioSvg',    label: 'Nucleus Size',   min: 0.3,  max: 1.0,  step: 0.01 },
     ],
   },
   {
@@ -74,7 +73,6 @@ const sections: Section[] = [
       { key: 'membraneDeformAAmp',   label: 'Deform A Amp', min: 0,  max: 10, step: 0.2  },
       { key: 'membraneDeformBSpeed', label: 'Deform B Spd', min: 0,  max: 2,  step: 0.05 },
       { key: 'membraneDeformBAmp',   label: 'Deform B Amp', min: 0,  max: 10, step: 0.2  },
-      { key: 'membraneRotSpeed',     label: 'Rot Speed',    min: -1, max: 1,  step: 0.05 },
     ],
   },
   {

@@ -442,8 +442,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       // Membrane blobs
       for (const blob of blobs) {
         if (gooCount >= GOO_MAX) break
-        const breathe = Math.sin(time * tuning.membraneBreatheSpeed + blob.breathePhase) * tuning.membraneBreatheAmp * wobbleI
-        const r = blob.radius + breathe
+        const breathe = Math.sin(time * tuning.membraneBreatheSpeed + blob.breathePhase) * tuning.membraneBreatheAmp
+        const deformA = Math.sin(time * tuning.membraneDeformASpeed + blob.wobblePhase) * tuning.membraneDeformAAmp
+        const deformB = Math.sin(time * tuning.membraneDeformBSpeed + blob.deformFreq) * tuning.membraneDeformBAmp
+        const r = blob.radius + (breathe + deformA + deformB) * wobbleI
         const [cr, cg, cb] = hexToVec3(blob.color)
         const off = gooCount * GOO_FLOATS_PER
         gooInstanceData[off] = blob.x
@@ -463,7 +465,7 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         for (let i = 0; i <= segments; i++) {
           if (gooCount >= GOO_MAX) break
           const t = i / segments
-          const sample = sampleConnection(conn, t, time, wobbleI, tuning.tubeWidthRatio, tuning.filletWidthRatio)
+          const sample = sampleConnection(conn, t, time, wobbleI, tuning.tubeWidthRatio, tuning.filletWidthRatio, tuning.edgeWobbleSpeed, tuning.edgeWobbleAmp)
           if (sample.width < 0.5) continue
           const blobR = sample.width * BRIDGE_RADIUS_MULT
           const color = blendVec3(srcVec, tgtVec, t)

@@ -83,10 +83,12 @@ export function sampleConnection(
   wobbleI = 1,
   tubeWidthRatio = 0.24,
   filletRatio = 1.4,
+  edgeWobbleSpeed = 1,
+  edgeWobbleAmp = 1,
 ): { x: number; y: number; width: number } {
   const curveBow = Math.sin(t * Math.PI) * conn.dist * 0.008
   const dampEnds = Math.sin(t * Math.PI)
-  const flowWave = Math.sin(time * conn.flowSpeed + t * 4 + conn.phaseOffset) * 4 * dampEnds * wobbleI
+  const flowWave = Math.sin(time * conn.flowSpeed * edgeWobbleSpeed + t * 4 + conn.phaseOffset) * 4 * edgeWobbleAmp * dampEnds * wobbleI
 
   const x = conn.sx + conn.dx * t + conn.nx * (curveBow + flowWave)
   const y = conn.sy + conn.dy * t + conn.ny * (curveBow + flowWave)
