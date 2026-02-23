@@ -17,13 +17,7 @@ export const mobileIdle = { active: false }
 export const Q = IS_MOBILE ? {
   canvasDpr: 2,
 
-  // GooCanvas — identical to desktop for visual parity
-  gooSamplesPerPx: 10,
-  gooMinSegments: 28,
-  gooBlobSteps: 48,
-  gooNucleusSteps: 64,
-  gooNucleusHarmonics: 5,
-  gooEdgeWobble: true as const,
+  // GooCanvas SDF renderer
   gooTargetDt: 1000 / 60,     // 60fps — ensures every frame draws on 60Hz displays
   gooIdleDt: 1000 / 60,       // match active — smooth wobble/breathing when idle (same as desktop)
 
@@ -40,12 +34,7 @@ export const Q = IS_MOBILE ? {
 } : {
   canvasDpr: 2,
 
-  gooSamplesPerPx: 10,
-  gooMinSegments: 28,
-  gooBlobSteps: 48,
-  gooNucleusSteps: 64,
-  gooNucleusHarmonics: 5,
-  gooEdgeWobble: true as const,
+  // GooCanvas SDF renderer
   gooTargetDt: 1000 / 60,   // 60fps — ensures every frame draws on 60Hz displays
   gooIdleDt: 1000 / 60,     // match active — consistent wobble when idle
 

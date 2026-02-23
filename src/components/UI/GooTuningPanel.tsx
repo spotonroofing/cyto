@@ -21,8 +21,10 @@ const sections: Section[] = [
     sliders: [
       { key: 'tubeWidthRatio',     label: 'Bridge Width',   min: 0.05, max: 0.60, step: 0.01 },
       { key: 'filletWidthRatio',   label: 'Fillet Ratio',   min: 0.5,  max: 3.0,  step: 0.1  },
-      { key: 'blurStdDev',         label: 'Goo Halo',       min: 0,    max: 30,   step: 1    },
+      { key: 'sminK',              label: 'Merge Radius',   min: 0,    max: 100,  step: 1    },
+      { key: 'sminKNucleus',       label: 'Nuc Merge',      min: 0,    max: 50,   step: 1    },
       { key: 'nucleusRatioSvg',    label: 'Nucleus Size',   min: 0.3,  max: 1.0,  step: 0.01 },
+      { key: 'membraneRadiusScale', label: 'Membrane Scale', min: 0.8,  max: 1.5,  step: 0.01 },
     ],
   },
   {
@@ -31,16 +33,6 @@ const sections: Section[] = [
       { key: 'iconSizeRatio',          label: 'Icon Size', min: 0.1, max: 0.5, step: 0.01 },
       { key: 'phaseNameFontSize',      label: 'Name Size', min: 6,   max: 24,  step: 1    },
       { key: 'phaseIndicatorFontSize', label: 'P# Size',   min: 4,   max: 18,  step: 1    },
-    ],
-  },
-  {
-    title: 'Goo Filter',
-    sliders: [
-      { key: 'gooContrast',      label: 'Goo Contrast',  min: 1,   max: 40, step: 1   },
-      { key: 'gooThreshold',     label: 'Goo Threshold', min: -20, max: 0,  step: 0.5 },
-      { key: 'nucleusBlur',      label: 'Nuc Blur',      min: 0,   max: 15, step: 0.5 },
-      { key: 'nucleusContrast',  label: 'Nuc Contrast',  min: 1,   max: 40, step: 1   },
-      { key: 'nucleusThreshold', label: 'Nuc Threshold', min: -20, max: 0,  step: 0.5 },
     ],
   },
   {

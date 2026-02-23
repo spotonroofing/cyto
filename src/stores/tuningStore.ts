@@ -3,8 +3,6 @@ import { create } from 'zustand'
 export const TUNING_DEFAULTS = {
   tubeWidthRatio: 0.175,
   filletWidthRatio: 1.50,
-  blurStdDev: 12,
-  nucleusRatioCanvas: 1,
   nucleusRatioSvg: 0.780,
   iconSizeRatio: 0.280,
   phaseNameFontSize: 16,
@@ -12,14 +10,9 @@ export const TUNING_DEFAULTS = {
   particleCount: 300,
   particleSpreadX: 1.60,
 
-  // Goo filter
-  gooContrast: 19,
-  gooThreshold: -4.0,
-
-  // Nucleus filter
-  nucleusBlur: 15,
-  nucleusContrast: 18,
-  nucleusThreshold: -7,
+  // SDF smooth-union
+  sminK: 45.0,
+  sminKNucleus: 0.0,
 
   // Edge wobble (multipliers on hardcoded constants)
   edgeWobbleSpeed: 2.65,
@@ -51,37 +44,28 @@ export type TuningKey = keyof typeof TUNING_DEFAULTS
 
 export interface TuningState {
   // Bridge geometry
-  tubeWidthRatio: number         // half-width = smallerR * this (default 0.24)
-  filletWidthRatio: number       // filletWidth = tubeWidth * this (default 1.4)
-
-  // Goo filter
-  blurStdDev: number             // SVG filter stdDeviation (default 12)
+  tubeWidthRatio: number         // half-width = smallerR * this (default 0.175)
+  filletWidthRatio: number       // filletWidth = tubeWidth * this (default 1.5)
 
   // Nucleus
-  nucleusRatioCanvas: number     // canvas layer: nucleusR = blobR * this (default 0.782)
-  nucleusRatioSvg: number        // SVG layer: nucleusR = radius * this (default 0.655)
+  nucleusRatioSvg: number        // nucleusR = radius * this (default 0.78)
 
   // Labels & icons
   iconSizeRatio: number          // icon = radius * this (default 0.28)
-  phaseNameFontSize: number      // px (default 11)
-  phaseIndicatorFontSize: number // px (default 8)
+  phaseNameFontSize: number      // px (default 16)
+  phaseIndicatorFontSize: number // px (default 12)
 
   // Particles
   particleCount: number          // base count before debug multiplier
-  particleSpreadX: number        // multiplier on horizontal range (default 1.0)
+  particleSpreadX: number        // multiplier on horizontal range (default 1.6)
 
-  // Goo filter
-  gooContrast: number            // feColorMatrix alpha multiplier (default 20)
-  gooThreshold: number           // feColorMatrix alpha offset (default -8)
-
-  // Nucleus filter
-  nucleusBlur: number            // nucleus feGaussianBlur stdDeviation (default 3)
-  nucleusContrast: number        // nucleus feColorMatrix alpha multiplier (default 18)
-  nucleusThreshold: number       // nucleus feColorMatrix alpha offset (default -7)
+  // SDF smooth-union
+  sminK: number                  // merge radius in world-space px (default 45.0)
+  sminKNucleus: number           // nucleus merge radius (0 = no merge) (default 0.0)
 
   // Edge wobble
-  edgeWobbleSpeed: number        // master speed multiplier on edge wobble (default 1.0)
-  edgeWobbleAmp: number          // master amplitude multiplier on edge wobble (default 1.0)
+  edgeWobbleSpeed: number        // master speed multiplier on edge wobble (default 2.65)
+  edgeWobbleAmp: number          // master amplitude multiplier on edge wobble (default 4.0)
 
   // SVG nucleus animation
   svgNucleusBreatheSpeed: number // breathing speed (default 0.8)

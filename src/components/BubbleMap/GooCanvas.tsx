@@ -4,146 +4,223 @@ import { Q, IS_MOBILE, mobileIdle } from '@/utils/performanceTier'
 import { useDebugStore } from '@/stores/debugStore'
 import { useTuningStore } from '@/stores/tuningStore'
 import {
-  precomputeConnections, sampleConnection, hexToVec3, blendVec3,
+  precomputeConnections, hexToVec3,
   type ConnectionData, type BlobData,
 } from './gooMath'
 import type { LayoutBubble, LayoutLink } from './useBubbleLayout'
 
-// ── Shader sources (inline GLSL) ────────────────────────────────
+// ── Shader sources ──────────────────────────────────────────────
 
-const GOO_DENSITY_VERT = `#version 300 es
-precision highp float;
-layout(location = 0) in vec2 a_corner;
-layout(location = 1) in vec2 a_center;
-layout(location = 2) in float a_radius;
-layout(location = 3) in vec3 a_color;
-uniform vec2 u_resolution;
-uniform vec3 u_camera;
-uniform float u_radiusScale;
-out vec2 v_localPos;
-out vec3 v_color;
+const SDF_VERT = `#version 300 es
 void main() {
-  float totalR = a_radius * u_radiusScale;
-  vec2 worldPos = a_center + a_corner * totalR;
-  vec2 screen = worldPos * u_camera.z + u_camera.xy;
-  vec2 clip = screen / u_resolution * 2.0 - 1.0;
-  clip.y = -clip.y;
-  gl_Position = vec4(clip, 0.0, 1.0);
-  v_localPos = a_corner;
-  v_color = a_color;
+  // Fullscreen triangle from gl_VertexID — no vertex buffer needed
+  float x = float((gl_VertexID << 1) & 2);
+  float y = float(gl_VertexID & 2);
+  gl_Position = vec4(x * 2.0 - 1.0, y * 2.0 - 1.0, 0.0, 1.0);
 }
 `
 
-const GOO_DENSITY_FRAG = `#version 300 es
+const SDF_FRAG = `#version 300 es
 precision highp float;
-in vec2 v_localPos;
-in vec3 v_color;
-out vec4 fragColor;
-void main() {
-  float dist = length(v_localPos);
-  if (dist > 1.0) discard;
-  float f = 1.0 - dist * dist;
-  float density = f * f;
-  fragColor = vec4(v_color * density, density);
-}
-`
 
-const NUC_DENSITY_VERT = `#version 300 es
-precision highp float;
-layout(location = 0) in vec2 a_corner;
-layout(location = 1) in vec2 a_center;
-layout(location = 2) in float a_radius;
-layout(location = 3) in vec3 a_color;
-layout(location = 4) in float a_breatheOffset;
-layout(location = 5) in vec4 a_harmAmps;
-layout(location = 6) in vec4 a_harmPhases;
-uniform vec2 u_resolution;
-uniform vec3 u_camera;
-uniform float u_radiusScale;
-out vec2 v_localPos;
-out vec3 v_color;
-out float v_breatheOffset;
-out vec4 v_harmAmps;
-out vec4 v_harmPhases;
-void main() {
-  float maxDeform = 1.25;
-  float totalR = a_radius * maxDeform * u_radiusScale;
-  vec2 worldPos = a_center + a_corner * totalR;
-  vec2 screen = worldPos * u_camera.z + u_camera.xy;
-  vec2 clip = screen / u_resolution * 2.0 - 1.0;
-  clip.y = -clip.y;
-  gl_Position = vec4(clip, 0.0, 1.0);
-  v_localPos = a_corner * maxDeform * u_radiusScale;
-  v_color = a_color;
-  v_breatheOffset = a_breatheOffset;
-  v_harmAmps = a_harmAmps;
-  v_harmPhases = a_harmPhases;
-}
-`
+#define MAX_CELLS 12
+#define MAX_CONNS 16
 
-const NUC_DENSITY_FRAG = `#version 300 es
-precision highp float;
-in vec2 v_localPos;
-in vec3 v_color;
-in float v_breatheOffset;
-in vec4 v_harmAmps;
-in vec4 v_harmPhases;
-out vec4 fragColor;
-void main() {
-  float angle = atan(v_localPos.y, v_localPos.x);
-  float r = 1.0 + v_breatheOffset;
-  r += v_harmAmps.x * sin(2.0 * angle + v_harmPhases.x);
-  r += v_harmAmps.y * sin(3.0 * angle + v_harmPhases.y);
-  r += v_harmAmps.z * sin(5.0 * angle + v_harmPhases.z);
-  r = clamp(r, 0.6, 1.25);
-  float normDist = length(v_localPos) / r;
-  if (normDist > 1.0) discard;
-  float f = 1.0 - normDist * normDist;
-  float density = f * f;
-  fragColor = vec4(v_color * density, density);
-}
-`
-
-const COMPOSITE_VERT = `#version 300 es
-in vec2 a_position;
-out vec2 v_uv;
-void main() {
-  gl_Position = vec4(a_position, 0.0, 1.0);
-  v_uv = a_position * 0.5 + 0.5;
-}
-`
-
-const COMPOSITE_FRAG = `#version 300 es
-precision highp float;
-in vec2 v_uv;
-uniform sampler2D u_gooDensity;
-uniform sampler2D u_nucDensity;
-uniform float u_gooThreshold;
-uniform float u_gooSmooth;
+uniform vec2  u_resolution;   // CSS pixel dimensions
+uniform float u_dpr;           // device pixel ratio
+uniform vec3  u_camera;        // (panX, panY, scale)
+uniform float u_time;
+uniform float u_sminK;         // membrane merge radius (world px)
 uniform float u_gooOpacity;
-uniform float u_nucThreshold;
-uniform float u_nucSmooth;
-uniform float u_nucOpacity;
+uniform float u_nucleusOpacity;
+uniform float u_wobbleIntensity;
+
+// Breathing / deformation speeds & amplitudes
+uniform float u_breatheSpeed;
+uniform float u_breatheAmp;
+uniform float u_deformASpeed;
+uniform float u_deformAAmp;
+uniform float u_deformBSpeed;
+uniform float u_deformBAmp;
+
+// Tube geometry
+uniform float u_tubeWidthRatio;
+uniform float u_filletWidthRatio;
+
+// Cell data
+uniform vec4 u_cells[MAX_CELLS];       // xy=pos, z=membraneRadius, w=phaseIndex
+uniform vec4 u_cellColors[MAX_CELLS];  // rgb + unused
+uniform int  u_numCells;
+
+// Connection data (packed as pairs of vec4)
+uniform vec4 u_conns[MAX_CONNS * 2];   // [i*2]: srcXY, dstXY; [i*2+1]: srcR, dstR, srcColorIdx, dstColorIdx
+uniform int  u_numConns;
+
+// Nucleus harmonic data (packed as pairs of vec4)
+uniform vec4 u_nucHarm[MAX_CELLS * 2]; // [i*2]: breatheOff, amp2, amp3, amp5; [i*2+1]: phase2, phase3, phase5, nucR
+
 out vec4 fragColor;
+
+float smin(float a, float b, float k) {
+  if (k < 0.001) return min(a, b);
+  float h = max(k - abs(a - b), 0.0) / k;
+  return min(a, b) - h * h * h * k * (1.0 / 6.0);
+}
+
 void main() {
-  vec4 goo = texture(u_gooDensity, v_uv);
-  vec3 gooColor = goo.a > 0.001 ? goo.rgb / goo.a : vec3(0.0);
-  float gooGrad = fwidth(goo.a);
-  float gooSm = max(u_gooSmooth, gooGrad * 1.5);
-  float gooAlpha = smoothstep(u_gooThreshold - gooSm, u_gooThreshold + gooSm, goo.a) * u_gooOpacity;
+  // Screen → world
+  vec2 sp = gl_FragCoord.xy / u_dpr;
+  sp.y = u_resolution.y - sp.y;
+  vec2 wp = (sp - u_camera.xy) / u_camera.z;
 
-  vec4 nuc = texture(u_nucDensity, v_uv);
-  vec3 nucColor = nuc.a > 0.001 ? nuc.rgb / nuc.a : vec3(0.0);
-  float nucGrad = fwidth(nuc.a);
-  float nucSm = max(u_nucSmooth, nucGrad * 1.5);
-  float nucAlpha = smoothstep(u_nucThreshold - nucSm, u_nucThreshold + nucSm, nuc.a) * u_nucOpacity;
+  float aaW = 1.5 / u_camera.z;
 
-  float outA = nucAlpha + gooAlpha * (1.0 - nucAlpha);
-  vec3 outC = outA > 0.001
-    ? (nucColor * nucAlpha + gooColor * gooAlpha * (1.0 - nucAlpha)) / outA
+  // ── Early termination: bounding box check ──
+  float minBoxDist = 9999.0;
+  for (int i = 0; i < MAX_CELLS; i++) {
+    if (i >= u_numCells) break;
+    vec2 center = u_cells[i].xy;
+    float r = u_cells[i].z * 1.2 + u_sminK + 20.0;
+    vec2 d = abs(wp - center) - vec2(r);
+    minBoxDist = min(minBoxDist, max(d.x, d.y));
+  }
+  for (int i = 0; i < MAX_CONNS; i++) {
+    if (i >= u_numConns) break;
+    vec4 c0 = u_conns[i * 2];
+    vec2 lo = min(c0.xy, c0.zw) - vec2(u_sminK + 60.0);
+    vec2 hi = max(c0.xy, c0.zw) + vec2(u_sminK + 60.0);
+    vec2 d = max(lo - wp, wp - hi);
+    minBoxDist = min(minBoxDist, max(d.x, d.y));
+  }
+  if (minBoxDist > 0.0) {
+    fragColor = vec4(0.0);
+    return;
+  }
+
+  // ── Membrane layer ──
+  float memDist = 9999.0;
+  vec3  memColor = vec3(0.0);
+  float memWeightSum = 0.0;
+  float blendK = max(u_sminK * 2.0, 20.0);
+
+  // Cells
+  for (int i = 0; i < MAX_CELLS; i++) {
+    if (i >= u_numCells) break;
+    vec2  center = u_cells[i].xy;
+    float baseR  = u_cells[i].z;
+    float pi     = u_cells[i].w; // phaseIndex as seed
+    vec3  color  = u_cellColors[i].rgb;
+
+    // Per-cell animated radius offset (deterministic from cell index + phaseIndex)
+    float breathe = sin(u_time * u_breatheSpeed + pi * 0.9 + float(i) * 0.5) * u_breatheAmp;
+    float deformA = sin(u_time * u_deformASpeed + float(i) * 2.1 + pi) * u_deformAAmp;
+    float deformB = sin(u_time * u_deformBSpeed + float(i) * 3.7 + pi * 0.6) * u_deformBAmp;
+    float r = baseR + (breathe + deformA + deformB) * u_wobbleIntensity;
+
+    float d = length(wp - center) - r;
+
+    // Distance-weighted color blending
+    float w = max(0.0, 1.0 - d / blendK);
+    w *= w;
+    memColor += color * w;
+    memWeightSum += w;
+
+    memDist = smin(memDist, d, u_sminK);
+  }
+
+  // Connections
+  for (int i = 0; i < MAX_CONNS; i++) {
+    if (i >= u_numConns) break;
+    vec4 c0 = u_conns[i * 2];
+    vec4 c1 = u_conns[i * 2 + 1];
+
+    vec2  a    = c0.xy;
+    vec2  b    = c0.zw;
+    float srcR = c1.x;
+    float dstR = c1.y;
+    int   srcCI = int(c1.z);
+    int   dstCI = int(c1.w);
+
+    vec3 srcColor = u_cellColors[srcCI].rgb;
+    vec3 dstColor = u_cellColors[dstCI].rgb;
+
+    // sdSegment with tapered radius (capsule)
+    vec2  pa = wp - a;
+    vec2  ba = b - a;
+    float baDot = dot(ba, ba);
+    float h = clamp(dot(pa, ba) / baDot, 0.0, 1.0);
+
+    float smallerR = min(srcR, dstR);
+    float tubeR    = smallerR * u_tubeWidthRatio;
+    float filletR  = tubeR * u_filletWidthRatio;
+
+    // Tapered profile: wider at endpoints (filletR), narrower in middle (tubeR)
+    float radius;
+    if (h < 0.3) {
+      radius = mix(filletR, tubeR, smoothstep(0.0, 0.3, h));
+    } else if (h > 0.7) {
+      radius = mix(tubeR, filletR, smoothstep(0.7, 1.0, h));
+    } else {
+      radius = tubeR;
+    }
+
+    float d = length(pa - ba * h) - radius;
+
+    // Connection color: interpolate along segment
+    vec3 connColor = mix(srcColor, dstColor, h);
+
+    // Distance-weighted color blending
+    float w = max(0.0, 1.0 - d / blendK);
+    w *= w;
+    memColor += connColor * w;
+    memWeightSum += w;
+
+    memDist = smin(memDist, d, u_sminK);
+  }
+
+  memColor /= max(memWeightSum, 0.001);
+  float memAlpha = smoothstep(aaW, -aaW, memDist) * u_gooOpacity;
+
+  // ── Nucleus layer (sharp circles, no smin) ──
+  float nucDist = 9999.0;
+  vec3  nucColor = vec3(0.0);
+
+  for (int i = 0; i < MAX_CELLS; i++) {
+    if (i >= u_numCells) break;
+    vec2 center = u_cells[i].xy;
+    vec4 h0 = u_nucHarm[i * 2];       // breatheOff, amp2, amp3, amp5
+    vec4 h1 = u_nucHarm[i * 2 + 1];   // phase2, phase3, phase5, nucR
+
+    float nucR = h1.w;
+    if (nucR < 0.5) continue;
+
+    float angle = atan(wp.y - center.y, wp.x - center.x);
+
+    // Angle-dependent harmonic deformation
+    float r = nucR * (1.0 + h0.x);  // breathing
+    r += h0.y * sin(2.0 * angle + h1.x) * nucR;
+    r += h0.z * sin(3.0 * angle + h1.y) * nucR;
+    r += h0.w * sin(5.0 * angle + h1.z) * nucR;
+    r = clamp(r, nucR * 0.6, nucR * 1.25);
+
+    float d = length(wp - center) - r;
+
+    if (d < nucDist) {
+      nucDist = d;
+      nucColor = u_cellColors[i].rgb;
+    }
+  }
+
+  float nucAlpha = smoothstep(aaW, -aaW, nucDist) * u_nucleusOpacity;
+
+  // ── Alpha-over composite ──
+  float outA = nucAlpha + memAlpha * (1.0 - nucAlpha);
+  vec3  outC = outA > 0.001
+    ? (nucColor * nucAlpha + memColor * memAlpha * (1.0 - nucAlpha)) / outA
     : vec3(0.0);
-  if (outA < 0.004) discard;
-  fragColor = vec4(outC, outA);
+
+  // Premultiplied alpha output
+  fragColor = vec4(outC * outA, outA);
 }
 `
 
@@ -155,7 +232,7 @@ function compileShader(gl: WebGL2RenderingContext, type: number, source: string)
   gl.shaderSource(shader, source)
   gl.compileShader(shader)
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error('[GooGL] Shader compile error:', gl.getShaderInfoLog(shader))
+    console.error('[GooSDF] Shader compile error:', gl.getShaderInfoLog(shader))
     gl.deleteShader(shader)
     return null
   }
@@ -171,32 +248,12 @@ function createProgram(gl: WebGL2RenderingContext, vertSrc: string, fragSrc: str
   gl.attachShader(prog, frag)
   gl.linkProgram(prog)
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-    console.error('[GooGL] Program link error:', gl.getProgramInfoLog(prog))
+    console.error('[GooSDF] Program link error:', gl.getProgramInfoLog(prog))
     return null
   }
   gl.deleteShader(vert)
   gl.deleteShader(frag)
   return prog
-}
-
-function createFBO(gl: WebGL2RenderingContext, w: number, h: number) {
-  const tex = gl.createTexture()!
-  gl.bindTexture(gl.TEXTURE_2D, tex)
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-  const fbo = gl.createFramebuffer()!
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
-  const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER)
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null)
-  if (status !== gl.FRAMEBUFFER_COMPLETE) {
-    console.error('[GooGL] FBO incomplete:', status)
-    return null
-  }
-  return { fbo, tex, w, h }
 }
 
 // ── Props ────────────────────────────────────────────────────────
@@ -211,13 +268,8 @@ interface GooCanvasProps {
 
 // ── Constants ────────────────────────────────────────────────────
 
-const GOO_FLOATS_PER = 6    // center.xy, radius, color.rgb
-const GOO_MAX = 400
-const NUC_FLOATS_PER = 14   // center.xy, radius, color.rgb, breatheOffset, harmAmps.xyzw, harmPhases.xyz(+pad)
-const NUC_MAX = 16
-const BRIDGE_SAMPLES = 25
-const BRIDGE_RADIUS_MULT = 1.8
-const FBO_SCALE = 0.5
+const MAX_CELLS = 12
+const MAX_CONNS = 16
 
 // ── Component ────────────────────────────────────────────────────
 
@@ -267,14 +319,10 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       preserveDrawingBuffer: false,
     })
     if (!gl) {
-      console.warn('[GooGL] WebGL2 unavailable — goo effects disabled')
+      console.warn('[GooSDF] WebGL2 unavailable — goo effects disabled')
       failedRef.current = true
       return
     }
-
-    // Check RGBA16F support (WebGL2 spec guarantees it but be defensive)
-    gl.getExtension('EXT_color_buffer_half_float')
-    gl.getExtension('EXT_color_buffer_float')
 
     const dpr = Math.min(window.devicePixelRatio || 1, Q.canvasDpr)
     const pxW = Math.round(width * dpr)
@@ -282,123 +330,51 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
     canvas.width = pxW
     canvas.height = pxH
 
-    // ── Programs ──
-    const gooProg = createProgram(gl, GOO_DENSITY_VERT, GOO_DENSITY_FRAG)
-    const nucProg = createProgram(gl, NUC_DENSITY_VERT, NUC_DENSITY_FRAG)
-    const compProg = createProgram(gl, COMPOSITE_VERT, COMPOSITE_FRAG)
-    if (!gooProg || !nucProg || !compProg) {
-      console.warn('[GooGL] Shader compilation failed — goo effects disabled')
+    // ── Single SDF program ──
+    const prog = createProgram(gl, SDF_VERT, SDF_FRAG)
+    if (!prog) {
+      console.warn('[GooSDF] Shader compilation failed — goo effects disabled')
       failedRef.current = true
       return
     }
 
-    // ── FBOs ──
-    const fboW = Math.ceil(pxW * FBO_SCALE)
-    const fboH = Math.ceil(pxH * FBO_SCALE)
-    const gooFBO = createFBO(gl, fboW, fboH)
-    const nucFBO = createFBO(gl, fboW, fboH)
-    if (!gooFBO || !nucFBO) {
-      console.warn('[GooGL] FBO creation failed — goo effects disabled')
-      failedRef.current = true
-      return
-    }
-
-    // ── Static quad geometry ──
-    const quadVerts = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])
-    const quadVBO = gl.createBuffer()!
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO)
-    gl.bufferData(gl.ARRAY_BUFFER, quadVerts, gl.STATIC_DRAW)
-
-    // ── Instance buffers ──
-    const gooInstanceData = new Float32Array(GOO_MAX * GOO_FLOATS_PER)
-    const gooInstanceVBO = gl.createBuffer()!
-    gl.bindBuffer(gl.ARRAY_BUFFER, gooInstanceVBO)
-    gl.bufferData(gl.ARRAY_BUFFER, gooInstanceData.byteLength, gl.DYNAMIC_DRAW)
-
-    const nucInstanceData = new Float32Array(NUC_MAX * NUC_FLOATS_PER)
-    const nucInstanceVBO = gl.createBuffer()!
-    gl.bindBuffer(gl.ARRAY_BUFFER, nucInstanceVBO)
-    gl.bufferData(gl.ARRAY_BUFFER, nucInstanceData.byteLength, gl.DYNAMIC_DRAW)
-
-    // ── VAOs ──
-
-    // Goo density VAO
-    const gooVAO = gl.createVertexArray()!
-    gl.bindVertexArray(gooVAO)
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO)
-    gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
-    gl.bindBuffer(gl.ARRAY_BUFFER, gooInstanceVBO)
-    const gooStride = GOO_FLOATS_PER * 4
-    gl.enableVertexAttribArray(1)
-    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, gooStride, 0)
-    gl.vertexAttribDivisor(1, 1)
-    gl.enableVertexAttribArray(2)
-    gl.vertexAttribPointer(2, 1, gl.FLOAT, false, gooStride, 8)
-    gl.vertexAttribDivisor(2, 1)
-    gl.enableVertexAttribArray(3)
-    gl.vertexAttribPointer(3, 3, gl.FLOAT, false, gooStride, 12)
-    gl.vertexAttribDivisor(3, 1)
-    gl.bindVertexArray(null)
-
-    // Nucleus density VAO
-    const nucVAO = gl.createVertexArray()!
-    gl.bindVertexArray(nucVAO)
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO)
-    gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
-    gl.bindBuffer(gl.ARRAY_BUFFER, nucInstanceVBO)
-    const nucStride = NUC_FLOATS_PER * 4
-    gl.enableVertexAttribArray(1)
-    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, nucStride, 0)
-    gl.vertexAttribDivisor(1, 1)
-    gl.enableVertexAttribArray(2)
-    gl.vertexAttribPointer(2, 1, gl.FLOAT, false, nucStride, 8)
-    gl.vertexAttribDivisor(2, 1)
-    gl.enableVertexAttribArray(3)
-    gl.vertexAttribPointer(3, 3, gl.FLOAT, false, nucStride, 12)
-    gl.vertexAttribDivisor(3, 1)
-    gl.enableVertexAttribArray(4)
-    gl.vertexAttribPointer(4, 1, gl.FLOAT, false, nucStride, 24)
-    gl.vertexAttribDivisor(4, 1)
-    gl.enableVertexAttribArray(5)
-    gl.vertexAttribPointer(5, 4, gl.FLOAT, false, nucStride, 28)
-    gl.vertexAttribDivisor(5, 1)
-    gl.enableVertexAttribArray(6)
-    gl.vertexAttribPointer(6, 4, gl.FLOAT, false, nucStride, 44)
-    gl.vertexAttribDivisor(6, 1)
-    gl.bindVertexArray(null)
-
-    // Composite VAO
-    const compVAO = gl.createVertexArray()!
-    gl.bindVertexArray(compVAO)
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO)
-    const compPosLoc = gl.getAttribLocation(compProg, 'a_position')
-    gl.enableVertexAttribArray(compPosLoc)
-    gl.vertexAttribPointer(compPosLoc, 2, gl.FLOAT, false, 0, 0)
-    gl.bindVertexArray(null)
+    // ── Empty VAO (WebGL2 requires a bound VAO) ──
+    const vao = gl.createVertexArray()!
 
     // ── Uniform locations ──
-    const gooUniforms = {
-      resolution: gl.getUniformLocation(gooProg, 'u_resolution'),
-      camera: gl.getUniformLocation(gooProg, 'u_camera'),
-      radiusScale: gl.getUniformLocation(gooProg, 'u_radiusScale'),
+    const loc = {
+      resolution: gl.getUniformLocation(prog, 'u_resolution'),
+      dpr: gl.getUniformLocation(prog, 'u_dpr'),
+      camera: gl.getUniformLocation(prog, 'u_camera'),
+      time: gl.getUniformLocation(prog, 'u_time'),
+      sminK: gl.getUniformLocation(prog, 'u_sminK'),
+      gooOpacity: gl.getUniformLocation(prog, 'u_gooOpacity'),
+      nucleusOpacity: gl.getUniformLocation(prog, 'u_nucleusOpacity'),
+      wobbleIntensity: gl.getUniformLocation(prog, 'u_wobbleIntensity'),
+      breatheSpeed: gl.getUniformLocation(prog, 'u_breatheSpeed'),
+      breatheAmp: gl.getUniformLocation(prog, 'u_breatheAmp'),
+      deformASpeed: gl.getUniformLocation(prog, 'u_deformASpeed'),
+      deformAAmp: gl.getUniformLocation(prog, 'u_deformAAmp'),
+      deformBSpeed: gl.getUniformLocation(prog, 'u_deformBSpeed'),
+      deformBAmp: gl.getUniformLocation(prog, 'u_deformBAmp'),
+      tubeWidthRatio: gl.getUniformLocation(prog, 'u_tubeWidthRatio'),
+      filletWidthRatio: gl.getUniformLocation(prog, 'u_filletWidthRatio'),
+      cells: gl.getUniformLocation(prog, 'u_cells'),
+      cellColors: gl.getUniformLocation(prog, 'u_cellColors'),
+      numCells: gl.getUniformLocation(prog, 'u_numCells'),
+      conns: gl.getUniformLocation(prog, 'u_conns'),
+      numConns: gl.getUniformLocation(prog, 'u_numConns'),
+      nucHarm: gl.getUniformLocation(prog, 'u_nucHarm'),
     }
-    const nucUniforms = {
-      resolution: gl.getUniformLocation(nucProg, 'u_resolution'),
-      camera: gl.getUniformLocation(nucProg, 'u_camera'),
-      radiusScale: gl.getUniformLocation(nucProg, 'u_radiusScale'),
-    }
-    const compUniforms = {
-      gooDensity: gl.getUniformLocation(compProg, 'u_gooDensity'),
-      nucDensity: gl.getUniformLocation(compProg, 'u_nucDensity'),
-      gooThreshold: gl.getUniformLocation(compProg, 'u_gooThreshold'),
-      gooSmooth: gl.getUniformLocation(compProg, 'u_gooSmooth'),
-      gooOpacity: gl.getUniformLocation(compProg, 'u_gooOpacity'),
-      nucThreshold: gl.getUniformLocation(compProg, 'u_nucThreshold'),
-      nucSmooth: gl.getUniformLocation(compProg, 'u_nucSmooth'),
-      nucOpacity: gl.getUniformLocation(compProg, 'u_nucOpacity'),
-    }
+
+    // ── Preallocate uniform arrays ──
+    const cellData = new Float32Array(MAX_CELLS * 4)
+    const cellColorData = new Float32Array(MAX_CELLS * 4)
+    const connData = new Float32Array(MAX_CONNS * 2 * 4)
+    const nucHarmData = new Float32Array(MAX_CELLS * 2 * 4)
+
+    // ── First-frame logging flag ──
+    let hasLogged = false
 
     // ── Animation state ──
     let time = 0
@@ -420,8 +396,6 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       }
       const isIdle = (timestamp - lastTransformChangeTime) > IDLE_THRESHOLD
 
-      // Mobile idle: signal other layers to pause, but keep goo rendering
-      // at a reduced framerate so breathing/wobble stay alive
       if (IS_MOBILE) mobileIdle.active = isIdle
 
       // FPS cap
@@ -439,59 +413,56 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
       const blobs = blobsRef.current
       const wobbleI = dbg.gooWobble ? dbg.gooWobbleIntensity : 0
       const tuning = useTuningStore.getState()
+      const sminK = dbg.gooFilter ? tuning.sminK * dbg.filterBlurRadius : 0
 
-      // ── Fill goo instance buffer ──
-      let gooCount = 0
+      // ── Pack cell uniforms ──
+      const numCells = Math.min(blobs.length, MAX_CELLS)
 
-      // Membrane blobs
-      for (const blob of blobs) {
-        if (gooCount >= GOO_MAX) break
-        const breathe = Math.sin(time * tuning.membraneBreatheSpeed + blob.breathePhase) * tuning.membraneBreatheAmp
-        const deformA = Math.sin(time * tuning.membraneDeformASpeed + blob.wobblePhase) * tuning.membraneDeformAAmp
-        const deformB = Math.sin(time * tuning.membraneDeformBSpeed + blob.deformFreq) * tuning.membraneDeformBAmp
-        const r = blob.radius * tuning.membraneRadiusScale + (breathe + deformA + deformB) * wobbleI
-        const [cr, cg, cb] = hexToVec3(blob.color)
-        const off = gooCount * GOO_FLOATS_PER
-        gooInstanceData[off] = blob.x
-        gooInstanceData[off + 1] = blob.y
-        gooInstanceData[off + 2] = r
-        gooInstanceData[off + 3] = cr
-        gooInstanceData[off + 4] = cg
-        gooInstanceData[off + 5] = cb
-        gooCount++
+      // Build cell index map for connection color lookups
+      const cellIndexMap = new Map<string, number>()
+
+      for (let i = 0; i < numCells; i++) {
+        const blob = blobs[i]!
+        const off = i * 4
+        cellData[off] = blob.x
+        cellData[off + 1] = blob.y
+        cellData[off + 2] = blob.radius * tuning.membraneRadiusScale
+        cellData[off + 3] = blob.phaseIndex
+
+        const [r, g, b] = hexToVec3(blob.color)
+        cellColorData[off] = r
+        cellColorData[off + 1] = g
+        cellColorData[off + 2] = b
+        cellColorData[off + 3] = 0
+
+        cellIndexMap.set(`${blob.x},${blob.y}`, i)
       }
 
-      // Connection bridge blobs
-      for (const conn of connections) {
-        const segments = Math.max(BRIDGE_SAMPLES, Math.floor(conn.dist / 100 * Q.gooSamplesPerPx))
-        const srcVec = hexToVec3(conn.sourceColor)
-        const tgtVec = hexToVec3(conn.targetColor)
-        for (let i = 0; i <= segments; i++) {
-          if (gooCount >= GOO_MAX) break
-          const t = i / segments
-          const sample = sampleConnection(conn, t, time, wobbleI, tuning.tubeWidthRatio, tuning.filletWidthRatio, tuning.edgeWobbleSpeed, tuning.edgeWobbleAmp)
-          if (sample.width < 0.5) continue
-          const blobR = sample.width * BRIDGE_RADIUS_MULT
-          const color = blendVec3(srcVec, tgtVec, t)
-          const off = gooCount * GOO_FLOATS_PER
-          gooInstanceData[off] = sample.x
-          gooInstanceData[off + 1] = sample.y
-          gooInstanceData[off + 2] = blobR
-          gooInstanceData[off + 3] = color[0]
-          gooInstanceData[off + 4] = color[1]
-          gooInstanceData[off + 5] = color[2]
-          gooCount++
-        }
+      // ── Pack connection uniforms ──
+      const numConns = Math.min(connections.length, MAX_CONNS)
+      for (let i = 0; i < numConns; i++) {
+        const conn = connections[i]!
+        const off = i * 8 // 2 vec4s per connection
+
+        // First vec4: srcXY, dstXY
+        connData[off] = conn.sx
+        connData[off + 1] = conn.sy
+        connData[off + 2] = conn.tx
+        connData[off + 3] = conn.ty
+
+        // Second vec4: srcR, dstR, srcColorIdx, dstColorIdx
+        connData[off + 4] = conn.sr
+        connData[off + 5] = conn.tr
+        connData[off + 6] = cellIndexMap.get(`${conn.sx},${conn.sy}`) ?? 0
+        connData[off + 7] = cellIndexMap.get(`${conn.tx},${conn.ty}`) ?? 0
       }
 
-      // ── Fill nucleus instance buffer ──
-      let nucCount = 0
-      for (const blob of blobs) {
-        if (nucCount >= NUC_MAX) break
-        // Stable per-blob offset for animation timing
+      // ── Pack nucleus harmonic uniforms ──
+      for (let i = 0; i < numCells; i++) {
+        const blob = blobs[i]!
         const pHash = blob.breathePhase * 2.7 + blob.phaseIndex * 1.3
         const nucleusR = blob.radius * tuning.nucleusRatioSvg
-        const [cr, cg, cb] = hexToVec3(blob.color)
+        const off = i * 8 // 2 vec4s per cell
 
         const breatheOffset = dbg.nucleusWobble
           ? Math.sin(time * tuning.svgNucleusBreatheSpeed + pHash * 2) * tuning.svgNucleusBreatheAmp
@@ -504,93 +475,69 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
         const phase3 = time * tuning.svgNucleus3LobeSpeed + pHash * 1.3
         const phase5 = -time * tuning.svgNucleus5LobeSpeed + pHash * 0.7
 
-        const off = nucCount * NUC_FLOATS_PER
-        nucInstanceData[off] = blob.x
-        nucInstanceData[off + 1] = blob.y
-        nucInstanceData[off + 2] = nucleusR
-        nucInstanceData[off + 3] = cr
-        nucInstanceData[off + 4] = cg
-        nucInstanceData[off + 5] = cb
-        nucInstanceData[off + 6] = breatheOffset
-        nucInstanceData[off + 7] = amp2
-        nucInstanceData[off + 8] = amp3
-        nucInstanceData[off + 9] = amp5
-        nucInstanceData[off + 10] = 0
-        nucInstanceData[off + 11] = phase2
-        nucInstanceData[off + 12] = phase3
-        nucInstanceData[off + 13] = phase5
-        nucCount++
+        // First vec4: breatheOff, amp2, amp3, amp5
+        nucHarmData[off] = breatheOffset
+        nucHarmData[off + 1] = amp2
+        nucHarmData[off + 2] = amp3
+        nucHarmData[off + 3] = amp5
+
+        // Second vec4: phase2, phase3, phase5, nucR
+        nucHarmData[off + 4] = phase2
+        nucHarmData[off + 5] = phase3
+        nucHarmData[off + 6] = phase5
+        nucHarmData[off + 7] = nucleusR
       }
 
-      // ── Upload instance data ──
-      gl.bindBuffer(gl.ARRAY_BUFFER, gooInstanceVBO)
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, gooInstanceData, 0, gooCount * GOO_FLOATS_PER)
-      gl.bindBuffer(gl.ARRAY_BUFFER, nucInstanceVBO)
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, nucInstanceData, 0, nucCount * NUC_FLOATS_PER)
-
-      // ── Threshold mapping from tuning store ──
-      const gooThreshold = dbg.gooFilter ? -tuning.gooThreshold / tuning.gooContrast : 0.01
-      const gooSmooth = dbg.gooFilter ? 1.0 / tuning.gooContrast : 0.5
-      const nucThreshold = -tuning.nucleusThreshold / tuning.nucleusContrast
-      const nucSmooth = 1.0 / tuning.nucleusContrast
-
-      // Radius scale: controls density reach beyond blob edge
-      const gooRadiusScale = 1.0 + (tuning.blurStdDev * dbg.filterBlurRadius) / 40.0
-      const nucRadiusScale = 1.0 + tuning.nucleusBlur / 30.0
-
-      // Camera uniform in CSS pixel coordinates (gl.viewport handles buffer scaling)
-      const camX = tf.x
-      const camY = tf.y
-      const camScale = tf.scale
-
-      // ── PASS 1: Goo density ──
-      gl.bindFramebuffer(gl.FRAMEBUFFER, gooFBO.fbo)
-      gl.viewport(0, 0, fboW, fboH)
-      gl.clearColor(0, 0, 0, 0)
-      gl.clear(gl.COLOR_BUFFER_BIT)
-      gl.enable(gl.BLEND)
-      gl.blendFunc(gl.ONE, gl.ONE)
-      gl.useProgram(gooProg)
-      gl.uniform2f(gooUniforms.resolution, width, height)
-      gl.uniform3f(gooUniforms.camera, camX, camY, camScale)
-      gl.uniform1f(gooUniforms.radiusScale, gooRadiusScale)
-      gl.bindVertexArray(gooVAO)
-      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gooCount)
-
-      // ── PASS 2: Nucleus density ──
-      gl.bindFramebuffer(gl.FRAMEBUFFER, nucFBO.fbo)
-      gl.viewport(0, 0, fboW, fboH)
-      gl.clear(gl.COLOR_BUFFER_BIT)
-      gl.useProgram(nucProg)
-      gl.uniform2f(nucUniforms.resolution, width, height)
-      gl.uniform3f(nucUniforms.camera, camX, camY, camScale)
-      gl.uniform1f(nucUniforms.radiusScale, nucRadiusScale)
-      gl.bindVertexArray(nucVAO)
-      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, nucCount)
-
-      // ── PASS 3: Composite to screen ──
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      // ── Render ──
       gl.viewport(0, 0, pxW, pxH)
       gl.clearColor(0, 0, 0, 0)
       gl.clear(gl.COLOR_BUFFER_BIT)
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-      gl.useProgram(compProg)
-      gl.activeTexture(gl.TEXTURE0)
-      gl.bindTexture(gl.TEXTURE_2D, gooFBO.tex)
-      gl.uniform1i(compUniforms.gooDensity, 0)
-      gl.activeTexture(gl.TEXTURE1)
-      gl.bindTexture(gl.TEXTURE_2D, nucFBO.tex)
-      gl.uniform1i(compUniforms.nucDensity, 1)
-      gl.uniform1f(compUniforms.gooThreshold, gooThreshold)
-      gl.uniform1f(compUniforms.gooSmooth, gooSmooth)
-      gl.uniform1f(compUniforms.gooOpacity, pal.goo)
-      gl.uniform1f(compUniforms.nucThreshold, nucThreshold)
-      gl.uniform1f(compUniforms.nucSmooth, nucSmooth)
-      gl.uniform1f(compUniforms.nucOpacity, tuning.nucleusOpacity)
-      gl.bindVertexArray(compVAO)
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+      gl.enable(gl.BLEND)
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA) // premultiplied alpha
+
+      gl.useProgram(prog)
+      gl.bindVertexArray(vao)
+
+      // Global uniforms
+      gl.uniform2f(loc.resolution, width, height)
+      gl.uniform1f(loc.dpr, dpr)
+      gl.uniform3f(loc.camera, tf.x, tf.y, tf.scale)
+      gl.uniform1f(loc.time, time)
+      gl.uniform1f(loc.sminK, sminK)
+      gl.uniform1f(loc.gooOpacity, pal.goo)
+      gl.uniform1f(loc.nucleusOpacity, tuning.nucleusOpacity)
+      gl.uniform1f(loc.wobbleIntensity, wobbleI)
+      gl.uniform1f(loc.breatheSpeed, tuning.membraneBreatheSpeed)
+      gl.uniform1f(loc.breatheAmp, tuning.membraneBreatheAmp)
+      gl.uniform1f(loc.deformASpeed, tuning.membraneDeformASpeed)
+      gl.uniform1f(loc.deformAAmp, tuning.membraneDeformAAmp)
+      gl.uniform1f(loc.deformBSpeed, tuning.membraneDeformBSpeed)
+      gl.uniform1f(loc.deformBAmp, tuning.membraneDeformBAmp)
+      gl.uniform1f(loc.tubeWidthRatio, tuning.tubeWidthRatio)
+      gl.uniform1f(loc.filletWidthRatio, tuning.filletWidthRatio)
+
+      // Per-cell data
+      gl.uniform4fv(loc.cells, cellData)
+      gl.uniform4fv(loc.cellColors, cellColorData)
+      gl.uniform1i(loc.numCells, numCells)
+
+      // Per-connection data
+      gl.uniform4fv(loc.conns, connData)
+      gl.uniform1i(loc.numConns, numConns)
+
+      // Nucleus harmonic data
+      gl.uniform4fv(loc.nucHarm, nucHarmData)
+
+      // Single draw call: fullscreen triangle
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
 
       gl.bindVertexArray(null)
+
+      // First-frame log
+      if (!hasLogged) {
+        hasLogged = true
+        console.log(`[GooSDF] DPR: ${dpr}, canvas: ${pxW}x${pxH}, cells: ${numCells}, conns: ${numConns}`)
+      }
 
       animFrameRef.current = requestAnimationFrame(draw)
     }
@@ -599,19 +546,8 @@ export function GooCanvas({ width, height, bubbles, links, transform }: GooCanva
 
     return () => {
       cancelAnimationFrame(animFrameRef.current)
-      gl.deleteVertexArray(gooVAO)
-      gl.deleteVertexArray(nucVAO)
-      gl.deleteVertexArray(compVAO)
-      gl.deleteBuffer(quadVBO)
-      gl.deleteBuffer(gooInstanceVBO)
-      gl.deleteBuffer(nucInstanceVBO)
-      gl.deleteFramebuffer(gooFBO.fbo)
-      gl.deleteTexture(gooFBO.tex)
-      gl.deleteFramebuffer(nucFBO.fbo)
-      gl.deleteTexture(nucFBO.tex)
-      gl.deleteProgram(gooProg)
-      gl.deleteProgram(nucProg)
-      gl.deleteProgram(compProg)
+      gl.deleteVertexArray(vao)
+      gl.deleteProgram(prog)
     }
   }, [width, height, bubbles, palette])
 
