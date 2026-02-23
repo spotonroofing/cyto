@@ -27,9 +27,6 @@ export const Q = IS_MOBILE ? {
   gooTargetDt: 1000 / 60,     // 60fps — ensures every frame draws on 60Hz displays
   gooIdleDt: 1000 / 60,       // match active — smooth wobble/breathing when idle (same as desktop)
 
-  // SVG goo filter blur (applied via CSS, browser handles DPR)
-  baseBlurStdDev: 12,
-
   // Background particles
   particleCount: 15,           // (desktop: 105) — minimal on mobile
   particleTargetDt: 1000 / 12, // ~12fps — half goo rate, non-critical layer
@@ -51,9 +48,6 @@ export const Q = IS_MOBILE ? {
   gooEdgeWobble: true as const,
   gooTargetDt: 1000 / 60,   // 60fps — ensures every frame draws on 60Hz displays
   gooIdleDt: 1000 / 60,     // match active — consistent wobble when idle
-
-  // SVG goo filter blur (applied via CSS, browser handles DPR)
-  baseBlurStdDev: 12,
 
   // Background particles
   particleCount: 105,

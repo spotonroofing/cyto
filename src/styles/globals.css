@@ -85,17 +85,6 @@
   animation: membrane-breathe 8s ease-in-out infinite;
 }
 
-/* === Pulse glow for active bubbles === */
-
-@keyframes pulse-glow {
-  0%, 100% { filter: drop-shadow(0 0 4px currentColor); }
-  50% { filter: drop-shadow(0 0 12px currentColor); }
-}
-
-.pulse-glow {
-  animation: pulse-glow 3s ease-in-out infinite;
-}
-
 /* === Petri dish membrane rings === */
 @keyframes membrane-ring-rotate {
   0% { transform: rotate(0deg); }
