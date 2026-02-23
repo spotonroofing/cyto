@@ -281,6 +281,16 @@ app.get('/api/health/debug/recent', async (c) => {
   return c.json(rows)
 })
 
+app.get('/api/health/debug/metrics', async (c) => {
+  const rows = await sql`
+    SELECT DISTINCT metric_name, COUNT(*)::int AS count
+    FROM health_metrics
+    GROUP BY metric_name
+    ORDER BY count DESC
+  `
+  return c.json(rows)
+})
+
 app.get('/api/health/debug/tables', async (c) => {
   const [hm, ss, nd, we] = await Promise.all([
     sql`SELECT COUNT(*)::int AS count FROM health_metrics`,
