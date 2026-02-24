@@ -5,6 +5,7 @@ import { FlareToggle } from './FlareToggle'
 import { FoodInput } from './FoodInput'
 import { DateSelector } from './DateSelector'
 import { useDailyLogStore, createEmptyLog } from '@/stores/dailyLogStore'
+import { useUIStore } from '@/stores/uiStore'
 import { useTheme } from '@/themes'
 import type { DailyLog } from '@/types'
 
@@ -16,9 +17,10 @@ export function DailyLogPanel({ onClose }: DailyLogPanelProps) {
   const { palette, phaseColor, isDark } = useTheme()
   const getLogForDate = useDailyLogStore((s) => s.getLogForDate)
   const saveLog = useDailyLogStore((s) => s.saveLog)
+  const logDate = useUIStore((s) => s.logDate)
 
   const today = new Date().toISOString().split('T')[0]!
-  const [selectedDate, setSelectedDate] = useState(today)
+  const [selectedDate, setSelectedDate] = useState(logDate ?? today)
   const [log, setLog] = useState<DailyLog>(() => getLogForDate(today) ?? createEmptyLog(today))
 
   // Load log when date changes

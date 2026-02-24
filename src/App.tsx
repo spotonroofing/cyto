@@ -10,6 +10,7 @@ import { BubbleMap } from '@/components/BubbleMap/BubbleMap'
 import { FloatingButton } from '@/components/UI/FloatingButton'
 import { GooTuningPanel } from '@/components/UI/GooTuningPanel'
 import { TypewriterTerminal } from '@/components/UI/TypewriterTerminal'
+import { CellColonyStrip } from '@/components/CellColony/CellColonyStrip'
 import { useTheme } from '@/themes'
 
 // Lazy-loaded overlays (not needed on initial render)
@@ -83,6 +84,9 @@ export function App() {
       >
         {/* Bubble Map (always rendered) */}
         <BubbleMap />
+
+        {/* Cell Colony Strip — left edge timeline */}
+        {showMapOnlyButtons && <CellColonyStrip />}
 
         <GooTuningPanel />
 

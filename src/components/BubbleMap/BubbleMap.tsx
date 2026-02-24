@@ -1,7 +1,6 @@
 import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useBubbleLayout } from './useBubbleLayout'
 import { Bubble } from './Bubble'
-import { DayRing } from './DayRing'
 import { GooCanvas } from './GooCanvas'
 import { BackgroundParticles } from './BackgroundParticles'
 import { DotGrid } from './DotGrid'
@@ -741,7 +740,6 @@ export function BubbleMap() {
           <g
             transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}
           >
-            <DayRing bubbles={bubbles} />
             {bubbles.map((bubble) => (
               <Bubble
                 key={bubble.milestoneId}

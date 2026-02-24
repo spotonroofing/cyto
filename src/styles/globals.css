@@ -75,24 +75,33 @@
   animation: membrane-breathe 8s ease-in-out infinite;
 }
 
-/* === Day Ring dot animations === */
+/* === Cell Colony Strip === */
 
-@keyframes day-ring-pulse {
-  0%, 100% { transform: scale(0.97); }
-  50% { transform: scale(1.03); }
-}
-
-@keyframes day-ring-breathe {
+@keyframes colony-today-breathe {
   0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.9; }
+  50% { opacity: 0.85; }
 }
 
-.day-ring-dot-pulse {
-  animation: day-ring-pulse 3s ease-in-out infinite;
+.colony-today-breathe {
+  animation: colony-today-breathe 2.5s ease-in-out infinite;
 }
 
-.day-ring-dot-breathe {
-  animation: day-ring-breathe 2s ease-in-out infinite;
+@keyframes colony-streak-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+.colony-streak-pulse {
+  animation: colony-streak-pulse 2s ease-in-out infinite;
+}
+
+/* Hide scrollbar in colony strip */
+.colony-scroll::-webkit-scrollbar {
+  display: none;
+}
+.colony-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* === Scrollbar styling === */

@@ -8,12 +8,14 @@ interface UIState {
   isLogOpen: boolean
   isAnalyticsOpen: boolean
   isSettingsOpen: boolean
+  logDate: string | null
 
   setView: (view: ViewState) => void
   selectMilestone: (id: string | null) => void
   openChat: (milestoneContext?: string) => void
   closeChat: () => void
   toggleLog: () => void
+  openLogForDate: (date: string) => void
   closeLog: () => void
   toggleAnalytics: () => void
   closeAnalytics: () => void
@@ -29,6 +31,7 @@ export const useUIStore = create<UIState>()((set) => ({
   isLogOpen: false,
   isAnalyticsOpen: false,
   isSettingsOpen: false,
+  logDate: null,
 
   setView: (view) => set({ currentView: view }),
 
@@ -43,8 +46,9 @@ export const useUIStore = create<UIState>()((set) => ({
 
   closeChat: () => set({ isChatOpen: false }),
 
-  toggleLog: () => set((s) => ({ isLogOpen: !s.isLogOpen })),
-  closeLog: () => set({ isLogOpen: false }),
+  toggleLog: () => set((s) => ({ isLogOpen: !s.isLogOpen, logDate: null })),
+  openLogForDate: (date: string) => set({ isLogOpen: true, logDate: date }),
+  closeLog: () => set({ isLogOpen: false, logDate: null }),
 
   toggleAnalytics: () => set((s) => ({ isAnalyticsOpen: !s.isAnalyticsOpen })),
   closeAnalytics: () => set({ isAnalyticsOpen: false }),
