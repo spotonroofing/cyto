@@ -75,6 +75,26 @@
   animation: membrane-breathe 8s ease-in-out infinite;
 }
 
+/* === Day Ring dot animations === */
+
+@keyframes day-ring-pulse {
+  0%, 100% { transform: scale(0.97); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes day-ring-breathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+
+.day-ring-dot-pulse {
+  animation: day-ring-pulse 3s ease-in-out infinite;
+}
+
+.day-ring-dot-breathe {
+  animation: day-ring-breathe 2s ease-in-out infinite;
+}
+
 /* === Scrollbar styling === */
 
 ::-webkit-scrollbar {
