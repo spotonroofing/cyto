@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import {
   LineChart,
   Line,
@@ -7,20 +8,25 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { useDailyLogStore } from '@/stores/dailyLogStore'
+import { useHealthDataStore } from '@/stores/healthDataStore'
 import { useTheme } from '@/themes'
 
 export function WeightChart() {
   const { palette } = useTheme()
-  const getRecentLogs = useDailyLogStore((s) => s.getRecentLogs)
+  const { weight, fetchWeightRange } = useHealthDataStore()
 
-  const logs = getRecentLogs(90)
-  const data = logs
-    .filter((l) => l.weight != null)
+  // Fetch last 90 days of weight data on mount
+  useEffect(() => {
+    const end = new Date().toISOString().split('T')[0]
+    const start = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    fetchWeightRange(start, end)
+  }, [fetchWeightRange])
+
+  const data = weight
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map((log) => ({
-      date: log.date.slice(5),
-      weight: log.weight,
+    .map((entry) => ({
+      date: entry.date.slice(5),
+      weight: entry.weight_lbs,
     }))
 
   return (

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   LineChart,
   Line,
@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useDailyLogStore } from '@/stores/dailyLogStore'
+import { useHealthDataStore } from '@/stores/healthDataStore'
 import { useTheme } from '@/themes'
 
 type MetricKey = 'energy' | 'fog' | 'mood' | 'sleep'
@@ -16,6 +17,7 @@ type MetricKey = 'energy' | 'fog' | 'mood' | 'sleep'
 export function TrendChart() {
   const { palette, phaseColor } = useTheme()
   const getRecentLogs = useDailyLogStore((s) => s.getRecentLogs)
+  const { sleep, fetchSleepRange } = useHealthDataStore()
   const [activeMetrics, setActiveMetrics] = useState<Set<MetricKey>>(
     new Set(['energy', 'fog', 'mood', 'sleep']),
   )
@@ -27,7 +29,22 @@ export function TrendChart() {
     { key: 'sleep' as const, label: 'Sleep', color: phaseColor(5) },
   ], [phaseColor])
 
+  // Fetch last 30 days of sleep data on mount
+  useEffect(() => {
+    const end = new Date().toISOString().split('T')[0]
+    const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    fetchSleepRange(start, end)
+  }, [fetchSleepRange])
+
   const logs = getRecentLogs(30)
+
+  // Map sleep sessions to date -> duration_hours
+  const sleepByDate = new Map<string, number>()
+  for (const session of sleep) {
+    const date = session.sleep_end.split('T')[0]
+    sleepByDate.set(date, session.duration_hours)
+  }
+
   const data = logs
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((log) => ({
@@ -35,7 +52,7 @@ export function TrendChart() {
       energy: log.energy,
       fog: log.fog,
       mood: log.mood,
-      sleep: log.sleep,
+      sleep: sleepByDate.get(log.date) ?? log.sleep, // prefer server data, fallback to log
     }))
 
   const toggleMetric = (key: MetricKey) => {
