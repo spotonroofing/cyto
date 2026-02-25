@@ -404,6 +404,66 @@ app.get('/api/health/summary/:date', async (c) => {
   })
 })
 
+// --- POST /api/logs — daily recovery log ---
+app.post('/api/logs', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { date, energy, fog, mood, flare, foods, notes } = body
+
+    if (!date) {
+      return c.json({ error: 'date is required (YYYY-MM-DD)' }, 400)
+    }
+
+    // upsert logic: insert or update on conflict
+    await sql`
+      INSERT INTO daily_logs (date, energy, fog, mood, flare, foods, notes, updated_at)
+      VALUES (${date}, ${energy}, ${fog}, ${mood}, ${flare ?? false}, ${JSON.stringify(foods ?? [])}, ${notes ?? ''}, NOW())
+      ON CONFLICT (date) DO UPDATE SET
+        energy = EXCLUDED.energy,
+        fog = EXCLUDED.fog,
+        mood = EXCLUDED.mood,
+        flare = EXCLUDED.flare,
+        foods = EXCLUDED.foods,
+        notes = EXCLUDED.notes,
+        updated_at = NOW()
+    `
+
+    return c.json({ ok: true, date })
+  } catch (err) {
+    console.error('POST /api/logs error:', err)
+    return c.json({ error: 'Failed to save log', detail: String(err) }, 500)
+  }
+})
+
+// --- GET /api/logs?start=YYYY-MM-DD&end=YYYY-MM-DD ---
+app.get('/api/logs', async (c) => {
+  try {
+    const start = c.req.query('start')
+    const end = c.req.query('end')
+
+    let rows
+    if (start && end) {
+      rows = await sql`
+        SELECT * FROM daily_logs
+        WHERE date >= ${start} AND date <= ${end}
+        ORDER BY date DESC
+      `
+    } else {
+      // default: last 30 days
+      rows = await sql`
+        SELECT * FROM daily_logs
+        ORDER BY date DESC
+        LIMIT 30
+      `
+    }
+
+    return c.json({ count: rows.length, data: rows })
+  } catch (err) {
+    console.error('GET /api/logs error:', err)
+    return c.json({ error: 'Failed to fetch logs', detail: String(err) }, 500)
+  }
+})
+
 // Serve static files from Vite build output
 app.use('/*', serveStatic({ root: './dist' }))
 

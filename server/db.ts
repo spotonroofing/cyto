@@ -63,5 +63,20 @@ export async function initDb() {
     )
   `
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS daily_logs (
+      id SERIAL PRIMARY KEY,
+      date DATE NOT NULL UNIQUE,
+      energy INTEGER CHECK (energy >= 1 AND energy <= 10),
+      fog INTEGER CHECK (fog >= 1 AND fog <= 10),
+      mood INTEGER CHECK (mood >= 1 AND mood <= 10),
+      flare BOOLEAN DEFAULT FALSE,
+      foods JSONB DEFAULT '[]',
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+
   console.log('Database tables initialized')
 }
