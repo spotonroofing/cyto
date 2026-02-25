@@ -86,6 +86,11 @@
   animation: ticker-pulse 2.5s ease-in-out infinite;
 }
 
+@keyframes ticker-card-appear {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 /* Hide scrollbar in ticker strip */
 .ticker-scroll::-webkit-scrollbar {
   display: none;

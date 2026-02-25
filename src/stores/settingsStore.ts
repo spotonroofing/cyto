@@ -19,7 +19,7 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       theme: 'light',
       themeId: defaultThemeId,
-      protocolStartDate: '2026-02-13',
+      protocolStartDate: '2026-02-12',
       healthContext: null,
 
       toggleTheme: () =>
