@@ -32,12 +32,70 @@ function createEmptyLog(date: string): DailyLog {
   }
 }
 
+// TODO: Remove sample data seeding before production
+async function seedSampleData(): Promise<void> {
+  const today = new Date(todayString() + 'T00:00:00')
+  const logs: DailyLog[] = []
+
+  for (let i = 1; i <= 14; i++) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - (14 - i))
+    const dateStr = d.toISOString().split('T')[0]!
+
+    // Day 6 and Day 13 are unlogged gaps
+    if (i === 6 || i === 13) continue
+
+    if (i === 14) {
+      // Today: specific values
+      logs.push({
+        date: dateStr,
+        energy: 7,
+        mood: 6,
+        fog: 4,
+        sleep: 7,
+        flare: true,
+        flareSeverity: 1,
+        foods: ['chicken', 'rice'],
+        notes: '',
+        timestamp: Date.now(),
+      })
+    } else {
+      // Deterministic values seeded by day index
+      const seed = i * 17 + 5
+      const energy = 5 + (seed % 4)           // 5-8
+      const mood = 4 + ((seed * 3) % 4)       // 4-7
+      const fog = 3 + ((seed * 7) % 4)        // 3-6
+      const sleep = 5 + ((seed * 11) % 4)     // 5-8
+      logs.push({
+        date: dateStr,
+        energy,
+        mood,
+        fog,
+        sleep,
+        flare: false,
+        foods: [],
+        notes: '',
+        timestamp: d.getTime(),
+      })
+    }
+  }
+
+  for (const log of logs) {
+    await db.dailyLogs.put(log)
+  }
+}
+
 export const useDailyLogStore = create<DailyLogState>()((set, get) => ({
   logs: [],
   initialized: false,
 
   initialize: async () => {
-    const logs = await db.dailyLogs.orderBy('date').reverse().toArray()
+    let logs = await db.dailyLogs.orderBy('date').reverse().toArray()
+    // TODO: Remove sample data seeding before production
+    if (logs.length === 0) {
+      await seedSampleData()
+      logs = await db.dailyLogs.orderBy('date').reverse().toArray()
+    }
     set({ logs, initialized: true })
   },
 

@@ -28,7 +28,8 @@ export function App() {
   const isLogOpen = useUIStore((s) => s.isLogOpen)
   const isAnalyticsOpen = useUIStore((s) => s.isAnalyticsOpen)
   const isChatOpen = useUIStore((s) => s.isChatOpen)
-  const toggleLog = useUIStore((s) => s.toggleLog)
+  const toggleLog = useUIStore((s) => s.toggleLog) // TODO: Re-enable daily log FAB button
+  void toggleLog
   const closeLog = useUIStore((s) => s.closeLog)
   const toggleAnalytics = useUIStore((s) => s.toggleAnalytics)
   const closeAnalytics = useUIStore((s) => s.closeAnalytics)
@@ -143,8 +144,8 @@ export function App() {
                 )}
               </FloatingButton>
 
-              {/* Daily log button */}
-              <FloatingButton
+              {/* TODO: Re-enable daily log FAB button */}
+              {/* <FloatingButton
                 onClick={toggleLog}
                 position="inline"
                 phaseColor={phaseColor(3)}
@@ -153,7 +154,7 @@ export function App() {
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
-              </FloatingButton>
+              </FloatingButton> */}
 
               {/* Chat button */}
               <FloatingButton

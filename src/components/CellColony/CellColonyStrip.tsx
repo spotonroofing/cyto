@@ -198,7 +198,7 @@ export function CellColonyStrip() {
   return (
     <div
       ref={stripRef}
-      className="fixed left-0 top-0 h-dvh z-30 flex flex-col"
+      className="fixed left-0 top-0 h-dvh z-10 flex flex-col"
       style={{
         width: expanded ? (window.innerWidth < 768 ? 180 : 200) : (window.innerWidth < 768 ? 44 : 48),
         transition: 'width 250ms ease-out',
@@ -208,6 +208,9 @@ export function CellColonyStrip() {
         borderRadius: '0 16px 16px 0',
       }}
     >
+      {/* Spacer so first cell starts below TypewriterTerminal */}
+      <div style={{ minHeight: 60, flexShrink: 0 }} />
+
       {/* Streak counter */}
       {streak >= 2 && (
         <div
