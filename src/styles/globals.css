@@ -75,31 +75,22 @@
   animation: membrane-breathe 8s ease-in-out infinite;
 }
 
-/* === Cell Colony Strip === */
+/* === Minimal Ticker Strip === */
 
-@keyframes colony-today-breathe {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.85; }
+@keyframes ticker-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
 }
 
-.colony-today-breathe {
-  animation: colony-today-breathe 2.5s ease-in-out infinite;
+.ticker-pulse {
+  animation: ticker-pulse 2.5s ease-in-out infinite;
 }
 
-@keyframes colony-streak-pulse {
-  0%, 100% { opacity: 0.8; }
-  50% { opacity: 1; }
-}
-
-.colony-streak-pulse {
-  animation: colony-streak-pulse 2s ease-in-out infinite;
-}
-
-/* Hide scrollbar in colony strip */
-.colony-scroll::-webkit-scrollbar {
+/* Hide scrollbar in ticker strip */
+.ticker-scroll::-webkit-scrollbar {
   display: none;
 }
-.colony-scroll {
+.ticker-scroll {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
