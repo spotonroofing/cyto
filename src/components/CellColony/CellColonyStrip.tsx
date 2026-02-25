@@ -6,16 +6,34 @@ import { phases } from '@/data/roadmap'
 import { useTheme } from '@/themes'
 import type { DailyLog } from '@/types'
 
-const DOT_SPACING = 18
-const COLLAPSED_WIDTH = 28
-const EXPANDED_WIDTH_MOBILE = 180
-const EXPANDED_WIDTH_DESKTOP = 200
+// ── Layout constants ──────────────────────────────────────────────────────
+const COLLAPSED_WIDTH = 36
+const EXPANDED_WIDTH_MOBILE = 220
+const EXPANDED_WIDTH_DESKTOP = 240
+const LINE_X = 18 // center of 36px strip
+const CURVE_RADIUS = 18
 const PADDING_TOP = 60
 const PADDING_BOTTOM = 70
-const LINE_X = 14 // center of 28px strip
-const CURVE_RADIUS = 20
-const DOT_R = 4 // dot radius (8px diameter)
-const HALO_R = 6 // halo radius (12px diameter)
+const ROW_HEIGHT = 40
+const DOT_R = 4 // 8px diameter
+const DOT_R_SELECTED = 6 // 12px diameter
+const DOT_R_TODAY = 5 // 10px diameter
+const HALO_R = 6 // 12px dark halo
+
+// ── Progress ring constants ───────────────────────────────────────────────
+const RING_SIZE = 40
+const RING_STROKE = 3
+const RING_R = (RING_SIZE - RING_STROKE) / 2
+const RING_CIRC = 2 * Math.PI * RING_R
+
+const METRIC_COLORS: Record<string, string> = {
+  E: '#F5A623',
+  M: '#7ED688',
+  F: '#6CB4EE',
+  S: '#B39DDB',
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
 
 function todayString(): string {
   return new Date().toISOString().split('T')[0]!
@@ -63,7 +81,7 @@ function buildDateList(protocolStart: string): string[] {
   return dates // newest first
 }
 
-function formatDateLabel(dateStr: string): string {
+function formatDateShort(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00')
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
@@ -75,19 +93,12 @@ function isYesterday(dateStr: string): boolean {
   return Math.round(diff / (1000 * 60 * 60 * 24)) === 1
 }
 
-// ---------- Progress Ring ----------
-
-const RING_SIZE = 32
-const RING_STROKE = 3
-const RING_R = (RING_SIZE - RING_STROKE) / 2
-const RING_CIRC = 2 * Math.PI * RING_R
-
-const METRIC_COLORS: Record<string, string> = {
-  E: '#F5A623',
-  M: '#7ED688',
-  F: '#6CB4EE',
-  S: '#B39DDB',
+function getWeekdayLabel(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
+
+// ── ProgressRing ──────────────────────────────────────────────────────────
 
 function ProgressRing({
   letter,
@@ -105,44 +116,56 @@ function ProgressRing({
   const color = METRIC_COLORS[letter] ?? phaseColor
 
   return (
-    <svg width={RING_SIZE} height={RING_SIZE} style={{ display: 'block' }}>
-      <circle
-        cx={RING_SIZE / 2}
-        cy={RING_SIZE / 2}
-        r={RING_R}
-        fill="none"
-        stroke={phaseColor}
-        strokeOpacity={0.12}
-        strokeWidth={RING_STROKE}
-      />
-      <circle
-        cx={RING_SIZE / 2}
-        cy={RING_SIZE / 2}
-        r={RING_R}
-        fill="none"
-        stroke={color}
-        strokeWidth={RING_STROKE}
-        strokeDasharray={RING_CIRC}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
-      />
-      <text
-        x={RING_SIZE / 2}
-        y={RING_SIZE / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="rgba(255,255,255,0.7)"
-        fontSize={9}
-        fontFamily="'JetBrains Mono', monospace"
+    <div style={{ textAlign: 'center' }}>
+      <svg width={RING_SIZE} height={RING_SIZE} style={{ display: 'block', margin: '0 auto' }}>
+        <circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RING_R}
+          fill="none"
+          stroke={phaseColor}
+          strokeOpacity={0.1}
+          strokeWidth={RING_STROKE}
+        />
+        <circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RING_R}
+          fill="none"
+          stroke={color}
+          strokeWidth={RING_STROKE}
+          strokeDasharray={RING_CIRC}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+        />
+        <text
+          x={RING_SIZE / 2}
+          y={RING_SIZE / 2}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="rgba(255,255,255,0.6)"
+          fontSize={10}
+          fontFamily="'JetBrains Mono', monospace"
+        >
+          {letter}
+        </text>
+      </svg>
+      <div
+        style={{
+          fontSize: 9,
+          color,
+          fontFamily: "'JetBrains Mono', monospace",
+          marginTop: 2,
+        }}
       >
-        {letter}
-      </text>
-    </svg>
+        {value}
+      </div>
+    </div>
   )
 }
 
-// ---------- Main Component ----------
+// ── Main Component ────────────────────────────────────────────────────────
 
 export function CellColonyStrip() {
   const protocolStartDate = useSettingsStore((s) => s.protocolStartDate)
@@ -151,10 +174,12 @@ export function CellColonyStrip() {
   const openLogForDate = useUIStore((s) => s.openLogForDate)
   const { phaseColor: themePhaseColor } = useTheme()
 
-  const [expanded, setExpanded] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [shelfOpen, setShelfOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<string>(todayString())
+  const [contentKey, setContentKey] = useState(0) // for crossfade
   const stripRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const swipeStartX = useRef<number | null>(null)
 
   const today = todayString()
 
@@ -219,13 +244,52 @@ export function CellColonyStrip() {
       ? EXPANDED_WIDTH_MOBILE
       : EXPANDED_WIDTH_DESKTOP
 
-  // Click/touch outside to collapse
+  // ── Scroll snap detection ───────────────────────────────────────────────
   useEffect(() => {
-    if (!expanded) return
+    const el = scrollRef.current
+    if (!el) return
+
+    let ticking = false
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        ticking = false
+        const containerRect = el.getBoundingClientRect()
+        const centerY = containerRect.top + containerRect.height / 2
+
+        // Find the row closest to the center
+        const rows = el.querySelectorAll<HTMLElement>('[data-date]')
+        let bestDate: string | null = null
+        let bestDist = Infinity
+
+        rows.forEach((row) => {
+          const rowRect = row.getBoundingClientRect()
+          const rowCenter = rowRect.top + rowRect.height / 2
+          const dist = Math.abs(rowCenter - centerY)
+          if (dist < bestDist) {
+            bestDist = dist
+            bestDate = row.dataset.date ?? null
+          }
+        })
+
+        if (bestDate && bestDate !== selectedDate) {
+          setSelectedDate(bestDate)
+          setContentKey((k) => k + 1)
+        }
+      })
+    }
+
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [selectedDate])
+
+  // ── Click/touch outside to close shelf ──────────────────────────────────
+  useEffect(() => {
+    if (!shelfOpen) return
     const handler = (e: MouseEvent | TouchEvent) => {
       if (stripRef.current && !stripRef.current.contains(e.target as Node)) {
-        setExpanded(false)
-        setSelectedDate(null)
+        setShelfOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -234,28 +298,48 @@ export function CellColonyStrip() {
       document.removeEventListener('mousedown', handler)
       document.removeEventListener('touchstart', handler)
     }
-  }, [expanded])
+  }, [shelfOpen])
 
-  const handleDotClick = useCallback(
-    (date: string) => {
-      if (!expanded) {
-        setExpanded(true)
-        setSelectedDate(date)
-      } else if (selectedDate === date) {
-        setExpanded(false)
-        setSelectedDate(null)
-      } else {
-        setSelectedDate(date)
+  // ── Swipe gestures on the strip ─────────────────────────────────────────
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    swipeStartX.current = e.touches[0]!.clientX
+  }, [])
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (swipeStartX.current === null) return
+      const dx = e.changedTouches[0]!.clientX - swipeStartX.current
+      swipeStartX.current = null
+
+      if (dx > 40 && !shelfOpen) {
+        setShelfOpen(true)
+      } else if (dx < -40 && shelfOpen) {
+        setShelfOpen(false)
       }
     },
-    [expanded, selectedDate],
+    [shelfOpen],
   )
 
-  const handleCardClick = useCallback(
+  // ── Dot tap handler ─────────────────────────────────────────────────────
+  const handleDotClick = useCallback(
+    (date: string) => {
+      if (selectedDate === date && shelfOpen) {
+        // Tap selected dot again => close shelf
+        setShelfOpen(false)
+      } else {
+        setSelectedDate(date)
+        setContentKey((k) => k + 1)
+        setShelfOpen(true)
+      }
+    },
+    [selectedDate, shelfOpen],
+  )
+
+  // ── Shelf content tap → open log panel ──────────────────────────────────
+  const handleShelfContentClick = useCallback(
     (date: string) => {
       openLogForDate(date)
-      setExpanded(false)
-      setSelectedDate(null)
+      setShelfOpen(false)
     },
     [openLogForDate],
   )
@@ -263,10 +347,10 @@ export function CellColonyStrip() {
   const currentPhaseColor = colorForDate(today)
   const noStartDate = !protocolStartDate
 
-  const contentHeight = dates.length * DOT_SPACING
-  const dotY = (i: number) => i * DOT_SPACING + DOT_SPACING / 2
+  // ── Gradient stops for the vertical line ────────────────────────────────
+  const contentHeight = dates.length * ROW_HEIGHT
+  const dotY = (i: number) => i * ROW_HEIGHT + ROW_HEIGHT / 2
 
-  // SVG gradient stops for line
   const gradientStops = useMemo(() => {
     if (dates.length <= 1) {
       return [
@@ -289,7 +373,7 @@ export function CellColonyStrip() {
     return stops
   }, [dates, colorForDate, currentPhaseColor, contentHeight])
 
-  // Dot positions for SVG mask cutouts
+  // ── Dot mask positions (for line interruption) ──────────────────────────
   const dotPositions = useMemo(() => {
     const positions: { y: number }[] = []
     for (let i = 0; i < dates.length; i++) {
@@ -304,17 +388,38 @@ export function CellColonyStrip() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dates, logs, today])
 
+  // ── Selected day data for shelf ─────────────────────────────────────────
+  const selectedLog = getLogForDate(selectedDate)
+  const selectedLogged = isLogged(selectedLog)
+  const selectedColor = colorForDate(selectedDate)
+  const selectedDayCount = dayCounterMap.get(selectedDate)
+
   return (
     <div
       ref={stripRef}
-      className="fixed left-0 top-0 h-dvh z-10"
+      className="fixed left-0 top-0 h-dvh"
       style={{
-        width: expanded ? expandedWidth : COLLAPSED_WIDTH,
-        transition: 'width 200ms ease-out',
-        touchAction: 'pan-y',
+        width: shelfOpen ? expandedWidth : COLLAPSED_WIDTH,
+        transition: 'width 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        zIndex: shelfOpen ? 12 : 10,
       }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
-      {/* Fixed top curve */}
+      {/* ── Shelf background (only visible when expanded) ───────────── */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: shelfOpen ? 'rgba(10, 8, 18, 0.9)' : 'transparent',
+          backdropFilter: shelfOpen ? 'blur(14px)' : 'none',
+          WebkitBackdropFilter: shelfOpen ? 'blur(14px)' : 'none',
+          borderRight: shelfOpen ? `1px solid ${selectedColor}1A` : 'none',
+          borderRadius: shelfOpen ? '0 16px 16px 0' : '0',
+          transition: 'background 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94), border-radius 250ms',
+        }}
+      />
+
+      {/* ── Fixed top curve ─────────────────────────────────────────── */}
       <svg
         className="absolute top-0 left-0 pointer-events-none"
         width={COLLAPSED_WIDTH}
@@ -330,7 +435,7 @@ export function CellColonyStrip() {
         />
       </svg>
 
-      {/* Scrollable content */}
+      {/* ── Scrollable snap area ────────────────────────────────────── */}
       <div
         ref={scrollRef}
         className="h-full overflow-y-auto ticker-scroll"
@@ -338,26 +443,36 @@ export function CellColonyStrip() {
           paddingTop: PADDING_TOP + CURVE_RADIUS,
           paddingBottom: PADDING_BOTTOM + CURVE_RADIUS,
           touchAction: 'pan-y',
+          scrollSnapType: 'y mandatory',
         }}
       >
         {noStartDate ? (
-          <NoStartDateMessage expanded={expanded} color={currentPhaseColor} />
+          <div
+            className="flex items-center justify-center h-full px-2"
+            style={{
+              fontSize: 10,
+              color: currentPhaseColor + '80',
+              textAlign: 'center',
+            }}
+          >
+            {shelfOpen ? 'Set protocol start date in Settings' : ''}
+          </div>
         ) : (
           <div className="relative" style={{ height: contentHeight, width: '100%' }}>
-            {/* SVG line + dots */}
+            {/* ── SVG line + dots layer ─────────────────────────────── */}
             <svg
               className="absolute top-0 left-0 pointer-events-none"
-              width={expanded ? expandedWidth : COLLAPSED_WIDTH}
+              width={COLLAPSED_WIDTH}
               height={contentHeight}
-              style={{ overflow: 'visible' }}
+              style={{ overflow: 'visible', zIndex: 1 }}
             >
               <defs>
-                <linearGradient id="colony-line-grad" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="colony-line-grad-v3" x1="0" y1="0" x2="0" y2="1">
                   {gradientStops.map((s, i) => (
                     <stop key={i} offset={s.offset} stopColor={s.color} />
                   ))}
                 </linearGradient>
-                <mask id="colony-line-mask">
+                <mask id="colony-line-mask-v3">
                   <rect x="0" y="0" width={COLLAPSED_WIDTH} height={contentHeight} fill="white" />
                   {dotPositions.map((dp, i) => (
                     <circle key={i} cx={LINE_X} cy={dp.y} r={HALO_R + 1} fill="black" />
@@ -365,19 +480,19 @@ export function CellColonyStrip() {
                 </mask>
               </defs>
 
-              {/* Vertical line with mask cutouts at dot positions */}
+              {/* Vertical line with mask cutouts */}
               <line
                 x1={LINE_X}
                 y1={0}
                 x2={LINE_X}
                 y2={contentHeight}
-                stroke="url(#colony-line-grad)"
+                stroke="url(#colony-line-grad-v3)"
                 strokeWidth={2}
                 strokeOpacity={0.5}
-                mask="url(#colony-line-mask)"
+                mask="url(#colony-line-mask-v3)"
               />
 
-              {/* Dots on top of line */}
+              {/* Dots */}
               {dates.map((date, i) => {
                 const log = getLogForDate(date)
                 const logged = isLogged(log)
@@ -386,11 +501,30 @@ export function CellColonyStrip() {
 
                 const cy = dotY(i)
                 const color = colorForDate(date)
-                const r = isTodayDate ? 5 : DOT_R
+                const isSelected = date === selectedDate
 
-                return logged ? (
-                  <circle key={date} cx={LINE_X} cy={cy} r={r} fill={color} />
-                ) : (
+                if (logged) {
+                  const r = isSelected ? DOT_R_SELECTED : DOT_R
+                  return (
+                    <circle
+                      key={date}
+                      cx={LINE_X}
+                      cy={cy}
+                      r={r}
+                      fill={color}
+                      style={{
+                        transition: 'r 100ms ease-out',
+                        filter: isSelected
+                          ? `drop-shadow(0 0 8px ${color}80)`
+                          : 'none',
+                      }}
+                    />
+                  )
+                }
+
+                // Today unlogged: hollow pulse
+                const r = isSelected ? DOT_R_SELECTED : DOT_R_TODAY
+                return (
                   <circle
                     key={date}
                     cx={LINE_X}
@@ -399,8 +533,14 @@ export function CellColonyStrip() {
                     fill="none"
                     stroke={color}
                     strokeWidth={1.5}
-                    strokeOpacity={0.6}
-                    className="ticker-pulse"
+                    strokeOpacity={0.5}
+                    className="ticker-today-pulse"
+                    style={{
+                      transition: 'r 100ms ease-out',
+                      filter: isSelected
+                        ? `drop-shadow(0 0 8px ${color}80)`
+                        : 'none',
+                    }}
                   />
                 )
               })}
@@ -409,66 +549,74 @@ export function CellColonyStrip() {
               {dates.map((date, i) => {
                 const count = dayCounterMap.get(date)
                 if (count == null) return null
+
+                const isSelected = date === selectedDate
                 const isLatest = date === latestLoggedDate
-                if (count % 5 !== 0 && !isLatest) return null
+                const showCount = count % 5 === 0 || isLatest || isSelected
+
+                if (!showCount) return null
+
+                const color = colorForDate(date)
 
                 return (
-                  <text
-                    key={`cnt-${date}`}
-                    x={LINE_X + 10}
-                    y={dotY(i)}
-                    fill={colorForDate(date)}
-                    fillOpacity={0.5}
-                    fontSize={9}
-                    fontFamily="'JetBrains Mono', monospace"
-                    style={{ fontFeatureSettings: '"tnum"' }}
-                    dominantBaseline="central"
-                  >
-                    {count}
-                  </text>
+                  <g key={`cnt-${date}`}>
+                    <text
+                      x={LINE_X + 12}
+                      y={isSelected ? dotY(i) - 4 : dotY(i)}
+                      fill={color}
+                      fillOpacity={isSelected ? 0.7 : 0.4}
+                      fontSize={9}
+                      fontFamily="'JetBrains Mono', monospace"
+                      style={{ fontFeatureSettings: '"tnum"' }}
+                      dominantBaseline="central"
+                    >
+                      {count}
+                    </text>
+                    {isSelected && (
+                      <text
+                        x={LINE_X + 12}
+                        y={dotY(i) + 7}
+                        fill={color}
+                        fillOpacity={0.3}
+                        fontSize={8}
+                        fontFamily="'JetBrains Mono', monospace"
+                        dominantBaseline="central"
+                      >
+                        {formatDateShort(date)}
+                      </text>
+                    )}
+                  </g>
                 )
               })}
             </svg>
 
-            {/* Hit targets + detail cards (HTML layer) */}
-            {dates.map((date, i) => {
-              const isSelected = expanded && selectedDate === date
-              return (
-                <div
-                  key={date}
-                  className="absolute"
-                  style={{
-                    top: dotY(i) - DOT_SPACING / 2,
-                    left: 0,
-                    width: COLLAPSED_WIDTH,
-                    height: DOT_SPACING,
-                  }}
-                >
-                  <button
-                    className="absolute inset-0 cursor-pointer"
-                    style={{ background: 'transparent', border: 'none', padding: 0, zIndex: 2 }}
-                    onClick={() => handleDotClick(date)}
-                    aria-label={`${date === today ? 'Today' : date}${isLogged(getLogForDate(date)) ? ' (logged)' : ''}`}
-                  />
-                  {isSelected && (
-                    <DetailCard
-                      date={date}
-                      log={getLogForDate(date)}
-                      logged={isLogged(getLogForDate(date))}
-                      isToday={date === today}
-                      color={colorForDate(date)}
-                      dayCount={dayCounterMap.get(date)}
-                      onCardClick={handleCardClick}
-                    />
-                  )}
-                </div>
-              )
-            })}
+            {/* ── Hit target rows (HTML, with scroll-snap-align) ────── */}
+            {dates.map((date, i) => (
+              <div
+                key={date}
+                data-date={date}
+                className="absolute"
+                style={{
+                  top: dotY(i) - ROW_HEIGHT / 2,
+                  left: 0,
+                  width: COLLAPSED_WIDTH,
+                  height: ROW_HEIGHT,
+                  scrollSnapAlign: 'center',
+                }}
+              >
+                <button
+                  className="absolute inset-0 cursor-pointer"
+                  style={{ background: 'transparent', border: 'none', padding: 0, zIndex: 2 }}
+                  onClick={() => handleDotClick(date)}
+                  aria-label={`${date === today ? 'Today' : date}${isLogged(getLogForDate(date)) ? ' (logged)' : ''}`}
+                />
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Fixed bottom curve */}
+      {/* ── Fixed bottom curve ──────────────────────────────────────── */}
       <svg
         className="absolute bottom-0 left-0 pointer-events-none"
         width={COLLAPSED_WIDTH}
@@ -476,78 +624,73 @@ export function CellColonyStrip() {
         style={{ zIndex: 3 }}
       >
         <path
-          d={`M ${LINE_X},${PADDING_BOTTOM - CURVE_RADIUS} A ${CURVE_RADIUS},${CURVE_RADIUS} 0 0,0 0,${PADDING_BOTTOM}`}
+          d={`M ${LINE_X},0 A ${CURVE_RADIUS},${CURVE_RADIUS} 0 0,0 0,${CURVE_RADIUS}`}
           fill="none"
           stroke={gradientStops[gradientStops.length - 1]?.color ?? currentPhaseColor}
           strokeWidth={2}
           strokeOpacity={0.5}
+          transform={`translate(0, ${PADDING_BOTTOM - CURVE_RADIUS})`}
         />
       </svg>
+
+      {/* ── Slide-out detail shelf content ──────────────────────────── */}
+      {shelfOpen && !noStartDate && (
+        <div
+          className="absolute top-0 h-full overflow-hidden"
+          style={{
+            left: COLLAPSED_WIDTH,
+            width: expandedWidth - COLLAPSED_WIDTH,
+            zIndex: 13,
+            pointerEvents: 'auto',
+          }}
+        >
+          <div
+            className="h-full flex items-center justify-center px-3"
+            style={{ position: 'relative' }}
+          >
+            <ShelfContent
+              key={contentKey}
+              date={selectedDate}
+              log={selectedLog}
+              logged={selectedLogged}
+              isToday={selectedDate === today}
+              color={selectedColor}
+              dayCount={selectedDayCount}
+              onContentClick={handleShelfContentClick}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// ---------- No Start Date ----------
+// ── ShelfContent ──────────────────────────────────────────────────────────
 
-function NoStartDateMessage({
-  expanded,
-  color,
-}: {
-  expanded: boolean
-  color: string
-}) {
-  return (
-    <div
-      className="flex items-center justify-center h-full px-2"
-      style={{ fontSize: 10, color: color + '80', textAlign: 'center' }}
-    >
-      {expanded ? 'Set protocol start date in Settings' : ''}
-    </div>
-  )
-}
-
-// ---------- Detail Card ----------
-
-interface DetailCardProps {
+interface ShelfContentProps {
   date: string
   log: DailyLog | undefined
   logged: boolean
   isToday: boolean
   color: string
   dayCount: number | undefined
-  onCardClick: (date: string) => void
+  onContentClick: (date: string) => void
 }
 
-function DetailCard({
+function ShelfContent({
   date,
   log,
   logged,
   isToday,
   color,
   dayCount,
-  onCardClick,
-}: DetailCardProps) {
-  const cardRef = useRef<HTMLDivElement>(null)
-  const [shiftY, setShiftY] = useState(0)
-
-  useEffect(() => {
-    if (!cardRef.current) return
-    const rect = cardRef.current.getBoundingClientRect()
-    const viewH = window.innerHeight
-    if (rect.bottom > viewH - 8) {
-      setShiftY(viewH - 8 - rect.bottom)
-    } else if (rect.top < 8) {
-      setShiftY(8 - rect.top)
-    } else {
-      setShiftY(0)
-    }
-  }, [date])
-
+  onContentClick,
+}: ShelfContentProps) {
   const dateLabel = isToday
     ? 'Today'
     : isYesterday(date)
       ? 'Yesterday'
-      : formatDateLabel(date)
+      : getWeekdayLabel(date)
 
   const metrics =
     logged && log
@@ -561,95 +704,112 @@ function DetailCard({
 
   return (
     <div
-      ref={cardRef}
-      className="absolute z-[15]"
-      style={{
-        left: COLLAPSED_WIDTH + 4,
-        top: -12 + shiftY,
-        width:
-          (typeof window !== 'undefined' && window.innerWidth < 768
-            ? EXPANDED_WIDTH_MOBILE
-            : EXPANDED_WIDTH_DESKTOP) -
-          COLLAPSED_WIDTH -
-          12,
-        animation: 'ticker-card-appear 150ms ease-out forwards',
-      }}
-      onClick={(e) => {
-        e.stopPropagation()
-        onCardClick(date)
-      }}
+      className="shelf-content-fade"
+      style={{ width: '100%', cursor: 'pointer' }}
+      onClick={() => onContentClick(date)}
     >
-      <div
-        className="cursor-pointer"
-        style={{
-          background: 'rgba(12, 8, 20, 0.88)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: `1px solid ${color}1F`,
-          borderRadius: 14,
-          padding: 12,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-        }}
-      >
-        {logged && metrics ? (
-          <>
-            {/* Top line: date + day counter */}
-            <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: color + 'CC' }}>{dateLabel}</span>
-              {dayCount != null && (
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: color + '66',
-                    fontFeatureSettings: '"tnum"',
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}
-                >
-                  Day {dayCount}
-                </span>
-              )}
-            </div>
-
-            {/* Progress rings row */}
-            <div className="flex justify-between" style={{ gap: 4 }}>
-              {metrics.map((m) => (
-                <ProgressRing key={m.key} letter={m.key} value={m.value} phaseColor={color} />
-              ))}
-            </div>
-
-            {/* Flare indicator */}
-            {log!.flare && (
-              <div className="flex items-center gap-1" style={{ marginTop: 6 }}>
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    backgroundColor: '#FF6B4A',
-                    display: 'inline-block',
-                    flexShrink: 0,
-                  }}
-                />
-                <span style={{ fontSize: 9, color: '#FF6B4A' }}>
-                  Flare{log!.flareSeverity ? ` ${log!.flareSeverity}` : ''}
-                </span>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: 11, color: color + 'CC', marginBottom: 4 }}>
-              {dateLabel}
-            </div>
-            <div
-              style={{ fontSize: 11, color: color + '66' }}
-              {...(isToday ? { className: 'ticker-pulse' } : {})}
-            >
-              Tap to log
-            </div>
-          </>
+      {/* Date header */}
+      <div style={{ marginBottom: 12 }}>
+        <div
+          style={{
+            fontSize: 13,
+            color,
+            fontWeight: 500,
+            fontFamily: "'JetBrains Mono', monospace",
+          }}
+        >
+          {dateLabel}
+        </div>
+        {dayCount != null && (
+          <div
+            style={{
+              fontSize: 10,
+              color: color + '59', // 35% opacity
+              fontFamily: "'JetBrains Mono', monospace",
+              marginTop: 2,
+            }}
+          >
+            Day {dayCount}
+          </div>
         )}
       </div>
+
+      {logged && metrics ? (
+        <>
+          {/* 2×2 metric grid */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 8,
+              marginBottom: 10,
+            }}
+          >
+            {metrics.map((m) => (
+              <ProgressRing key={m.key} letter={m.key} value={m.value} phaseColor={color} />
+            ))}
+          </div>
+
+          {/* Flare badge */}
+          {log!.flare && (
+            <div
+              className="flex items-center gap-1"
+              style={{
+                background: 'rgba(255,107,74,0.12)',
+                borderRadius: 8,
+                padding: '4px 8px',
+                marginTop: 4,
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  backgroundColor: '#FF6B4A',
+                  display: 'inline-block',
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ fontSize: 9, color: '#FF6B4A' }}>
+                Flare{log!.flareSeverity ? ` ${log!.flareSeverity}` : ''}
+              </span>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Unlogged state */}
+          <div
+            style={{
+              fontSize: 11,
+              color: 'rgba(255,255,255,0.35)',
+              marginBottom: 12,
+            }}
+          >
+            No log
+          </div>
+          <button
+            className={isToday ? 'ticker-today-pulse' : ''}
+            style={{
+              border: `1px solid ${color}`,
+              background: 'transparent',
+              color,
+              fontSize: 10,
+              fontFamily: "'JetBrains Mono', monospace",
+              borderRadius: 20,
+              padding: '6px 16px',
+              cursor: 'pointer',
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onContentClick(date)
+            }}
+          >
+            Tap to log
+          </button>
+        </>
+      )}
     </div>
   )
 }

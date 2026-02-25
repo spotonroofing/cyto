@@ -75,20 +75,25 @@
   animation: membrane-breathe 8s ease-in-out infinite;
 }
 
-/* === Minimal Ticker Strip === */
+/* === Ticker Strip v3 === */
 
-@keyframes ticker-pulse {
+@keyframes ticker-today-pulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
 }
 
-.ticker-pulse {
-  animation: ticker-pulse 2.5s ease-in-out infinite;
+.ticker-today-pulse {
+  animation: ticker-today-pulse 2.5s ease-in-out infinite;
 }
 
-@keyframes ticker-card-appear {
-  from { opacity: 0; transform: translateX(-8px); }
-  to { opacity: 1; transform: translateX(0); }
+/* Shelf content crossfade on day change */
+@keyframes shelf-content-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.shelf-content-fade {
+  animation: shelf-content-fade-in 120ms ease-out forwards;
 }
 
 /* Hide scrollbar in ticker strip */
