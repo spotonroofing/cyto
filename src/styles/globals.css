@@ -75,7 +75,7 @@
   animation: membrane-breathe 8s ease-in-out infinite;
 }
 
-/* === Ticker Strip v3 === */
+/* === Colony Drawer === */
 
 @keyframes ticker-today-pulse {
   0%, 100% { opacity: 0.4; }
@@ -86,21 +86,11 @@
   animation: ticker-today-pulse 2.5s ease-in-out infinite;
 }
 
-/* Shelf content crossfade on day change */
-@keyframes shelf-content-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.shelf-content-fade {
-  animation: shelf-content-fade-in 120ms ease-out forwards;
-}
-
-/* Hide scrollbar in ticker strip */
-.ticker-scroll::-webkit-scrollbar {
+/* Hide scrollbar in drawer */
+.drawer-scroll::-webkit-scrollbar {
   display: none;
 }
-.ticker-scroll {
+.drawer-scroll {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
