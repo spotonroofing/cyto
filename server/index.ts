@@ -227,6 +227,14 @@ app.get('/api/state', (c) => {
   return c.json(currentState)
 })
 
+// GET /api/state — Return current roadmap state
+app.get('/api/state', (c) => {
+  if (!currentState) {
+    return c.json({ error: 'No state available yet' }, 404)
+  }
+  return c.json(currentState)
+})
+
 // POST /api/state — Client pushes state here
 app.post('/api/state', async (c) => {
   try {
