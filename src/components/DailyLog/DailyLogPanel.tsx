@@ -24,6 +24,20 @@ export function DailyLogPanel({ onClose }: DailyLogPanelProps) {
   const [selectedDate, setSelectedDate] = useState(initialDate)
   const [log, setLog] = useState<DailyLog>(() => getLogForDate(initialDate) ?? createEmptyLog(initialDate))
 
+  // Sync logDate from store when it changes (e.g., tapping a day row in CellColonyStrip)
+  useEffect(() => {
+    if (logDate !== null) {
+      setSelectedDate(logDate)
+    }
+  }, [logDate])
+
+  // Reset logDate on unmount
+  useEffect(() => {
+    return () => {
+      useUIStore.setState({ logDate: null })
+    }
+  }, [])
+
   // Load log when date changes
   useEffect(() => {
     const existing = getLogForDate(selectedDate)

@@ -452,6 +452,22 @@ export function CellColonyStrip() {
         overflow: 'hidden',
       }}
     >
+      {/* Frosted glass background — always rendered, fills outer container to avoid flash */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.15)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderRadius: '0 12px 12px 0',
+          pointerEvents: 'none',
+        }}
+      />
+
       {/* Inner container: fixed width, right-aligned */}
       <div
         style={{
@@ -462,22 +478,6 @@ export function CellColonyStrip() {
           height: '100%',
         }}
       >
-        {/* CHANGE 7: Frosted glass background — always rendered */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.15)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            borderRadius: '0 12px 12px 0',
-            pointerEvents: 'none',
-          }}
-        />
-
         {/* Scrollable viewport */}
         <div
           ref={scrollRef}
