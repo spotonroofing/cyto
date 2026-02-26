@@ -90,11 +90,11 @@ function formatDateShort(dateStr: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-// Day quality bar: average with inverted fog, hue 0 (red) at avg=1 to 130 (green) at avg=10
+// Day quality bar: average with inverted fog, hue 0 (red) at avg=0 to 120 (green) at avg=10
 function dayQualityColor(energy: number, mood: number, fog: number, sleep: number): string {
   const avg = (energy + mood + (10 - fog) + sleep) / 4
-  const clamped = Math.max(1, Math.min(10, avg))
-  const hue = ((clamped - 1) * 130) / 9
+  const clamped = Math.max(0, Math.min(10, avg))
+  const hue = (clamped / 10) * 120
   return `hsl(${hue}, 70%, 55%)`
 }
 
