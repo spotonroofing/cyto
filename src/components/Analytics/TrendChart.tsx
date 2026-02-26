@@ -31,8 +31,8 @@ export function TrendChart() {
 
   // Fetch last 30 days of sleep data on mount
   useEffect(() => {
-    const end = new Date().toISOString().split('T')[0]
-    const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const end = new Date().toISOString().split('T')[0] ?? ''
+    const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? ''
     fetchSleepRange(start, end)
   }, [fetchSleepRange])
 
@@ -41,7 +41,7 @@ export function TrendChart() {
   // Map sleep sessions to date -> duration_hours
   const sleepByDate = new Map<string, number>()
   for (const session of sleep) {
-    const date = session.sleep_end.split('T')[0]
+    const date = session.sleep_end.split('T')[0] ?? ''
     sleepByDate.set(date, session.duration_hours)
   }
 

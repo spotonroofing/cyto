@@ -17,8 +17,8 @@ export function WeightChart() {
 
   // Fetch last 90 days of weight data on mount
   useEffect(() => {
-    const end = new Date().toISOString().split('T')[0]
-    const start = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const end = new Date().toISOString().split('T')[0] ?? ''
+    const start = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? ''
     fetchWeightRange(start, end)
   }, [fetchWeightRange])
 
