@@ -877,7 +877,8 @@ export function CellColonyStrip() {
             left: 0,
             right: DOT_COL_WIDTH,
             height: STATS_HEIGHT,
-            opacity: contentVisible ? 1 : 0,
+            opacity: drawerOpen && contentVisible ? 1 : 0,
+            pointerEvents: drawerOpen ? undefined : 'none',
             transition: contentVisible
               ? 'opacity 200ms 80ms'
               : 'opacity 100ms',
