@@ -12,11 +12,9 @@ const EXPANDED_WIDTH_MOBILE = 240
 const EXPANDED_WIDTH_DESKTOP = 260
 const ROW_HEIGHT = 52
 const VISIBLE_ROWS = 7
-const PADDING_Y = 20
-const CURVE_R = 12
-const CURVE_AREA = 20
 const DOT_COL_WIDTH = 24
-const DOT_X_OFFSET = 12 // dot column center from right edge of drawer
+const DOT_X_OFFSET = 12
+const STATS_HEIGHT = 44
 
 // ── Progress ring constants ───────────────────────────────────────────────
 const RING_SIZE = 32
@@ -141,7 +139,7 @@ function ProgressRing({
         y={RING_SIZE / 2}
         textAnchor="middle"
         dominantBaseline="central"
-        fill={`rgba(255,255,255,${logged ? 0.5 : 0.2})`}
+        fill={`rgba(255,255,255,${logged ? 0.5 : 0.15})`}
         fontSize={8}
         fontFamily="'JetBrains Mono', monospace"
         style={{ transform: 'rotate(90deg)', transformOrigin: '50% 50%' }}
@@ -149,6 +147,53 @@ function ProgressRing({
         {letter}
       </text>
     </svg>
+  )
+}
+
+// ── FlareIndicator ────────────────────────────────────────────────────────
+
+function FlareIndicator({ severity }: { severity: number }) {
+  const dotCount = Math.min(severity, 3)
+  const showPlus = severity > 3
+  const dotSize = 5
+  const gap = 3
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap,
+      }}
+    >
+      {Array.from({ length: dotCount }, (_, i) => (
+        <span
+          key={i}
+          style={{
+            width: dotSize,
+            height: dotSize,
+            borderRadius: '50%',
+            backgroundColor: '#FF6B4A',
+            display: 'block',
+            flexShrink: 0,
+          }}
+        />
+      ))}
+      {showPlus && (
+        <span
+          style={{
+            fontSize: 7,
+            color: '#FF6B4A',
+            fontFamily: "'JetBrains Mono', monospace",
+            lineHeight: 1,
+            marginTop: 1,
+          }}
+        >
+          +
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -210,10 +255,13 @@ export function CellColonyStrip() {
     [getDayOffset, phaseColors],
   )
 
-  const lineColor = useMemo(() => {
-    const offset = getDayOffset(today)
-    return getPhaseDarkColor(Math.max(0, offset))
-  }, [getDayOffset, today])
+  const darkColorForDate = useCallback(
+    (date: string) => {
+      const offset = getDayOffset(date)
+      return getPhaseDarkColor(Math.max(0, offset))
+    },
+    [getDayOffset],
+  )
 
   // Running day counter (only logged days count)
   const dayCounterMap = useMemo(() => {
@@ -236,20 +284,18 @@ export function CellColonyStrip() {
       : EXPANDED_WIDTH_DESKTOP
 
   const viewportHeight = VISIBLE_ROWS * ROW_HEIGHT
-  const totalDrawerHeight = viewportHeight + PADDING_Y * 2 + CURVE_AREA * 2
+  const totalDrawerHeight = viewportHeight + STATS_HEIGHT
   const contentHeight = dates.length * ROW_HEIGHT
 
   // ── Open/close state management ──────────────────────────────────────
   const openDrawer = useCallback(() => {
     setDrawerOpen(true)
     setDrawerWidth(expandedWidth)
-    // Fade in content after slight delay
     setTimeout(() => setContentVisible(true), 80)
   }, [expandedWidth])
 
   const closeDrawer = useCallback(() => {
     setContentVisible(false)
-    // Collapse width after content fades out
     setTimeout(() => {
       setDrawerOpen(false)
       setDrawerWidth(COLLAPSED_WIDTH)
@@ -282,7 +328,6 @@ export function CellColonyStrip() {
 
   // ── Scroll to today on mount ─────────────────────────────────────────
   useEffect(() => {
-    // Today is dates[0] (most recent first), so scroll to top
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0
     }
@@ -340,7 +385,6 @@ export function CellColonyStrip() {
 
     if (!wasHorizontal) return
 
-    // Snap open or closed based on threshold
     if (drawerWidth > expandedWidth * 0.5) {
       openDrawer()
     } else {
@@ -362,7 +406,6 @@ export function CellColonyStrip() {
   // ── Dot column tap (toggle drawer) ───────────────────────────────────
   const handleDotColumnClick = useCallback(
     (e: React.MouseEvent) => {
-      // Only toggle if it was a true tap (not end of drag)
       if (!isDragging) {
         e.stopPropagation()
         toggleDrawer()
@@ -395,6 +438,58 @@ export function CellColonyStrip() {
     return () => el.removeEventListener('scroll', onScroll)
   }, [dates.length])
 
+  // ── CHANGE 3: Line color based on selected day's phase darkColor ─────
+  const lineColor = useMemo(() => {
+    const selectedDate = dates[selectedIndex]
+    if (!selectedDate) return phases[0]!.darkColor
+    return darkColorForDate(selectedDate)
+  }, [dates, selectedIndex, darkColorForDate])
+
+  // ── CHANGE 9: Streak calculation ─────────────────────────────────────
+  const streak = useMemo(() => {
+    let count = 0
+    let started = false
+    for (let i = 0; i < dates.length; i++) {
+      if (isLogged(getLogForDate(dates[i]!))) {
+        started = true
+        count++
+      } else {
+        if (started) break
+      }
+    }
+    return count
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dates, logs])
+
+  // ── CHANGE 9: Weekly averages for visible 7 days ─────────────────────
+  const weeklyAverages = useMemo(() => {
+    const visibleDates = dates.slice(selectedIndex, selectedIndex + VISIBLE_ROWS)
+    let eSum = 0, mSum = 0, fSum = 0, sSum = 0, count = 0
+    for (const d of visibleDates) {
+      const log = getLogForDate(d)
+      if (log && isLogged(log)) {
+        eSum += log.energy
+        mSum += log.mood
+        fSum += log.fog
+        sSum += log.sleep
+        count++
+      }
+    }
+    if (count === 0) return null
+    return {
+      E: Math.round(eSum / count),
+      M: Math.round(mSum / count),
+      F: Math.round(fSum / count),
+      S: Math.round(sSum / count),
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dates, selectedIndex, logs])
+
+  const selectedPhaseColor = useMemo(() => {
+    const d = dates[selectedIndex]
+    return d ? colorForDate(d) : phaseColors[0]!
+  }, [dates, selectedIndex, colorForDate, phaseColors])
+
   return (
     <div
       ref={containerRef}
@@ -424,70 +519,34 @@ export function CellColonyStrip() {
           height: '100%',
         }}
       >
-        {/* Background glass (only visible when open) */}
+        {/* CHANGE 1: Frosted glass background (only when expanded) */}
         <div
           style={{
             position: 'absolute',
-            top: CURVE_AREA,
+            top: 0,
             left: 0,
             right: DOT_COL_WIDTH,
-            bottom: CURVE_AREA,
-            background:
-              drawerWidth > COLLAPSED_WIDTH
-                ? 'rgba(10, 8, 18, 0.88)'
-                : 'transparent',
-            backdropFilter:
-              drawerWidth > COLLAPSED_WIDTH ? 'blur(14px)' : 'none',
-            WebkitBackdropFilter:
-              drawerWidth > COLLAPSED_WIDTH ? 'blur(14px)' : 'none',
+            bottom: 0,
+            background: contentVisible ? 'rgba(0,0,0,0.15)' : 'transparent',
+            backdropFilter: contentVisible ? 'blur(16px)' : 'none',
+            WebkitBackdropFilter: contentVisible ? 'blur(16px)' : 'none',
             borderRadius: '0 12px 12px 0',
             transition: isDragging
               ? 'none'
               : `background 280ms ${TRANSITION_EASE}, backdrop-filter 280ms ${TRANSITION_EASE}`,
-            opacity: contentVisible ? 1 : 0,
             pointerEvents: 'none',
           }}
         />
 
-        {/* Top rack-mount curve SVG */}
-        <svg
-          width={expandedWidth}
-          height={CURVE_AREA}
-          style={{ position: 'absolute', top: 0, left: 0 }}
-          className="pointer-events-none"
-        >
-          <path
-            d={`M 0,${CURVE_AREA} L ${expandedWidth - DOT_COL_WIDTH - CURVE_R},${CURVE_AREA} A ${CURVE_R},${CURVE_R} 0 0,1 ${expandedWidth - DOT_COL_WIDTH},${CURVE_AREA - CURVE_R} L ${expandedWidth - DOT_COL_WIDTH},0`}
-            fill="none"
-            stroke={lineColor}
-            strokeWidth={2}
-            strokeOpacity={0.5}
-          />
-        </svg>
+        {/* CHANGE 2: Rack-mount SVGs removed entirely */}
 
-        {/* Bottom rack-mount curve SVG */}
-        <svg
-          width={expandedWidth}
-          height={CURVE_AREA}
-          style={{ position: 'absolute', bottom: 0, left: 0 }}
-          className="pointer-events-none"
-        >
-          <path
-            d={`M ${expandedWidth - DOT_COL_WIDTH},0 L ${expandedWidth - DOT_COL_WIDTH},${CURVE_R} A ${CURVE_R},${CURVE_R} 0 0,1 ${expandedWidth - DOT_COL_WIDTH - CURVE_R},${CURVE_AREA} L 0,${CURVE_AREA}`}
-            fill="none"
-            stroke={lineColor}
-            strokeWidth={2}
-            strokeOpacity={0.5}
-          />
-        </svg>
-
-        {/* Scrollable viewport */}
+        {/* Scrollable viewport — CHANGE 5: no top padding, starts at 0 */}
         <div
           ref={scrollRef}
           className="drawer-scroll"
           style={{
             position: 'absolute',
-            top: CURVE_AREA + PADDING_Y,
+            top: 0,
             left: 0,
             right: 0,
             height: viewportHeight,
@@ -519,7 +578,7 @@ export function CellColonyStrip() {
                 width: '100%',
               }}
             >
-              {/* Vertical dot column line */}
+              {/* CHANGE 3+4: Vertical dot column line with SVG mask cutouts */}
               <svg
                 width={DOT_COL_WIDTH}
                 height={contentHeight}
@@ -531,67 +590,97 @@ export function CellColonyStrip() {
                   zIndex: 1,
                 }}
               >
+                <defs>
+                  <mask id="dot-line-mask">
+                    <rect x={0} y={0} width={DOT_COL_WIDTH} height={contentHeight} fill="white" />
+                    {dates.map((_, i) => (
+                      <circle
+                        key={i}
+                        cx={DOT_X_OFFSET}
+                        cy={i * ROW_HEIGHT + ROW_HEIGHT / 2}
+                        r={7}
+                        fill="black"
+                      />
+                    ))}
+                  </mask>
+                </defs>
+
+                {/* Line with mask — color transitions with selected day */}
                 <line
                   x1={DOT_X_OFFSET}
                   y1={0}
                   x2={DOT_X_OFFSET}
                   y2={contentHeight}
-                  stroke={lineColor}
                   strokeWidth={2}
                   strokeOpacity={0.5}
+                  mask="url(#dot-line-mask)"
+                  style={{
+                    stroke: lineColor,
+                    transition: 'stroke 200ms',
+                  }}
                 />
 
-                {/* Dot halos + dots */}
+                {/* CHANGE 4: Dots for EVERY day */}
                 {dates.map((date, i) => {
                   const log = getLogForDate(date)
                   const logged = isLogged(log)
                   const isToday = date === today
-                  if (!logged && !isToday) return null
-
                   const cy = i * ROW_HEIGHT + ROW_HEIGHT / 2
                   const color = colorForDate(date)
-                  const isSel = i === selectedIndex
 
-                  return (
-                    <g key={date}>
-                      {/* Dark halo to interrupt line */}
-                      <circle
-                        cx={DOT_X_OFFSET}
-                        cy={cy}
-                        r={6}
-                        fill="rgba(10, 8, 18, 0.9)"
-                      />
-                      {logged ? (
+                  if (isToday) {
+                    if (logged) {
+                      return (
                         <circle
+                          key={date}
                           cx={DOT_X_OFFSET}
                           cy={cy}
-                          r={isSel ? 6 : isToday ? 5 : 4}
+                          r={5}
                           fill={color}
                           style={{
-                            transition: 'r 100ms ease-out',
-                            filter: isSel
-                              ? `drop-shadow(0 0 8px ${color}66)`
-                              : isToday
-                                ? `drop-shadow(0 0 4px ${color}44)`
-                                : 'none',
+                            filter: `drop-shadow(0 0 6px ${color}88)`,
                           }}
                         />
-                      ) : (
-                        /* Today unlogged: hollow pulse */
+                      )
+                    } else {
+                      return (
                         <circle
+                          key={date}
                           cx={DOT_X_OFFSET}
                           cy={cy}
-                          r={isSel ? 6 : 5}
+                          r={5}
                           fill="none"
                           stroke={color}
                           strokeWidth={2}
                           strokeOpacity={0.5}
                           className="ticker-today-pulse"
-                          style={{ transition: 'r 100ms ease-out' }}
                         />
-                      )}
-                    </g>
-                  )
+                      )
+                    }
+                  } else if (logged) {
+                    return (
+                      <circle
+                        key={date}
+                        cx={DOT_X_OFFSET}
+                        cy={cy}
+                        r={4}
+                        fill={color}
+                      />
+                    )
+                  } else {
+                    return (
+                      <circle
+                        key={date}
+                        cx={DOT_X_OFFSET}
+                        cy={cy}
+                        r={4}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={2}
+                        strokeOpacity={0.3}
+                      />
+                    )
+                  }
                 })}
               </svg>
 
@@ -639,7 +728,7 @@ export function CellColonyStrip() {
                       }}
                       onClick={() => handleRowClick(date)}
                     >
-                      {/* Day counter + date label (50px) */}
+                      {/* CHANGE 6: Day counter + date label */}
                       <div
                         style={{
                           width: 50,
@@ -647,35 +736,76 @@ export function CellColonyStrip() {
                           overflow: 'hidden',
                         }}
                       >
-                        {dayCount != null && (
+                        {isToday ? (
+                          <>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color,
+                                opacity: 0.8,
+                                fontFamily: "'JetBrains Mono', monospace",
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              Today
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 9,
+                                color,
+                                opacity: 0.4,
+                                fontFamily: "'JetBrains Mono', monospace",
+                                lineHeight: 1.2,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {formatDateShort(date)}
+                            </div>
+                          </>
+                        ) : logged && dayCount != null ? (
+                          <>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color,
+                                opacity: 0.7,
+                                fontFamily: "'JetBrains Mono', monospace",
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              {dayCount === 1 ? '1 day' : `${dayCount} days`}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 9,
+                                color,
+                                opacity: 0.4,
+                                fontFamily: "'JetBrains Mono', monospace",
+                                lineHeight: 1.2,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {formatDateShort(date)}
+                            </div>
+                          </>
+                        ) : (
                           <div
                             style={{
-                              fontSize: 13,
-                              fontWeight: 700,
+                              fontSize: 9,
                               color,
-                              opacity: 0.8,
+                              opacity: 0.4,
                               fontFamily: "'JetBrains Mono', monospace",
                               lineHeight: 1.2,
+                              whiteSpace: 'nowrap',
                             }}
                           >
-                            {dayCount}
+                            {formatDateShort(date)}
                           </div>
                         )}
-                        <div
-                          style={{
-                            fontSize: 9,
-                            color,
-                            opacity: 0.4,
-                            fontFamily: "'JetBrains Mono', monospace",
-                            lineHeight: 1.2,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {isToday ? 'Today' : formatDateShort(date)}
-                        </div>
                       </div>
 
-                      {/* 4 progress rings */}
+                      {/* CHANGE 7: Progress rings (letters already in ProgressRing) */}
                       <div
                         style={{
                           display: 'flex',
@@ -705,7 +835,7 @@ export function CellColonyStrip() {
                         />
                       </div>
 
-                      {/* Flare indicator */}
+                      {/* CHANGE 8: Flare indicator — stacked dots */}
                       <div
                         style={{
                           width: 20,
@@ -713,34 +843,11 @@ export function CellColonyStrip() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: 2,
                           marginLeft: 4,
                         }}
                       >
                         {logged && log?.flare && (
-                          <>
-                            <span
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: '50%',
-                                backgroundColor: '#FF6B4A',
-                                display: 'inline-block',
-                                flexShrink: 0,
-                              }}
-                            />
-                            {log.flareSeverity != null && (
-                              <span
-                                style={{
-                                  fontSize: 8,
-                                  color: '#FF6B4A',
-                                  fontFamily: "'JetBrains Mono', monospace",
-                                }}
-                              >
-                                {log.flareSeverity}
-                              </span>
-                            )}
-                          </>
+                          <FlareIndicator severity={log.flareSeverity ?? 1} />
                         )}
                       </div>
                     </div>
@@ -763,6 +870,60 @@ export function CellColonyStrip() {
               })}
             </div>
           )}
+        </div>
+
+        {/* CHANGE 9: Bottom weekly stats (fixed, not scrollable) */}
+        <div
+          style={{
+            position: 'absolute',
+            top: viewportHeight,
+            left: 0,
+            right: DOT_COL_WIDTH,
+            height: STATS_HEIGHT,
+            opacity: contentVisible ? 1 : 0,
+            transition: isDragging
+              ? 'none'
+              : contentVisible
+                ? 'opacity 200ms 80ms'
+                : 'opacity 100ms',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingLeft: 8,
+            paddingRight: 8,
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          {/* Streak */}
+          <div
+            style={{
+              fontSize: 10,
+              fontFamily: "'JetBrains Mono', monospace",
+              color: selectedPhaseColor,
+              opacity: streak >= 2 ? 0.6 : 0.3,
+            }}
+          >
+            {streak >= 2 ? `${streak} day streak` : 'No streak'}
+          </div>
+
+          {/* Weekly averages */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              fontSize: 9,
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            {(['E', 'M', 'F', 'S'] as const).map((key) => (
+              <span key={key}>
+                <span style={{ color: METRIC_COLORS[key] }}>{key}</span>
+                <span style={{ color: 'rgba(255,255,255,0.5)' }}>
+                  :{weeklyAverages ? weeklyAverages[key] : '-'}
+                </span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
