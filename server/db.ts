@@ -78,5 +78,23 @@ export async function initDb() {
     )
   `
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value JSONB NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+
+  // Seed default settings if empty
+  const settingsCount = await sql`SELECT COUNT(*) as count FROM settings`
+  if (Number(settingsCount[0]?.count) === 0) {
+    await sql`
+      INSERT INTO settings (key, value) VALUES
+      ('protocolStartDate', '"2026-02-12"'),
+      ('healthContext', 'null')
+    `
+  }
+
   console.log('Database tables initialized')
 }

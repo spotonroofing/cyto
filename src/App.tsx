@@ -42,6 +42,7 @@ export function App() {
 
   useEffect(() => {
     Promise.all([
+      useSettingsStore.getState().initialize(),
       useRoadmapStore.getState().initialize(),
       useDailyLogStore.getState().initialize(),
       useChatStore.getState().initialize(),

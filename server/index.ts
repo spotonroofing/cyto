@@ -464,6 +464,43 @@ app.get('/api/logs', async (c) => {
   }
 })
 
+// --- GET /api/settings ---
+app.get('/api/settings', async (c) => {
+  try {
+    const rows = await sql`SELECT key, value FROM settings`
+    const settings: Record<string, any> = {}
+    for (const row of rows) {
+      settings[row.key] = row.value
+    }
+    return c.json(settings)
+  } catch (err) {
+    console.error('GET /api/settings error:', err)
+    return c.json({ error: 'Failed to fetch settings', detail: String(err) }, 500)
+  }
+})
+
+// --- PUT /api/settings ---
+app.put('/api/settings', async (c) => {
+  try {
+    const body = await c.req.json()
+    
+    for (const [key, value] of Object.entries(body)) {
+      await sql`
+        INSERT INTO settings (key, value, updated_at)
+        VALUES (${key}, ${JSON.stringify(value)}, NOW())
+        ON CONFLICT (key) DO UPDATE SET
+          value = EXCLUDED.value,
+          updated_at = NOW()
+      `
+    }
+
+    return c.json({ ok: true })
+  } catch (err) {
+    console.error('PUT /api/settings error:', err)
+    return c.json({ error: 'Failed to update settings', detail: String(err) }, 500)
+  }
+})
+
 // Serve static files from Vite build output
 app.use('/*', serveStatic({ root: './dist' }))
 
