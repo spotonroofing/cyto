@@ -10,21 +10,20 @@ import type { DailyLog } from '@/types'
 const COLLAPSED_WIDTH = 36
 const EXPANDED_WIDTH_MOBILE = 220
 const EXPANDED_WIDTH_DESKTOP = 240
-const LINE_X = 18 // center of 36px strip
-const CURVE_RADIUS = 18
-const PADDING_TOP = 60
-const PADDING_BOTTOM = 70
-const ROW_HEIGHT = 40
-const DOT_R = 4 // 8px diameter
-const DOT_R_SELECTED = 6 // 12px diameter
-const DOT_R_TODAY = 5 // 10px diameter
-const HALO_R = 6 // 12px dark halo
+const LINE_X = 18
+const CURVE_R = 18
+const CURVE_AREA = 20
+const ROW_HEIGHT = 28
+const DOT_R = 4
+const DOT_R_SELECTED = 5.5
+const DOT_R_TODAY = 5
+const HALO_R = 7
 
 // ── Progress ring constants ───────────────────────────────────────────────
-const RING_SIZE = 40
+const RING_SIZE = 36
 const RING_STROKE = 3
-const RING_R = (RING_SIZE - RING_STROKE) / 2
-const RING_CIRC = 2 * Math.PI * RING_R
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2
+const RING_CIRC = 2 * Math.PI * RING_RADIUS
 
 const METRIC_COLORS: Record<string, string> = {
   E: '#F5A623',
@@ -44,6 +43,11 @@ function getPhaseIndex(dayOffset: number): number {
     if (dayOffset >= phases[i]!.defaultStartOffset) return i
   }
   return 0
+}
+
+function getPhaseDarkColor(dayOffset: number): string {
+  const idx = getPhaseIndex(dayOffset)
+  return phases[idx]?.darkColor ?? phases[0]!.darkColor
 }
 
 function getPhaseColorFromPalette(
@@ -78,7 +82,7 @@ function buildDateList(protocolStart: string): string[] {
     dates.push(cursor.toISOString().split('T')[0]!)
     cursor.setDate(cursor.getDate() - 1)
   }
-  return dates // newest first
+  return dates
 }
 
 function formatDateShort(dateStr: string): string {
@@ -116,12 +120,16 @@ function ProgressRing({
   const color = METRIC_COLORS[letter] ?? phaseColor
 
   return (
-    <div style={{ textAlign: 'center' }}>
-      <svg width={RING_SIZE} height={RING_SIZE} style={{ display: 'block', margin: '0 auto' }}>
+    <div style={{ textAlign: 'center', flex: '0 0 auto' }}>
+      <svg
+        width={RING_SIZE}
+        height={RING_SIZE}
+        style={{ display: 'block', transform: 'rotate(-90deg)' }}
+      >
         <circle
           cx={RING_SIZE / 2}
           cy={RING_SIZE / 2}
-          r={RING_R}
+          r={RING_RADIUS}
           fill="none"
           stroke={phaseColor}
           strokeOpacity={0.1}
@@ -130,33 +138,34 @@ function ProgressRing({
         <circle
           cx={RING_SIZE / 2}
           cy={RING_SIZE / 2}
-          r={RING_R}
+          r={RING_RADIUS}
           fill="none"
           stroke={color}
           strokeWidth={RING_STROKE}
           strokeDasharray={RING_CIRC}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
         />
         <text
           x={RING_SIZE / 2}
           y={RING_SIZE / 2}
           textAnchor="middle"
           dominantBaseline="central"
-          fill="rgba(255,255,255,0.6)"
-          fontSize={10}
+          fill="rgba(255,255,255,0.55)"
+          fontSize={9}
           fontFamily="'JetBrains Mono', monospace"
+          style={{ transform: 'rotate(90deg)', transformOrigin: '50% 50%' }}
         >
           {letter}
         </text>
       </svg>
       <div
         style={{
-          fontSize: 9,
+          fontSize: 8,
           color,
+          opacity: 0.7,
           fontFamily: "'JetBrains Mono', monospace",
-          marginTop: 2,
+          marginTop: 1,
         }}
       >
         {value}
@@ -172,14 +181,14 @@ export function CellColonyStrip() {
   const getLogForDate = useDailyLogStore((s) => s.getLogForDate)
   const logs = useDailyLogStore((s) => s.logs)
   const openLogForDate = useUIStore((s) => s.openLogForDate)
-  const { phaseColor: themePhaseColor } = useTheme()
+  const { palette, phaseColor: themePhaseColor } = useTheme()
 
   const [shelfOpen, setShelfOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>(todayString())
-  const [contentKey, setContentKey] = useState(0) // for crossfade
+  const [contentKey, setContentKey] = useState(0)
   const stripRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const swipeStartX = useRef<number | null>(null)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
 
   const today = todayString()
 
@@ -216,7 +225,13 @@ export function CellColonyStrip() {
     [getDayOffset, phaseColors],
   )
 
-  // Running day counter: date -> logged day number (oldest first count)
+  // Active phase dark color for the line stroke
+  const lineColor = useMemo(() => {
+    const offset = getDayOffset(today)
+    return getPhaseDarkColor(Math.max(0, offset))
+  }, [getDayOffset, today])
+
+  // Running day counter
   const dayCounterMap = useMemo(() => {
     const map = new Map<string, number>()
     let counter = 0
@@ -231,18 +246,12 @@ export function CellColonyStrip() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dates, logs])
 
-  // Most recent logged day
-  const latestLoggedDate = useMemo(() => {
-    for (const date of dates) {
-      if (dayCounterMap.has(date)) return date
-    }
-    return null
-  }, [dates, dayCounterMap])
-
   const expandedWidth =
     typeof window !== 'undefined' && window.innerWidth < 768
       ? EXPANDED_WIDTH_MOBILE
       : EXPANDED_WIDTH_DESKTOP
+
+  const bgColor = palette.bg
 
   // ── Scroll snap detection ───────────────────────────────────────────────
   useEffect(() => {
@@ -258,7 +267,6 @@ export function CellColonyStrip() {
         const containerRect = el.getBoundingClientRect()
         const centerY = containerRect.top + containerRect.height / 2
 
-        // Find the row closest to the center
         const rows = el.querySelectorAll<HTMLElement>('[data-date]')
         let bestDate: string | null = null
         let bestDist = Infinity
@@ -284,7 +292,7 @@ export function CellColonyStrip() {
     return () => el.removeEventListener('scroll', onScroll)
   }, [selectedDate])
 
-  // ── Click/touch outside to close shelf ──────────────────────────────────
+  // ── Click outside to close shelf ────────────────────────────────────────
   useEffect(() => {
     if (!shelfOpen) return
     const handler = (e: MouseEvent | TouchEvent) => {
@@ -300,20 +308,26 @@ export function CellColonyStrip() {
     }
   }, [shelfOpen])
 
-  // ── Swipe gestures on the strip ─────────────────────────────────────────
+  // ── Swipe gestures ──────────────────────────────────────────────────────
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    swipeStartX.current = e.touches[0]!.clientX
+    const t = e.touches[0]!
+    touchStartRef.current = { x: t.clientX, y: t.clientY }
   }, [])
 
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
-      if (swipeStartX.current === null) return
-      const dx = e.changedTouches[0]!.clientX - swipeStartX.current
-      swipeStartX.current = null
+      if (!touchStartRef.current) return
+      const dx = e.changedTouches[0]!.clientX - touchStartRef.current.x
+      const dy = e.changedTouches[0]!.clientY - touchStartRef.current.y
+      touchStartRef.current = null
+
+      if (Math.abs(dx) <= Math.abs(dy)) return
 
       if (dx > 40 && !shelfOpen) {
+        e.stopPropagation()
         setShelfOpen(true)
       } else if (dx < -40 && shelfOpen) {
+        e.stopPropagation()
         setShelfOpen(false)
       }
     },
@@ -324,7 +338,6 @@ export function CellColonyStrip() {
   const handleDotClick = useCallback(
     (date: string) => {
       if (selectedDate === date && shelfOpen) {
-        // Tap selected dot again => close shelf
         setShelfOpen(false)
       } else {
         setSelectedDate(date)
@@ -344,51 +357,11 @@ export function CellColonyStrip() {
     [openLogForDate],
   )
 
-  const currentPhaseColor = colorForDate(today)
   const noStartDate = !protocolStartDate
-
-  // ── Gradient stops for the vertical line ────────────────────────────────
   const contentHeight = dates.length * ROW_HEIGHT
   const dotY = (i: number) => i * ROW_HEIGHT + ROW_HEIGHT / 2
+  const selectedIndex = dates.indexOf(selectedDate)
 
-  const gradientStops = useMemo(() => {
-    if (dates.length <= 1) {
-      return [
-        { offset: '0%', color: currentPhaseColor },
-        { offset: '100%', color: currentPhaseColor },
-      ]
-    }
-    const stops: { offset: string; color: string }[] = []
-    let prevColor = ''
-    for (let i = 0; i < dates.length; i++) {
-      const color = colorForDate(dates[i]!)
-      const pct = (dotY(i) / contentHeight) * 100
-      if (color !== prevColor) {
-        if (prevColor) stops.push({ offset: `${pct.toFixed(1)}%`, color: prevColor })
-        stops.push({ offset: `${pct.toFixed(1)}%`, color })
-        prevColor = color
-      }
-    }
-    if (prevColor) stops.push({ offset: '100%', color: prevColor })
-    return stops
-  }, [dates, colorForDate, currentPhaseColor, contentHeight])
-
-  // ── Dot mask positions (for line interruption) ──────────────────────────
-  const dotPositions = useMemo(() => {
-    const positions: { y: number }[] = []
-    for (let i = 0; i < dates.length; i++) {
-      const date = dates[i]!
-      const log = getLogForDate(date)
-      const logged = isLogged(log)
-      if (logged || date === today) {
-        positions.push({ y: dotY(i) })
-      }
-    }
-    return positions
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dates, logs, today])
-
-  // ── Selected day data for shelf ─────────────────────────────────────────
   const selectedLog = getLogForDate(selectedDate)
   const selectedLogged = isLogged(selectedLog)
   const selectedColor = colorForDate(selectedDate)
@@ -397,53 +370,57 @@ export function CellColonyStrip() {
   return (
     <div
       ref={stripRef}
-      className="fixed left-0 top-0 h-dvh"
+      className="fixed left-0"
       style={{
+        top: 60,
         width: shelfOpen ? expandedWidth : COLLAPSED_WIDTH,
+        height: '50vh',
         transition: 'width 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
         zIndex: shelfOpen ? 12 : 10,
+        overflow: 'hidden',
       }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* ── Shelf background (only visible when expanded) ───────────── */}
+      {/* Shelf background */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: shelfOpen ? 'rgba(10, 8, 18, 0.9)' : 'transparent',
+          background: shelfOpen ? 'rgba(10, 8, 18, 0.92)' : 'transparent',
           backdropFilter: shelfOpen ? 'blur(14px)' : 'none',
           WebkitBackdropFilter: shelfOpen ? 'blur(14px)' : 'none',
           borderRight: shelfOpen ? `1px solid ${selectedColor}1A` : 'none',
           borderRadius: shelfOpen ? '0 16px 16px 0' : '0',
-          transition: 'background 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94), border-radius 250ms',
+          transition: 'background 250ms, border-radius 250ms',
         }}
       />
 
-      {/* ── Fixed top curve ─────────────────────────────────────────── */}
+      {/* Top curve */}
       <svg
-        className="absolute top-0 left-0 pointer-events-none"
+        className="absolute left-0 pointer-events-none"
         width={COLLAPSED_WIDTH}
-        height={PADDING_TOP + CURVE_RADIUS}
-        style={{ zIndex: 3 }}
+        height={CURVE_AREA}
+        style={{ top: 0, zIndex: 3 }}
       >
         <path
-          d={`M 0,${PADDING_TOP} A ${CURVE_RADIUS},${CURVE_RADIUS} 0 0,1 ${LINE_X},${PADDING_TOP + CURVE_RADIUS}`}
+          d={`M 0,0 A ${CURVE_R},${CURVE_R} 0 0,1 ${LINE_X},${CURVE_AREA}`}
           fill="none"
-          stroke={gradientStops[0]?.color ?? currentPhaseColor}
+          stroke={lineColor}
           strokeWidth={2}
           strokeOpacity={0.5}
         />
       </svg>
 
-      {/* ── Scrollable snap area ────────────────────────────────────── */}
+      {/* Scrollable snap area */}
       <div
         ref={scrollRef}
-        className="h-full overflow-y-auto ticker-scroll"
+        className="absolute left-0 overflow-y-auto ticker-scroll"
         style={{
-          paddingTop: PADDING_TOP + CURVE_RADIUS,
-          paddingBottom: PADDING_BOTTOM + CURVE_RADIUS,
-          touchAction: 'pan-y',
+          top: CURVE_AREA,
+          bottom: CURVE_AREA,
+          width: '100%',
           scrollSnapType: 'y mandatory',
+          touchAction: 'pan-y',
         }}
       >
         {noStartDate ? (
@@ -451,241 +428,255 @@ export function CellColonyStrip() {
             className="flex items-center justify-center h-full px-2"
             style={{
               fontSize: 10,
-              color: currentPhaseColor + '80',
+              color: selectedColor + '80',
               textAlign: 'center',
             }}
           >
-            {shelfOpen ? 'Set protocol start date in Settings' : ''}
+            {shelfOpen ? 'Set start date in Settings' : ''}
           </div>
         ) : (
           <div className="relative" style={{ height: contentHeight, width: '100%' }}>
-            {/* ── SVG line + dots layer ─────────────────────────────── */}
+            {/* Vertical line + dots SVG */}
             <svg
               className="absolute top-0 left-0 pointer-events-none"
               width={COLLAPSED_WIDTH}
               height={contentHeight}
-              style={{ overflow: 'visible', zIndex: 1 }}
+              style={{ zIndex: 1 }}
             >
-              <defs>
-                <linearGradient id="colony-line-grad-v3" x1="0" y1="0" x2="0" y2="1">
-                  {gradientStops.map((s, i) => (
-                    <stop key={i} offset={s.offset} stopColor={s.color} />
-                  ))}
-                </linearGradient>
-                <mask id="colony-line-mask-v3">
-                  <rect x="0" y="0" width={COLLAPSED_WIDTH} height={contentHeight} fill="white" />
-                  {dotPositions.map((dp, i) => (
-                    <circle key={i} cx={LINE_X} cy={dp.y} r={HALO_R + 1} fill="black" />
-                  ))}
-                </mask>
-              </defs>
-
-              {/* Vertical line with mask cutouts */}
               <line
                 x1={LINE_X}
                 y1={0}
                 x2={LINE_X}
                 y2={contentHeight}
-                stroke="url(#colony-line-grad-v3)"
+                stroke={lineColor}
                 strokeWidth={2}
                 strokeOpacity={0.5}
-                mask="url(#colony-line-mask-v3)"
               />
+
+              {/* Dark halos */}
+              {dates.map((date, i) => {
+                const log = getLogForDate(date)
+                const logged = isLogged(log)
+                if (!logged && date !== today) return null
+                return (
+                  <circle
+                    key={`h-${date}`}
+                    cx={LINE_X}
+                    cy={dotY(i)}
+                    r={HALO_R}
+                    fill={bgColor}
+                  />
+                )
+              })}
 
               {/* Dots */}
               {dates.map((date, i) => {
                 const log = getLogForDate(date)
                 const logged = isLogged(log)
-                const isTodayDate = date === today
-                if (!logged && !isTodayDate) return null
+                if (!logged && date !== today) return null
 
                 const cy = dotY(i)
                 const color = colorForDate(date)
-                const isSelected = date === selectedDate
+                const isSel = date === selectedDate
 
                 if (logged) {
-                  const r = isSelected ? DOT_R_SELECTED : DOT_R
                   return (
                     <circle
-                      key={date}
+                      key={`d-${date}`}
                       cx={LINE_X}
                       cy={cy}
-                      r={r}
+                      r={isSel ? DOT_R_SELECTED : DOT_R}
                       fill={color}
                       style={{
                         transition: 'r 100ms ease-out',
-                        filter: isSelected
-                          ? `drop-shadow(0 0 8px ${color}80)`
-                          : 'none',
+                        filter: isSel ? `drop-shadow(0 0 8px ${color}66)` : 'none',
                       }}
                     />
                   )
                 }
 
-                // Today unlogged: hollow pulse
-                const r = isSelected ? DOT_R_SELECTED : DOT_R_TODAY
                 return (
                   <circle
-                    key={date}
+                    key={`d-${date}`}
                     cx={LINE_X}
                     cy={cy}
-                    r={r}
+                    r={isSel ? DOT_R_SELECTED : DOT_R_TODAY}
                     fill="none"
                     stroke={color}
-                    strokeWidth={1.5}
+                    strokeWidth={2}
                     strokeOpacity={0.5}
                     className="ticker-today-pulse"
                     style={{
                       transition: 'r 100ms ease-out',
-                      filter: isSelected
-                        ? `drop-shadow(0 0 8px ${color}80)`
-                        : 'none',
+                      filter: isSel ? `drop-shadow(0 0 8px ${color}66)` : 'none',
                     }}
                   />
                 )
               })}
-
-              {/* Day counter labels */}
-              {dates.map((date, i) => {
-                const count = dayCounterMap.get(date)
-                if (count == null) return null
-
-                const isSelected = date === selectedDate
-                const isLatest = date === latestLoggedDate
-                const showCount = count % 5 === 0 || isLatest || isSelected
-
-                if (!showCount) return null
-
-                const color = colorForDate(date)
-
-                return (
-                  <g key={`cnt-${date}`}>
-                    <text
-                      x={LINE_X + 12}
-                      y={isSelected ? dotY(i) - 4 : dotY(i)}
-                      fill={color}
-                      fillOpacity={isSelected ? 0.7 : 0.4}
-                      fontSize={9}
-                      fontFamily="'JetBrains Mono', monospace"
-                      style={{ fontFeatureSettings: '"tnum"' }}
-                      dominantBaseline="central"
-                    >
-                      {count}
-                    </text>
-                    {isSelected && (
-                      <text
-                        x={LINE_X + 12}
-                        y={dotY(i) + 7}
-                        fill={color}
-                        fillOpacity={0.3}
-                        fontSize={8}
-                        fontFamily="'JetBrains Mono', monospace"
-                        dominantBaseline="central"
-                      >
-                        {formatDateShort(date)}
-                      </text>
-                    )}
-                  </g>
-                )
-              })}
             </svg>
 
-            {/* ── Hit target rows (HTML, with scroll-snap-align) ────── */}
-            {dates.map((date, i) => (
-              <div
-                key={date}
-                data-date={date}
-                className="absolute"
-                style={{
-                  top: dotY(i) - ROW_HEIGHT / 2,
-                  left: 0,
-                  width: COLLAPSED_WIDTH,
-                  height: ROW_HEIGHT,
-                  scrollSnapAlign: 'center',
-                }}
-              >
-                <button
-                  className="absolute inset-0 cursor-pointer"
-                  style={{ background: 'transparent', border: 'none', padding: 0, zIndex: 2 }}
-                  onClick={() => handleDotClick(date)}
-                  aria-label={`${date === today ? 'Today' : date}${isLogged(getLogForDate(date)) ? ' (logged)' : ''}`}
-                />
-              </div>
-            ))}
+            {/* Hit target rows + selected day labels */}
+            {dates.map((date, i) => {
+              const isSel = date === selectedDate
+              const count = dayCounterMap.get(date)
+              const color = colorForDate(date)
+
+              return (
+                <div
+                  key={date}
+                  data-date={date}
+                  className="absolute"
+                  style={{
+                    top: dotY(i) - ROW_HEIGHT / 2,
+                    left: 0,
+                    width: '100%',
+                    height: ROW_HEIGHT,
+                    scrollSnapAlign: 'center',
+                  }}
+                >
+                  <button
+                    className="absolute cursor-pointer"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      top: 0,
+                      left: 0,
+                      width: COLLAPSED_WIDTH,
+                      height: ROW_HEIGHT,
+                      zIndex: 2,
+                    }}
+                    onClick={() => handleDotClick(date)}
+                    aria-label={`${date === today ? 'Today' : date}${isLogged(getLogForDate(date)) ? ' (logged)' : ''}`}
+                  />
+
+                  {isSel && count != null && (
+                    <div
+                      className="absolute pointer-events-none shelf-content-fade"
+                      style={{
+                        left: LINE_X + 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 9,
+                          color,
+                          opacity: 0.5,
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontFeatureSettings: '"tnum"',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {count}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 7,
+                          color,
+                          opacity: 0.5,
+                          fontFamily: "'JetBrains Mono', monospace",
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {formatDateShort(date)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
 
-      {/* ── Fixed bottom curve ──────────────────────────────────────── */}
+      {/* Bottom curve */}
       <svg
-        className="absolute bottom-0 left-0 pointer-events-none"
+        className="absolute left-0 bottom-0 pointer-events-none"
         width={COLLAPSED_WIDTH}
-        height={PADDING_BOTTOM + CURVE_RADIUS}
+        height={CURVE_AREA}
         style={{ zIndex: 3 }}
       >
         <path
-          d={`M ${LINE_X},0 A ${CURVE_RADIUS},${CURVE_RADIUS} 0 0,0 0,${CURVE_RADIUS}`}
+          d={`M ${LINE_X},0 A ${CURVE_R},${CURVE_R} 0 0,0 0,${CURVE_AREA}`}
           fill="none"
-          stroke={gradientStops[gradientStops.length - 1]?.color ?? currentPhaseColor}
+          stroke={lineColor}
           strokeWidth={2}
           strokeOpacity={0.5}
-          transform={`translate(0, ${PADDING_BOTTOM - CURVE_RADIUS})`}
         />
       </svg>
 
-      {/* ── Slide-out detail shelf content ──────────────────────────── */}
+      {/* Shelf content */}
       {shelfOpen && !noStartDate && (
-        <div
-          className="absolute top-0 h-full overflow-hidden"
-          style={{
-            left: COLLAPSED_WIDTH,
-            width: expandedWidth - COLLAPSED_WIDTH,
-            zIndex: 13,
-            pointerEvents: 'auto',
-          }}
-        >
-          <div
-            className="h-full flex items-center justify-center px-3"
-            style={{ position: 'relative' }}
-          >
-            <ShelfContent
-              key={contentKey}
-              date={selectedDate}
-              log={selectedLog}
-              logged={selectedLogged}
-              isToday={selectedDate === today}
-              color={selectedColor}
-              dayCount={selectedDayCount}
-              onContentClick={handleShelfContentClick}
-            />
-          </div>
-        </div>
+        <ShelfPanel
+          key={contentKey}
+          date={selectedDate}
+          log={selectedLog}
+          logged={selectedLogged}
+          isToday={selectedDate === today}
+          color={selectedColor}
+          dayCount={selectedDayCount}
+          scrollRef={scrollRef}
+          selectedIndex={selectedIndex}
+          onContentClick={handleShelfContentClick}
+          expandedWidth={expandedWidth}
+        />
       )}
     </div>
   )
 }
 
-// ── ShelfContent ──────────────────────────────────────────────────────────
+// ── ShelfPanel ────────────────────────────────────────────────────────────
 
-interface ShelfContentProps {
+interface ShelfPanelProps {
   date: string
   log: DailyLog | undefined
   logged: boolean
   isToday: boolean
   color: string
   dayCount: number | undefined
+  scrollRef: React.RefObject<HTMLDivElement | null>
+  selectedIndex: number
   onContentClick: (date: string) => void
+  expandedWidth: number
 }
 
-function ShelfContent({
+function ShelfPanel({
   date,
   log,
   logged,
   isToday,
   color,
   dayCount,
+  scrollRef,
+  selectedIndex,
   onContentClick,
-}: ShelfContentProps) {
+  expandedWidth,
+}: ShelfPanelProps) {
+  const [shelfTop, setShelfTop] = useState(0)
+
+  useEffect(() => {
+    const scrollEl = scrollRef.current
+    if (!scrollEl || selectedIndex < 0) return
+
+    const updatePos = () => {
+      const dotYInContent = selectedIndex * ROW_HEIGHT + ROW_HEIGHT / 2
+      const scrollTop = scrollEl.scrollTop
+      const dotScreenY = CURVE_AREA + dotYInContent - scrollTop
+
+      const shelfHeight = 160
+      const minTop = CURVE_AREA + 8
+      const maxTop = scrollEl.offsetHeight + CURVE_AREA - shelfHeight - 8
+      const idealTop = dotScreenY - shelfHeight / 2
+      setShelfTop(Math.max(minTop, Math.min(maxTop, idealTop)))
+    }
+
+    updatePos()
+    scrollEl.addEventListener('scroll', updatePos, { passive: true })
+    return () => scrollEl.removeEventListener('scroll', updatePos)
+  }, [scrollRef, selectedIndex])
+
   const dateLabel = isToday
     ? 'Today'
     : isYesterday(date)
@@ -704,45 +695,51 @@ function ShelfContent({
 
   return (
     <div
-      className="shelf-content-fade"
-      style={{ width: '100%', cursor: 'pointer' }}
+      className="absolute shelf-content-fade"
+      style={{
+        left: COLLAPSED_WIDTH,
+        top: shelfTop,
+        width: expandedWidth - COLLAPSED_WIDTH,
+        zIndex: 13,
+        pointerEvents: 'auto',
+        padding: '0 12px',
+      }}
       onClick={() => onContentClick(date)}
     >
-      {/* Date header */}
-      <div style={{ marginBottom: 12 }}>
+      <div
+        style={{
+          fontSize: 12,
+          color,
+          opacity: 0.8,
+          fontWeight: 500,
+          fontFamily: "'JetBrains Mono', monospace",
+        }}
+      >
+        {dateLabel}
+      </div>
+
+      {dayCount != null && (
         <div
           style={{
-            fontSize: 13,
+            fontSize: 9,
             color,
-            fontWeight: 500,
+            opacity: 0.3,
             fontFamily: "'JetBrains Mono', monospace",
+            marginTop: 2,
           }}
         >
-          {dateLabel}
+          Day {dayCount}
         </div>
-        {dayCount != null && (
-          <div
-            style={{
-              fontSize: 10,
-              color: color + '59', // 35% opacity
-              fontFamily: "'JetBrains Mono', monospace",
-              marginTop: 2,
-            }}
-          >
-            Day {dayCount}
-          </div>
-        )}
-      </div>
+      )}
 
       {logged && metrics ? (
         <>
-          {/* 2×2 metric grid */}
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 8,
-              marginBottom: 10,
+              display: 'flex',
+              gap: 6,
+              marginTop: 10,
+              alignItems: 'flex-start',
             }}
           >
             {metrics.map((m) => (
@@ -750,55 +747,49 @@ function ShelfContent({
             ))}
           </div>
 
-          {/* Flare badge */}
           {log!.flare && (
             <div
-              className="flex items-center gap-1"
               style={{
-                background: 'rgba(255,107,74,0.12)',
-                borderRadius: 8,
-                padding: '4px 8px',
-                marginTop: 4,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                marginTop: 8,
               }}
             >
               <span
                 style={{
-                  width: 6,
-                  height: 6,
+                  width: 5,
+                  height: 5,
                   borderRadius: '50%',
                   backgroundColor: '#FF6B4A',
                   display: 'inline-block',
                   flexShrink: 0,
                 }}
               />
-              <span style={{ fontSize: 9, color: '#FF6B4A' }}>
+              <span
+                style={{
+                  fontSize: 8,
+                  color: '#FF6B4A',
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+              >
                 Flare{log!.flareSeverity ? ` ${log!.flareSeverity}` : ''}
               </span>
             </div>
           )}
         </>
       ) : (
-        <>
-          {/* Unlogged state */}
-          <div
-            style={{
-              fontSize: 11,
-              color: 'rgba(255,255,255,0.35)',
-              marginBottom: 12,
-            }}
-          >
-            No log
-          </div>
+        <div style={{ marginTop: 10 }}>
           <button
             className={isToday ? 'ticker-today-pulse' : ''}
             style={{
               border: `1px solid ${color}`,
               background: 'transparent',
               color,
-              fontSize: 10,
+              fontSize: 9,
               fontFamily: "'JetBrains Mono', monospace",
-              borderRadius: 20,
-              padding: '6px 16px',
+              borderRadius: 16,
+              padding: '4px 12px',
               cursor: 'pointer',
             }}
             onClick={(e) => {
@@ -808,7 +799,7 @@ function ShelfContent({
           >
             Tap to log
           </button>
-        </>
+        </div>
       )}
     </div>
   )
