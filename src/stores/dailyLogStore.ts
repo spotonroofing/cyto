@@ -85,11 +85,43 @@ async function seedSampleData(): Promise<void> {
   }
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || ''
+
 export const useDailyLogStore = create<DailyLogState>()((set, get) => ({
   logs: [],
   initialized: false,
 
   initialize: async () => {
+    // Fetch from server API first
+    try {
+      const res = await fetch(`${API_BASE}/api/logs`)
+      if (res.ok) {
+        const json = await res.json()
+        const serverLogs: DailyLog[] = (json.data ?? []).map((row: any) => ({
+          date: row.date.split('T')[0],
+          energy: row.energy ?? 5,
+          fog: row.fog ?? 5,
+          mood: row.mood ?? 5,
+          sleep: 5, // sleep comes from separate health endpoint
+          flare: row.flare ?? false,
+          foods: Array.isArray(row.foods) ? row.foods : JSON.parse(row.foods ?? '[]'),
+          notes: row.notes ?? '',
+          timestamp: new Date(row.created_at).getTime(),
+        }))
+        
+        // Sync to local Dexie for offline support
+        for (const log of serverLogs) {
+          await db.dailyLogs.put(log)
+        }
+        
+        set({ logs: serverLogs, initialized: true })
+        return
+      }
+    } catch (err) {
+      console.warn('Failed to fetch logs from server, falling back to local:', err)
+    }
+
+    // Fallback: load from local Dexie
     let logs = await db.dailyLogs.orderBy('date').reverse().toArray()
     // TODO: Remove sample data seeding before production
     if (logs.length === 0) {
@@ -101,6 +133,27 @@ export const useDailyLogStore = create<DailyLogState>()((set, get) => ({
 
   saveLog: async (log: DailyLog) => {
     const toSave = { ...log, timestamp: Date.now() }
+    
+    // POST to server
+    try {
+      await fetch(`${API_BASE}/api/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: log.date,
+          energy: log.energy,
+          fog: log.fog,
+          mood: log.mood,
+          flare: log.flare ?? false,
+          foods: log.foods ?? [],
+          notes: log.notes ?? '',
+        }),
+      })
+    } catch (err) {
+      console.warn('Failed to POST log to server:', err)
+    }
+
+    // Save to local Dexie
     await db.dailyLogs.put(toSave)
     set((state) => {
       const existing = state.logs.findIndex((l) => l.date === log.date)
