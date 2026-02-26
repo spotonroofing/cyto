@@ -25,6 +25,7 @@ const RING_CIRC = 2 * Math.PI * RING_RADIUS
 const METRIC_COLORS: Record<string, string> = {
   E: '#F5A623',
   M: '#7ED688',
+  B: '#6CB4EE',
   F: '#6CB4EE',
   S: '#B39DDB',
 }
@@ -89,9 +90,10 @@ function formatDateShort(dateStr: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-// CHANGE 2: HSL interpolation for ring color based on value
-function valueToHsl(value: number): string {
-  const clamped = Math.max(1, Math.min(10, value))
+// Day quality bar: average with inverted fog, hue 0 (red) at avg=1 to 130 (green) at avg=10
+function dayQualityColor(energy: number, mood: number, fog: number, sleep: number): string {
+  const avg = (energy + mood + (10 - fog) + sleep) / 4
+  const clamped = Math.max(1, Math.min(10, avg))
   const hue = ((clamped - 1) * 130) / 9
   return `hsl(${hue}, 70%, 55%)`
 }
@@ -113,8 +115,8 @@ function ProgressRing({
   value: number
   logged: boolean
 }) {
-  // CHANGE 2: Use HSL interpolation instead of fixed metric color
-  const color = logged ? valueToHsl(value) : 'rgba(255,255,255,0.08)'
+  // Fixed metric color per ring
+  const color = logged ? (METRIC_COLORS[letter] ?? 'rgba(255,255,255,0.08)') : 'rgba(255,255,255,0.08)'
   const fraction = logged ? Math.min(value / 10, 1) : 0
   const offset = RING_CIRC * (1 - fraction)
 
@@ -147,15 +149,15 @@ function ProgressRing({
           strokeLinecap="round"
         />
       )}
-      {/* CHANGE 1: Center letter */}
+      {/* Center letter */}
       <text
-        x="50%"
-        y="50%"
+        x={RING_SIZE / 2}
+        y={RING_SIZE / 2}
         textAnchor="middle"
         dominantBaseline="central"
-        fill={`rgba(255,255,255,${logged ? 0.5 : 0.15})`}
-        fontSize={8}
-        fontFamily="'JetBrains Mono', monospace"
+        fontSize="9"
+        fontWeight="500"
+        fill={logged ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.18)'}
         style={{ transform: 'rotate(90deg)', transformOrigin: '50% 50%' }}
       >
         {letter}
@@ -392,33 +394,22 @@ export function CellColonyStrip() {
     return darkColorForDate(selectedDate)
   }, [dates, selectedIndex, darkColorForDate])
 
-  // Streak calculation
+  // Streak calculation: consecutive logged days ending yesterday (today excluded)
   const streak = useMemo(() => {
     let count = 0
-    let started = false
-    for (let i = 0; i < dates.length; i++) {
+    // dates[0] is today (most recent first), so start from dates[1] (yesterday)
+    for (let i = 1; i < dates.length; i++) {
       if (isLogged(getLogForDate(dates[i]!))) {
-        started = true
         count++
       } else {
-        if (started) break
+        break
       }
     }
     return count
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dates, logs])
 
-  // CHANGE 8c: Total logged days count
-  const totalLogged = useMemo(() => {
-    let count = 0
-    for (const date of dates) {
-      if (isLogged(getLogForDate(date))) count++
-    }
-    return count
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dates, logs])
-
-  // CHANGE 9: Weekly averages for visible 7 days (already scroll-reactive)
+  // Weekly averages for visible 7 days (already scroll-reactive)
   const weeklyAverages = useMemo(() => {
     const visibleDates = dates.slice(selectedIndex, selectedIndex + VISIBLE_ROWS)
     let eSum = 0, mSum = 0, fSum = 0, sSum = 0, count = 0
@@ -455,8 +446,8 @@ export function CellColonyStrip() {
         top: '50%',
         transform: 'translateY(-50%)',
         width: drawerWidth,
-        height: totalDrawerHeight,
-        transition: `width 280ms ${TRANSITION_EASE}`,
+        height: drawerOpen ? totalDrawerHeight : viewportHeight,
+        transition: `width 280ms ${TRANSITION_EASE}, height 280ms ${TRANSITION_EASE}`,
         zIndex: 10,
         overflow: 'hidden',
       }}
@@ -639,12 +630,10 @@ export function CellColonyStrip() {
                 const color = colorForDate(date)
                 const dayCount = dayCounterMap.get(date)
 
-                // CHANGE 8b: Average health color for logged days
+                // Day quality bar color (inverted fog)
                 const avgColor =
                   logged && log
-                    ? valueToHsl(
-                        (log.energy + log.mood + log.fog + log.sleep) / 4,
-                      )
+                    ? dayQualityColor(log.energy, log.mood, log.fog, log.sleep)
                     : undefined
 
                 return (
@@ -663,7 +652,7 @@ export function CellColonyStrip() {
                       // CHANGE 4: removed borderBottom — 4px visual gap via row spacing
                     }}
                   >
-                    {/* CHANGE 8b: Vertical health bar on far left */}
+                    {/* Day quality vertical bar on far left */}
                     {logged && avgColor && contentVisible && (
                       <div
                         style={{
@@ -671,10 +660,9 @@ export function CellColonyStrip() {
                           left: 0,
                           top: 4,
                           bottom: 4,
-                          width: 2,
+                          width: 3,
                           backgroundColor: avgColor,
-                          borderRadius: 1,
-                          opacity: 0.6,
+                          borderRadius: 2,
                         }}
                       />
                     )}
@@ -710,7 +698,7 @@ export function CellColonyStrip() {
                             <div
                               style={{
                                 fontSize: 11,
-                                fontWeight: 700,
+                                fontWeight: 400,
                                 color,
                                 opacity: 0.8,
                                 fontFamily: "'JetBrains Mono', monospace",
@@ -832,7 +820,7 @@ export function CellColonyStrip() {
                           logged={logged}
                         />
                         <ProgressRing
-                          letter="F"
+                          letter="B"
                           value={log?.fog ?? 0}
                           logged={logged}
                         />
@@ -901,29 +889,17 @@ export function CellColonyStrip() {
             borderTop: '1px solid rgba(255,255,255,0.06)',
           }}
         >
-          {/* Streak */}
+          {/* Streak (only show if >= 2) */}
           <div
             style={{
               fontSize: 10,
               fontFamily: "'JetBrains Mono', monospace",
               color: selectedPhaseColor,
-              opacity: streak >= 2 ? 0.6 : 0.3,
+              opacity: 0.6,
               flexShrink: 0,
             }}
           >
-            {streak >= 2 ? `${streak} day streak` : 'No streak'}
-          </div>
-
-          {/* CHANGE 8c: Logged count */}
-          <div
-            style={{
-              fontSize: 9,
-              fontFamily: "'JetBrains Mono', monospace",
-              color: 'rgba(255,255,255,0.3)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {totalLogged} of {dates.length} logged
+            {streak >= 2 ? `${streak} day streak` : ''}
           </div>
 
           {/* Weekly averages */}

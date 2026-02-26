@@ -20,8 +20,9 @@ export function DailyLogPanel({ onClose }: DailyLogPanelProps) {
   const logDate = useUIStore((s) => s.logDate)
 
   const today = new Date().toISOString().split('T')[0]!
-  const [selectedDate, setSelectedDate] = useState(logDate ?? today)
-  const [log, setLog] = useState<DailyLog>(() => getLogForDate(today) ?? createEmptyLog(today))
+  const initialDate = logDate ?? today
+  const [selectedDate, setSelectedDate] = useState(initialDate)
+  const [log, setLog] = useState<DailyLog>(() => getLogForDate(initialDate) ?? createEmptyLog(initialDate))
 
   // Load log when date changes
   useEffect(() => {
