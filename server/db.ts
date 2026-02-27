@@ -78,6 +78,12 @@ export async function initDb() {
     )
   `
 
+  // Add sleep columns to daily_logs (idempotent)
+  await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS sleep_start TIMESTAMPTZ`
+  await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS sleep_end TIMESTAMPTZ`
+  await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS sleep_duration_hours NUMERIC`
+  await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS sleep_quality_pct NUMERIC`
+
   await sql`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,

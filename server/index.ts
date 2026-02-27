@@ -416,7 +416,7 @@ app.get('/api/health/summary/:date', async (c) => {
 app.post('/api/logs', async (c) => {
   try {
     const body = await c.req.json()
-    const { date, energy, fog, mood, flare, foods, notes } = body
+    const { date, energy, fog, mood, flare, foods, notes, sleep_start, sleep_end, sleep_duration_hours, sleep_quality_pct } = body
 
     if (!date) {
       return c.json({ error: 'date is required (YYYY-MM-DD)' }, 400)
@@ -424,8 +424,18 @@ app.post('/api/logs', async (c) => {
 
     // upsert logic: insert or update on conflict
     await sql`
-      INSERT INTO daily_logs (date, energy, fog, mood, flare, foods, notes, updated_at)
-      VALUES (${date}, ${energy}, ${fog}, ${mood}, ${flare ?? false}, ${JSON.stringify(foods ?? [])}, ${notes ?? ''}, NOW())
+      INSERT INTO daily_logs (
+        date, energy, fog, mood, flare, foods, notes,
+        sleep_start, sleep_end, sleep_duration_hours, sleep_quality_pct,
+        updated_at
+      )
+      VALUES (
+        ${date}, ${energy}, ${fog}, ${mood}, ${flare ?? false},
+        ${JSON.stringify(foods ?? [])}, ${notes ?? ''},
+        ${sleep_start ?? null}, ${sleep_end ?? null},
+        ${sleep_duration_hours ?? null}, ${sleep_quality_pct ?? null},
+        NOW()
+      )
       ON CONFLICT (date) DO UPDATE SET
         energy = EXCLUDED.energy,
         fog = EXCLUDED.fog,
@@ -433,6 +443,10 @@ app.post('/api/logs', async (c) => {
         flare = EXCLUDED.flare,
         foods = EXCLUDED.foods,
         notes = EXCLUDED.notes,
+        sleep_start = EXCLUDED.sleep_start,
+        sleep_end = EXCLUDED.sleep_end,
+        sleep_duration_hours = EXCLUDED.sleep_duration_hours,
+        sleep_quality_pct = EXCLUDED.sleep_quality_pct,
         updated_at = NOW()
     `
 
