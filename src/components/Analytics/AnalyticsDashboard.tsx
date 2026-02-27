@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { TrendChart } from './TrendChart'
 import { WeightChart } from './WeightChart'
+import { SleepChart } from './SleepChart'
 import { FoodToleranceChart } from './FoodToleranceChart'
 import { FlareCalendar } from './FlareCalendar'
 import { MilestoneProgress } from './MilestoneProgress'
@@ -61,6 +62,10 @@ export function AnalyticsDashboard({ onClose }: AnalyticsDashboardProps) {
 
             <div className={`p-5 rounded-[24px] ${isDark ? 'bg-white/5' : 'bg-black/[0.03]'}`}>
               <WeightChart />
+            </div>
+
+            <div className={`p-5 rounded-[24px] ${isDark ? 'bg-white/5' : 'bg-black/[0.03]'}`}>
+              <SleepChart />
             </div>
 
             <div className={`p-5 rounded-[24px] ${isDark ? 'bg-white/5' : 'bg-black/[0.03]'}`}>

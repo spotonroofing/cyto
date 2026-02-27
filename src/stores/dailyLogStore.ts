@@ -102,10 +102,14 @@ export const useDailyLogStore = create<DailyLogState>()((set, get) => ({
           energy: row.energy ?? 5,
           fog: row.fog ?? 5,
           mood: row.mood ?? 5,
-          sleep: 5, // sleep comes from separate health endpoint
+          sleep: 5, // legacy field, kept for old logs
           flare: row.flare ?? false,
           foods: Array.isArray(row.foods) ? row.foods : JSON.parse(row.foods ?? '[]'),
           notes: row.notes ?? '',
+          sleep_start: row.sleep_start ?? undefined,
+          sleep_end: row.sleep_end ?? undefined,
+          sleep_duration_hours: row.sleep_duration_hours ?? undefined,
+          sleep_quality_pct: row.sleep_quality_pct ?? undefined,
           timestamp: new Date(row.created_at).getTime(),
         }))
         

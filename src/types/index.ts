@@ -46,8 +46,13 @@ export interface DailyLog {
   energy: number // 1-10
   fog: number // 1-10
   mood: number // 1-10
-  sleep: number // 1-10
+  sleep: number // 1-10 (legacy, kept for old logs)
   flare: boolean
+  // Sleep data from Apple Health
+  sleep_start?: string // ISO timestamp
+  sleep_end?: string // ISO timestamp
+  sleep_duration_hours?: number
+  sleep_quality_pct?: number
   flareSeverity?: number // 1-5
   flareTrigger?: string
   weight?: number // lbs
