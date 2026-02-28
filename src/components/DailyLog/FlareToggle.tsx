@@ -29,17 +29,13 @@ export function FlareToggle({
             flare
               ? 'bg-red-400/60'
               : isDark
-                ? 'bg-white/5'
-                : 'bg-black/5'
+                ? 'bg-white/10'
+                : 'bg-black/10'
           }`}
         >
           <span
             className={`absolute top-0.5 w-5 h-5 rounded-full transition-transform shadow-sm ${
-              flare
-                ? 'translate-x-6 bg-red-500'
-                : isDark
-                  ? 'translate-x-0.5 bg-white/40'
-                  : 'translate-x-0.5 bg-black/20'
+              flare ? 'translate-x-6 bg-red-400' : 'translate-x-0.5 bg-white'
             }`}
           />
         </button>
