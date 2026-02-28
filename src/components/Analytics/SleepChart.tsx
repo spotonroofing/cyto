@@ -18,21 +18,21 @@ export function SleepChart() {
 
   // Fetch last 30 days of sleep data on mount
   useEffect(() => {
-    const end = new Date().toISOString().split('T')[0]
-    const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const end = new Date().toISOString().split('T')[0]!
+    const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!
     fetchSleepRange(start, end)
   }, [fetchSleepRange])
 
   const data = sleep
     .sort((a, b) => a.sleep_end.localeCompare(b.sleep_end))
     .map((session) => {
-      const date = session.sleep_end.split('T')[0]
+      const date = session.sleep_end.split('T')[0] ?? ''
       const quality = session.total_sleep && session.duration_hours
         ? Math.round((session.total_sleep / session.duration_hours) * 100)
         : 0
       
       return {
-        date: date.slice(5), // MM-DD
+        date: date.length > 5 ? date.slice(5) : date, // MM-DD
         duration: Number(session.duration_hours?.toFixed(1) ?? 0),
         quality,
       }
