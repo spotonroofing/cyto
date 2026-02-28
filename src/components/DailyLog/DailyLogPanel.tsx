@@ -118,12 +118,45 @@ export function DailyLogPanel({ onClose }: DailyLogPanelProps) {
             onChange={(v) => update({ mood: v })}
             color={phaseColor(1)}
           />
-          <LogSlider
-            label="Sleep Quality"
-            value={log.sleep}
-            onChange={(v) => update({ sleep: v })}
-            color={phaseColor(5)}
-          />
+          {/* Sleep data (read-only, from Apple Health) */}
+          <div className="mb-4">
+            <span className="text-sm font-medium block mb-2">Sleep</span>
+            {log.sleep_duration_hours && log.sleep_quality_pct ? (
+              <div
+                className="px-3 py-2 rounded-xl text-sm font-mono"
+                style={{
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                  color: phaseColor(5),
+                }}
+              >
+                🌙 {log.sleep_duration_hours.toFixed(1)}h ({Math.round(log.sleep_quality_pct)}% quality)
+                {log.sleep_start && log.sleep_end && (
+                  <div className="text-xs opacity-50 mt-1">
+                    {new Date(log.sleep_start).toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                      timeZone: 'America/New_York',
+                    })}{' '}
+                    →{' '}
+                    {new Date(log.sleep_end).toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                      timeZone: 'America/New_York',
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div
+                className="px-3 py-2 rounded-xl text-sm opacity-30"
+                style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}
+              >
+                No sleep data
+              </div>
+            )}
+          </div>
 
           <FlareToggle
             flare={log.flare}
