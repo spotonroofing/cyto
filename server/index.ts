@@ -214,17 +214,41 @@ const app = new Hono()
 // CORS for dev (Vite dev server runs on a different port)
 app.use('/api/*', cors())
 
+// --- Auth middleware (runs before all /api/* route handlers) ---
+// Requires x-api-key header matching CYTO_API_KEY env var.
+// All /api/health/* endpoints require API key (import, backfill, health data reads).
+// Write operations (POST/PUT) on /api/state, /api/logs, /api/settings require API key.
+// GET on /api/state, /api/logs, /api/settings remain open for frontend dashboard.
+app.use('/api/*', async (c, next) => {
+  const path = c.req.path
+  const method = c.req.method
+
+  // Health check endpoints: no auth
+  if (path === '/api/health') return next()
+
+  // All /api/health/* endpoints: require key
+  if (path.startsWith('/api/health/')) {
+    const key = c.req.header('x-api-key')
+    if (!process.env.CYTO_API_KEY || key !== process.env.CYTO_API_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+    return next()
+  }
+
+  // Write operations on state/logs/settings: require key
+  if (method !== 'GET' && (path === '/api/state' || path === '/api/logs' || path === '/api/settings')) {
+    const key = c.req.header('x-api-key')
+    if (!process.env.CYTO_API_KEY || key !== process.env.CYTO_API_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+  }
+
+  return next()
+})
+
 // Health check — Railway uses this to confirm the app is alive
 app.get('/health', (c) => {
   return c.json({ status: 'ok' })
-})
-
-// GET /api/state — OpenClaw reads this
-app.get('/api/state', (c) => {
-  if (!currentState) {
-    return c.json({ error: 'No state available yet' }, 404)
-  }
-  return c.json(currentState)
 })
 
 // GET /api/state — Return current roadmap state
@@ -258,15 +282,6 @@ app.post('/api/state', async (c) => {
 // GET /api/health — Kept for backward compat
 app.get('/api/health', (c) => {
   return c.json({ status: 'ok', hasState: currentState !== null })
-})
-
-// --- Auth middleware for new health data endpoints (not GET /api/health) ---
-app.use('/api/health/*', async (c, next) => {
-  const key = c.req.header('x-api-key')
-  if (!process.env.CYTO_API_KEY || key !== process.env.CYTO_API_KEY) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-  await next()
 })
 
 // --- Health data import ---
