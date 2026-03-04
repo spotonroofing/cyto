@@ -6,6 +6,7 @@ interface UIState {
   selectedMilestoneId: string | null
   isChatOpen: boolean
   isLogOpen: boolean
+  isQuickLogOpen: boolean
   isAnalyticsOpen: boolean
   isSettingsOpen: boolean
   logDate: string | null
@@ -15,8 +16,10 @@ interface UIState {
   openChat: (milestoneContext?: string) => void
   closeChat: () => void
   toggleLog: () => void
+  toggleQuickLog: () => void
   openLogForDate: (date: string) => void
   closeLog: () => void
+  closeQuickLog: () => void
   toggleAnalytics: () => void
   closeAnalytics: () => void
   toggleSettings: () => void
@@ -29,6 +32,7 @@ export const useUIStore = create<UIState>()((set) => ({
   selectedMilestoneId: null,
   isChatOpen: false,
   isLogOpen: false,
+  isQuickLogOpen: false,
   isAnalyticsOpen: false,
   isSettingsOpen: false,
   logDate: null,
@@ -47,8 +51,10 @@ export const useUIStore = create<UIState>()((set) => ({
   closeChat: () => set({ isChatOpen: false }),
 
   toggleLog: () => set((s) => ({ isLogOpen: !s.isLogOpen, logDate: null })),
+  toggleQuickLog: () => set((s) => ({ isQuickLogOpen: !s.isQuickLogOpen })),
   openLogForDate: (date: string) => set({ isLogOpen: true, logDate: date }),
   closeLog: () => set({ isLogOpen: false, logDate: null }),
+  closeQuickLog: () => set({ isQuickLogOpen: false }),
 
   toggleAnalytics: () => set((s) => ({ isAnalyticsOpen: !s.isAnalyticsOpen })),
   closeAnalytics: () => set({ isAnalyticsOpen: false }),
@@ -60,6 +66,7 @@ export const useUIStore = create<UIState>()((set) => ({
     set({
       isChatOpen: false,
       isLogOpen: false,
+      isQuickLogOpen: false,
       isAnalyticsOpen: false,
       isSettingsOpen: false,
     }),

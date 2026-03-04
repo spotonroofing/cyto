@@ -16,6 +16,7 @@ import { useTheme } from '@/themes'
 // Lazy-loaded overlays (not needed on initial render)
 const MilestoneDetail = lazy(() => import('@/components/MilestoneDetail/MilestoneDetail').then((m) => ({ default: m.MilestoneDetail })))
 const DailyLogPanel = lazy(() => import('@/components/DailyLog/DailyLogPanel').then((m) => ({ default: m.DailyLogPanel })))
+const QuickLogModal = lazy(() => import('@/components/DailyLog/QuickLogModal').then((m) => ({ default: m.QuickLogModal })))
 const AnalyticsDashboard = lazy(() => import('@/components/Analytics/AnalyticsDashboard').then((m) => ({ default: m.AnalyticsDashboard })))
 const ChatPanel = lazy(() => import('@/components/Chat/ChatPanel').then((m) => ({ default: m.ChatPanel })))
 const SettingsPanel = lazy(() => import('@/components/Settings/SettingsPanel').then((m) => ({ default: m.SettingsPanel })))
@@ -26,11 +27,13 @@ export function App() {
 
   const selectedMilestoneId = useUIStore((s) => s.selectedMilestoneId)
   const isLogOpen = useUIStore((s) => s.isLogOpen)
+  const isQuickLogOpen = useUIStore((s) => s.isQuickLogOpen)
   const isAnalyticsOpen = useUIStore((s) => s.isAnalyticsOpen)
   const isChatOpen = useUIStore((s) => s.isChatOpen)
-  const toggleLog = useUIStore((s) => s.toggleLog) // TODO: Re-enable daily log FAB button
-  void toggleLog
+  const toggleQuickLog = useUIStore((s) => s.toggleQuickLog)
+  const toggleLog = useUIStore((s) => s.toggleLog)
   const closeLog = useUIStore((s) => s.closeLog)
+  const closeQuickLog = useUIStore((s) => s.closeQuickLog)
   const toggleAnalytics = useUIStore((s) => s.toggleAnalytics)
   const closeAnalytics = useUIStore((s) => s.closeAnalytics)
   const openChat = useUIStore((s) => s.openChat)
@@ -71,10 +74,10 @@ export function App() {
   }
 
   // True when we're on the clean map view with nothing open
-  const showMapOnlyButtons = !selectedMilestoneId && !isLogOpen && !isAnalyticsOpen && !isChatOpen && !isSettingsOpen
+  const showMapOnlyButtons = !selectedMilestoneId && !isLogOpen && !isQuickLogOpen && !isAnalyticsOpen && !isChatOpen && !isSettingsOpen
 
   // Any bottom-right panel button should hide when ANY other panel in that stack is open
-  const anyBottomPanelOpen = isLogOpen || isChatOpen
+  const anyBottomPanelOpen = isLogOpen || isQuickLogOpen || isChatOpen
 
   return (
     <ThemeProvider>
@@ -145,9 +148,9 @@ export function App() {
                 )}
               </FloatingButton>
 
-              {/* TODO: Re-enable daily log FAB button */}
-              {/* <FloatingButton
-                onClick={toggleLog}
+              {/* Quick log button */}
+              <FloatingButton
+                onClick={toggleQuickLog}
                 position="inline"
                 phaseColor={phaseColor(3)}
                 className="w-12 h-12 !px-0 flex items-center justify-center"
@@ -155,7 +158,7 @@ export function App() {
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
-              </FloatingButton> */}
+              </FloatingButton>
 
               {/* Chat button */}
               <FloatingButton
@@ -225,7 +228,22 @@ export function App() {
           )}
         </AnimatePresence>
 
-        {/* Daily Log Panel */}
+        {/* Quick Log Modal */}
+        <AnimatePresence>
+          {isQuickLogOpen && (
+            <Suspense fallback={null}>
+              <QuickLogModal
+                onClose={closeQuickLog}
+                onOpenFull={() => {
+                  closeQuickLog()
+                  toggleLog()
+                }}
+              />
+            </Suspense>
+          )}
+        </AnimatePresence>
+
+        {/* Daily Log Panel (full details) */}
         <AnimatePresence>
           {isLogOpen && (
             <Suspense fallback={null}>
