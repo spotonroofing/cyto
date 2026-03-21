@@ -538,6 +538,49 @@ app.put('/api/settings', async (c) => {
   }
 })
 
+
+// --- POST /api/voice-message — receive dictated text from iPhone shortcut ---
+// No auth required (public endpoint, rate limited by obscurity of URL + chat_id check)
+app.post('/api/voice-message', async (c) => {
+  try {
+    const body = await c.req.json()
+    const text = body?.text ?? body?.message ?? null
+
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return c.json({ error: 'text field is required' }, 400)
+    }
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN
+    const chatId = '8495602141'
+
+    if (!botToken) {
+      console.error('TELEGRAM_BOT_TOKEN not set')
+      return c.json({ error: 'Bot token not configured' }, 500)
+    }
+
+    const telegramRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `🎙️ ${text.trim()}`,
+      }),
+    })
+
+    const telegramData = await telegramRes.json() as any
+
+    if (!telegramData.ok) {
+      console.error('Telegram API error:', telegramData)
+      return c.json({ error: 'Failed to send to Telegram', detail: telegramData }, 500)
+    }
+
+    return c.json({ ok: true })
+  } catch (err) {
+    console.error('POST /api/voice-message error:', err)
+    return c.json({ error: 'Internal error', detail: String(err) }, 500)
+  }
+})
+
 // Serve static files from Vite build output
 app.use('/*', serveStatic({ root: './dist' }))
 
