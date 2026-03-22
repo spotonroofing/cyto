@@ -566,7 +566,7 @@ app.post('/api/voice-message', async (c) => {
         updated_at = NOW()
     `
 
-    // Also send a Telegram notification so Willem knows it was received
+    // Send minimal receipt emoji so Willem knows it landed
     const botToken = process.env.TELEGRAM_BOT_TOKEN
     if (botToken) {
       await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -574,7 +574,7 @@ app.post('/api/voice-message', async (c) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: '8495602141',
-          text: `🎙️ got it: "${text.trim()}" — responding soon`,
+          text: `🎙️`,
         }),
       }).catch(() => {})
     }
