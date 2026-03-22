@@ -574,7 +574,7 @@ app.post('/api/voice-message', async (c) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: '8495602141',
-          text: `🎙️`,
+          text: `🎙️: "${text.trim()}"`,
         }),
       }).catch(() => {})
     }
