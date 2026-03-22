@@ -540,7 +540,7 @@ app.put('/api/settings', async (c) => {
 
 
 // --- POST /api/voice-message — receive dictated text from iPhone shortcut ---
-// No auth required (public endpoint, rate limited by obscurity of URL + chat_id check)
+// Stores message in DB queue; heartbeat picks it up and responds via OpenClaw hooks
 app.post('/api/voice-message', async (c) => {
   try {
     const body = await c.req.json()
@@ -550,34 +550,74 @@ app.post('/api/voice-message', async (c) => {
       return c.json({ error: 'text field is required' }, 400)
     }
 
+    // Store in settings table as a pending voice message queue (JSON array)
+    const existing = await sql`SELECT value FROM settings WHERE key = 'voice_message_queue' LIMIT 1`
+    const queue: Array<{text: string, ts: string}> = existing.length > 0
+      ? (typeof existing[0].value === 'string' ? JSON.parse(existing[0].value) : existing[0].value) ?? []
+      : []
+
+    queue.push({ text: text.trim(), ts: new Date().toISOString() })
+
+    await sql`
+      INSERT INTO settings (key, value, updated_at)
+      VALUES ('voice_message_queue', ${JSON.stringify(queue)}, NOW())
+      ON CONFLICT (key) DO UPDATE SET
+        value = EXCLUDED.value,
+        updated_at = NOW()
+    `
+
+    // Also send a Telegram notification so Willem knows it was received
     const botToken = process.env.TELEGRAM_BOT_TOKEN
-    const chatId = '8495602141'
-
-    if (!botToken) {
-      console.error('TELEGRAM_BOT_TOKEN not set')
-      return c.json({ error: 'Bot token not configured' }, 500)
-    }
-
-    const telegramRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: `🎙️ ${text.trim()}`,
-      }),
-    })
-
-    const telegramData = await telegramRes.json() as any
-
-    if (!telegramData.ok) {
-      console.error('Telegram API error:', telegramData)
-      return c.json({ error: 'Failed to send to Telegram', detail: telegramData }, 500)
+    if (botToken) {
+      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: '8495602141',
+          text: `🎙️ got it: "${text.trim()}" — responding soon`,
+        }),
+      }).catch(() => {})
     }
 
     return c.json({ ok: true })
   } catch (err) {
     console.error('POST /api/voice-message error:', err)
     return c.json({ error: 'Internal error', detail: String(err) }, 500)
+  }
+})
+
+// --- GET /api/voice-message/queue — heartbeat reads pending messages ---
+app.get('/api/voice-message/queue', async (c) => {
+  try {
+    const key = c.req.header('x-api-key')
+    if (!process.env.CYTO_API_KEY || key !== process.env.CYTO_API_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+    const rows = await sql`SELECT value FROM settings WHERE key = 'voice_message_queue' LIMIT 1`
+    const queue = rows.length > 0
+      ? (typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value) ?? []
+      : []
+    return c.json({ queue })
+  } catch (err) {
+    return c.json({ error: String(err) }, 500)
+  }
+})
+
+// --- DELETE /api/voice-message/queue — heartbeat clears after processing ---
+app.delete('/api/voice-message/queue', async (c) => {
+  try {
+    const key = c.req.header('x-api-key')
+    if (!process.env.CYTO_API_KEY || key !== process.env.CYTO_API_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+    await sql`
+      INSERT INTO settings (key, value, updated_at)
+      VALUES ('voice_message_queue', '[]', NOW())
+      ON CONFLICT (key) DO UPDATE SET value = '[]', updated_at = NOW()
+    `
+    return c.json({ ok: true })
+  } catch (err) {
+    return c.json({ error: String(err) }, 500)
   }
 })
 
