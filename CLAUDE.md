@@ -16,13 +16,8 @@ Cyto is a personal health recovery tracker with an organic, cellular visual them
 - `src/components/BubbleMap/GooCanvas.tsx` — Canvas layer for goo connections (tapered filled paths)
 - `src/components/BubbleMap/Bubble.tsx` — SVG layer for milestone nuclei + click handlers
 - `src/components/BubbleMap/useBubbleLayout.ts` — Deterministic layout positions
-- `src/components/BubbleMap/BackgroundParticles.tsx` — Canvas ambient particles
-- `src/components/MilestoneDetail/SubDetailView.tsx` — Milestone detail overlay
-- `src/components/MilestoneDetail/MilestoneDetail.tsx` — Detail panel
-- `src/components/UI/FloatingButton.tsx` — Floating action buttons
-- `src/components/Settings/SettingsPanel.tsx` — Settings panel
+- `src/components/MilestoneDetail/` — Detail overlay + panel
 - `src/styles/theme.ts` — Central color definitions
-- `src/styles/globals.css` — CSS keyframes (membrane-breathe)
 - `src/data/dependencies.ts` — Milestone dependency graph
 - `src/stores/roadmapStore.ts` — Zustand store (milestones, phases, user state)
 - `server/index.ts` — Hono server
@@ -38,9 +33,11 @@ Cyto is a personal health recovery tracker with an organic, cellular visual them
 ## Architecture Decisions
 - **Canvas for goo, SVG for UI:** Canvas handles high-particle-count goo rendering + blur filters efficiently. SVG keeps nuclei/text/buttons crisp.
 - **CSS keyframes for ambient animation:** Membrane breathing is pure CSS (GPU accelerated). No JS animation loops for constant effects.
-- **Deterministic layout:** Milestone positions are pre-calculated, not D3 force simulation. Same positions every load.
+- **Deterministic layout:** Milestone positions are pre-calculated, not D3 force simulation. Same positions every load. Current layout: left-to-right winding path with fork/merge.
 - **No scale animations on overlays:** Scale transforms on SubDetailView/MilestoneDetail cause text jitter. Only border-radius and box-shadow animate.
 - **Native touch handlers:** Framer Motion drag conflicted with pan/zoom. Using native addEventListener with passive: false on a plain <g>, not motion.g.
+- **Goo connections:** Canvas with tapered filled paths (the v8 approach).
+- Daily logging is available in-app but primarily done via the Telegram agent.
 
 ## Things NOT To Do
 - Do NOT use generateBlobPath / blobPath.ts — produces hexagonal shapes. Use plain circles.
@@ -50,20 +47,17 @@ Cyto is a personal health recovery tracker with an organic, cellular visual them
 - Do NOT use feTurbulence for cell shapes — kills mobile performance (15fps).
 - Do NOT add Framer Motion scale transforms to overlay containers.
 - Do NOT use D3 force simulation for layout — causes random positions on each load.
-- Do NOT over-engineer. Keep changes minimal and focused.
 
-## Current State
-- Phase 0 (Stabilize & Baseline) is active
-- Goo connections use Canvas with tapered filled paths (v8 approach)
-- Layout is deterministic left-to-right winding path with fork/merge
-- Mobile touch pan/zoom uses native handlers
-- Daily logging available but primarily done via Telegram agent
+## PowerShell Note
+`bundle-for-review.ps1` runs under Windows PowerShell 5.1: no literal `"` inside `-ArgumentList @()`; `ConvertTo-Json` wraps bare arrays in `{value:[...],Count:N}` (serialize per-item and join); non-ASCII chars in a BOM-less `.ps1` silently break parsing (stick to ASCII or add a BOM).
 
 ## Reference Docs
 - `docs/WEB_APP_SCOPE.md` — Full feature inventory with status markers
-- `docs/WEB_APP_APPROACHES_TRIED.md` — CRITICAL: Every technique tried, what failed, and why
+- `docs/APPROACHES_TRIED_ARCHIVE.md` — CRITICAL: Every technique tried, what failed, and why
 - `docs/WEB_APP_ARCHITECTURE.md` — File structure, data flow, technical decisions
 - `docs/WEB_APP_KNOWN_BUGS.md` — Current bug list
 - `docs/WEB_APP_FUTURE_IDEAS.md` — Backlog of v2+ ideas
 - `docs/VISUAL_OVERHAUL_PROMPTS.md` — Pre-written prompt sequence for visual improvements (DO NOT run unless Willem says to)
 - `docs/WILLEM_CONTEXT.md` — Health context (for understanding what the milestones represent)
+- `docs/FEATURE_ARCHITECTURE.md` — Data models, rendering pipeline, UI structure, state management. Read before planning a new feature.
+- `docs/SPEC.md` — the original spec; `docs/CYTO_WEBAPP_PLAN.md` — the web-app plan; `docs/GOO_SDF_DESIGN.md` — the SDF goo design notes (with a working snapshot in `docs/goo-backups/`)
