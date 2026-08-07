@@ -14,7 +14,8 @@
       "Bash(git config:*)",
       "Bash(git push:*)",
       "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"./bundle-for-review.ps1\")",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(ipconfig:*)"
     ]
   }
 }
